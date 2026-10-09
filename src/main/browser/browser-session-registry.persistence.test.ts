@@ -364,6 +364,17 @@ describe('BrowserSessionRegistry persistence', () => {
     })
     expect(permissionCallback).toHaveBeenLastCalledWith(false)
 
+    // Slack's desktop app already notifies, so its web page is muted silently (no denial notice).
+    const slackWc = { id: 402, getURL: vi.fn(() => 'https://app.slack.com/client/T1') }
+    requestHandler(slackWc, 'notifications', permissionCallback)
+    expect(permissionCallback).toHaveBeenLastCalledWith(false)
+    requestHandler(guestWc, 'notifications', permissionCallback, {
+      requestingUrl: 'https://acme.slack.com/'
+    })
+    expect(permissionCallback).toHaveBeenLastCalledWith(false)
+    expect(checkHandler(null, 'notifications', 'https://app.slack.com/')).toBe(false)
+    expect(checkHandler(null, 'notifications', 'https://example.com/')).toBe(true)
+
     // Why: the reported symptom was a user-visible denial notice, so pin the notified list here —
     // storage-access must no longer raise one, while the deliberate top-level denial still does.
     expect(

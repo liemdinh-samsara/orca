@@ -39,8 +39,25 @@ const AUTO_GRANTED_BROWSER_PERMISSIONS = new Set([
 // protocols keep Orca's default denial.
 const AUTHENTICATOR_APP_PROTOCOLS = new Set(['com-okta-authenticator:'])
 
+// Why: these sites' desktop apps already notify, so a granted web copy doubles every alert.
+const NOTIFICATION_MUTED_SITES = ['slack.com']
+
 export function isAutoGrantedBrowserSessionPermission(permission: string): boolean {
   return AUTO_GRANTED_BROWSER_PERMISSIONS.has(permission)
+}
+
+/** True when `url` belongs to a site whose page notifications Orca withholds. */
+export function isMutedSiteNotification(permission: string, url: string | undefined): boolean {
+  if (permission !== 'notifications' || !url) {
+    return false
+  }
+  let hostname: string
+  try {
+    hostname = new URL(url).hostname
+  } catch {
+    return false
+  }
+  return NOTIFICATION_MUTED_SITES.some((site) => hostname === site || hostname.endsWith(`.${site}`))
 }
 
 export function allowsAuthenticatorAppLaunch(

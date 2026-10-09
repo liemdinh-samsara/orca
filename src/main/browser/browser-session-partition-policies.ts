@@ -10,7 +10,8 @@ import {
 import { hasSystemMediaAccess, requestSystemMediaAccess } from './browser-media-access'
 import {
   allowsAuthenticatorAppLaunch,
-  isAutoGrantedBrowserSessionPermission
+  isAutoGrantedBrowserSessionPermission,
+  isMutedSiteNotification
 } from './browser-session-permission-policy'
 import { installBrowserSessionUserAgentPolicy } from './browser-session-ua'
 import { getBrowserProcessUserAgentIdentity } from './browser-process-user-agent'
@@ -162,6 +163,11 @@ export async function installBrowserSessionPartitionPolicies(
         )
         return
       }
+      // Why: a deliberate per-site mute, so no denial notice; the page just sees "denied".
+      if (isMutedSiteNotification(permission, details?.requestingUrl || webContents.getURL())) {
+        callback(false)
+        return
+      }
       const allowed =
         isAutoGrantedBrowserSessionPermission(permission) ||
         allowsAuthenticatorAppLaunch(permission, details)
@@ -175,12 +181,15 @@ export async function installBrowserSessionPartitionPolicies(
       }
       callback(allowed)
     })
-    sess.setPermissionCheckHandler((_webContents, permission, _origin, details) => {
+    sess.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
       if (permission === 'media') {
         return hasSystemMediaAccess(details?.mediaType)
       }
       if (allowsBrowserWebAuthnPermission(permission, details)) {
         return true
+      }
+      if (isMutedSiteNotification(permission, requestingOrigin || details?.requestingUrl)) {
+        return false
       }
       return isAutoGrantedBrowserSessionPermission(permission)
     })

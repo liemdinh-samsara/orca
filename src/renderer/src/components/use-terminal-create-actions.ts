@@ -161,6 +161,7 @@ export function useTerminalCreateActions(controller: TerminalColdActivationContr
     createBrowserTab(activeWorktreeId, defaultUrl, {
       title: translate('auto.components.Terminal.37da0d736f', 'New Browser Tab'),
       focusAddressBar: true,
+      placement: 'side-pane',
       ...(runtimeEnvironmentId ? { browserRuntimeEnvironmentId: null } : {})
     })
   }, [activeWorktreeId, createBrowserTab, openNewBrowserTabInActiveWorkspace])

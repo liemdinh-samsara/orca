@@ -74,7 +74,8 @@ describe('openHttpLink', () => {
 
     expect(setActiveWorktreeMock).toHaveBeenCalledWith('wt-1')
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openUrlMock).not.toHaveBeenCalled()
   })
@@ -97,7 +98,7 @@ describe('openHttpLink', () => {
     expect(createBrowserTabMock).toHaveBeenCalledWith(
       FLOATING_TERMINAL_WORKTREE_ID,
       'https://example.com/',
-      { activate: true }
+      { activate: true, placement: 'side-pane' }
     )
     expect(openUrlMock).not.toHaveBeenCalled()
   })
@@ -121,7 +122,8 @@ describe('openHttpLink', () => {
     })
 
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openUrlMock).not.toHaveBeenCalled()
   })
@@ -149,7 +151,8 @@ describe('openHttpLink', () => {
     })
 
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openRuntimeBrowserTabMock).not.toHaveBeenCalled()
   })
@@ -193,7 +196,8 @@ describe('openHttpLink', () => {
     })
 
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openUrlMock).not.toHaveBeenCalled()
   })
@@ -637,7 +641,8 @@ describe('openHttpLink modifier routing', () => {
 
     expect(setActiveWorktreeMock).toHaveBeenCalledWith('wt-1')
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openUrlMock).not.toHaveBeenCalled()
   })

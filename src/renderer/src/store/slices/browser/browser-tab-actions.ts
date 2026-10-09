@@ -24,6 +24,7 @@ import {
   loadPairedBrowserTabCreator
 } from './paired-browser-tab-creator'
 import { findGroupAndWorktree } from '../tab-group-state'
+import { placeInBrowserSidePane } from './browser-side-pane-placement'
 
 export function createBrowserTabActions(
   set: BrowserSliceSet,
@@ -161,7 +162,10 @@ export function createBrowserTabActions(
         const created = state.createUnifiedTab(worktreeId, 'browser', {
           entityId: workspaceId,
           label: browserTab.title,
-          targetGroupId: options?.targetGroupId,
+          targetGroupId:
+            options?.placement === 'side-pane'
+              ? placeInBrowserSidePane(get, worktreeId, options.targetGroupId)
+              : options?.targetGroupId,
           ...(options?.afterTabId ? { afterTabId: options.afterTabId } : {}),
           // Why no routing-host default: a substituted host would disown the wrapper from its worktree.
           ...(options?.executionHostId ? { executionHostId: options.executionHostId } : {}),
@@ -226,7 +230,8 @@ export function createBrowserTabActions(
         title: translate('auto.store.slices.browser.d175274b6d', 'New Browser Tab'),
         focusAddressBar: true,
         ...(runtimeEnvironmentId ? { browserRuntimeEnvironmentId: null } : {}),
-        targetGroupId: groupId
+        targetGroupId: groupId,
+        placement: 'side-pane'
       })
       get().recordFeatureInteraction('browser-tab-created')
     },

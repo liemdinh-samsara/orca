@@ -42,7 +42,8 @@ describe('modifier routing across link source owners', () => {
     })
 
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
   })
 

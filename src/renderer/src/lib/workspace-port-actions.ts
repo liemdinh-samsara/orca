@@ -169,7 +169,7 @@ export async function openWorkspacePortInBrowser(args: {
     }
   }
   try {
-    args.createBrowserTab(worktreeId, url, { activate: true })
+    args.createBrowserTab(worktreeId, url, { activate: true, placement: 'side-pane' })
     return { ok: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

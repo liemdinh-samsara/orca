@@ -39,6 +39,8 @@ export type CreateBrowserTabOptions = {
   sessionPartition?: string | null
   // Place the new tab in a specific group (e.g. "Open Preview to the Side"); defaults to the worktree's active group.
   targetGroupId?: string
+  /** 'side-pane' opens user-requested tabs in the pane right of the target, splitting one off if needed. */
+  placement?: 'side-pane'
   /** Client-local unified tab id of the source; the new tab lands right after it when still live. */
   afterTabId?: string
   /** Verified execution host for the new wrapper; unset keeps createUnifiedTab's active-workspace fallback. */

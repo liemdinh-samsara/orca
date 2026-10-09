@@ -38,7 +38,11 @@ type StoreAccessor = () => {
     >
   > | null
   setActiveWorktree: (worktreeId: string) => void
-  createBrowserTab: (worktreeId: string, url: string, opts: { activate: boolean }) => unknown
+  createBrowserTab: (
+    worktreeId: string,
+    url: string,
+    opts: { activate: boolean; placement?: 'side-pane' }
+  ) => unknown
   repos?: readonly LocalhostLinkRepo[]
   projects?: readonly LocalhostLinkProject[]
   worktreesByRepo?: Record<string, LocalhostLinkWorktree[]>
@@ -184,11 +188,11 @@ export function openHttpLink(url: string, opts: OpenHttpLinkOptions = {}): void 
     }
     const localhostRoute = localhostLabelRouteForHttpLink(url, state, sourceOwner)
     if (!localhostRoute) {
-      state.createBrowserTab(worktreeId, url, { activate: true })
+      state.createBrowserTab(worktreeId, url, { activate: true, placement: 'side-pane' })
       return
     }
     void openLabeledLocalhostLink(url, localhostRoute, (labeledUrl) => {
-      state.createBrowserTab(worktreeId, labeledUrl, { activate: true })
+      state.createBrowserTab(worktreeId, labeledUrl, { activate: true, placement: 'side-pane' })
     })
     return
   }

@@ -141,10 +141,8 @@ export function getHostScopedWorktreeLineageInputs(
 ): { worktreeMap: Map<string, Worktree>; lineageById: Record<string, WorktreeLineage> } {
   const worktreeMap = new Map<string, Worktree>()
   const hostLineageById: Record<string, WorktreeLineage> = {}
-  for (const worktree of worktrees) {
-    if (executionHostId && worktree.hostId && worktree.hostId !== executionHostId) {
-      continue
-    }
+  const otherHostRows: Worktree[] = []
+  const add = (worktree: Worktree): void => {
     worktreeMap.set(worktree.id, worktree)
     const projected = lineageById[worktree.id]
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolved rows may carry an inline lineage the Worktree type omits; it is only read, never trusted over a matching projection.
@@ -152,6 +150,19 @@ export function getHostScopedWorktreeLineageInputs(
     const lineage = projected?.worktreeInstanceId === worktree.instanceId ? projected : inline
     if (lineage) {
       hostLineageById[worktree.id] = lineage
+    }
+  }
+  for (const worktree of worktrees) {
+    if (executionHostId && worktree.hostId && worktree.hostId !== executionHostId) {
+      otherHostRows.push(worktree)
+    } else {
+      add(worktree)
+    }
+  }
+  // Why: same-project lineage can cross hosts; other hosts fill only ids this host lacks.
+  for (const worktree of otherHostRows) {
+    if (!worktreeMap.has(worktree.id)) {
+      add(worktree)
     }
   }
   return { worktreeMap, lineageById: hostLineageById }
@@ -178,9 +189,31 @@ export function getWorktreeLineageAncestors(
   return ancestors
 }
 
+// Why: a row with no host id (older metadata) still nests only under a parent with none either.
+function isOnOtherKnownHost(row: Worktree, worktree: Worktree): boolean {
+  return row.hostId !== undefined && worktree.hostId !== undefined && row.hostId !== worktree.hostId
+}
+
+const rowsByIdCache = new WeakMap<ReadonlyMap<string, Worktree>, Map<string, Worktree[]>>()
+
+function getRowsById(rowsByHostIdentity: ReadonlyMap<string, Worktree>): Map<string, Worktree[]> {
+  let rowsById = rowsByIdCache.get(rowsByHostIdentity)
+  if (!rowsById) {
+    rowsById = new Map()
+    for (const row of rowsByHostIdentity.values()) {
+      const rows = rowsById.get(row.id) ?? []
+      rows.push(row)
+      rowsById.set(row.id, rows)
+    }
+    rowsByIdCache.set(rowsByHostIdentity, rowsById)
+  }
+  return rowsById
+}
+
 /**
  * The row a worktree nests under in the sidebar: its lineage parent on the worktree's own host,
- * where a row with no host id (older metadata) nests only under a parent with none either.
+ * where a row with no host id (older metadata) nests only under a parent with none either. A
+ * same-project parent on another known host counts when its instance matches the recorded one.
  */
 export function getSidebarLineageParent(
   worktree: Worktree,
@@ -194,12 +227,15 @@ export function getSidebarLineageParent(
   if (!lineage) {
     return undefined
   }
-  const parent = rowsByHostIdentity.get(
+  const sameHostParent = rowsByHostIdentity.get(
     composeWorktreeHostIdentity(worktree.hostId, lineage.parentWorktreeId)
   )
-  return parent && isValidResolvedWorktreeLineageEdge(worktree, parent, lineage)
-    ? parent
-    : undefined
+  const candidates = sameHostParent
+    ? [sameHostParent]
+    : (getRowsById(rowsByHostIdentity).get(lineage.parentWorktreeId) ?? []).filter((row) =>
+        isOnOtherKnownHost(row, worktree)
+      )
+  return candidates.find((parent) => isValidResolvedWorktreeLineageEdge(worktree, parent, lineage))
 }
 
 /** The rows a worktree nests under in the sidebar, nearest first; a lineage cycle nests nothing. */

@@ -57,10 +57,19 @@ describe('sharesWorktreeLineageBoundary', () => {
     expect(sharesWorktreeLineageBoundary(boundary(), boundary())).toBe(true)
   })
 
-  it('rejects a differing repo even when host and project agree', () => {
-    expect(sharesWorktreeLineageBoundary(boundary(), boundary({ repoId: 'other-repo' }))).toBe(
-      false
-    )
+  it.each([
+    ['repo', boundary({ repoId: 'other-repo' })],
+    ['host', boundary({ hostId: 'ssh:remote' })],
+    ['repo and host', boundary({ repoId: 'devbox-repo', hostId: 'ssh:remote' })]
+  ])('accepts a differing %s when the project agrees', (_label, parent) => {
+    expect(sharesWorktreeLineageBoundary(boundary(), parent)).toBe(true)
+  })
+
+  it.each([
+    ['repo', boundary({ projectId: undefined, repoId: 'other-repo' })],
+    ['host', boundary({ projectId: undefined, hostId: 'ssh:remote' })]
+  ])('rejects a differing %s without a project on both sides', (_label, parent) => {
+    expect(sharesWorktreeLineageBoundary(boundary(), parent)).toBe(false)
   })
 
   it.each([
@@ -73,10 +82,16 @@ describe('sharesWorktreeLineageBoundary', () => {
   })
 
   it.each([
-    ['host', boundary({ hostId: 'ssh:remote' })],
-    ['project', boundary({ projectId: 'github:other/project' })]
-  ])('rejects a defined %s mismatch', (_label, parent) => {
-    expect(sharesWorktreeLineageBoundary(boundary(), parent)).toBe(false)
+    ['child', boundary({ hostId: 'runtime:env-a' }), boundary()],
+    ['parent', boundary(), boundary({ hostId: 'runtime:env-a' })]
+  ])('rejects a cross-host edge when the %s is on a paired runtime', (_label, child, parent) => {
+    expect(sharesWorktreeLineageBoundary(child, parent)).toBe(false)
+  })
+
+  it('rejects a defined project mismatch even on the same repo and host', () => {
+    expect(
+      sharesWorktreeLineageBoundary(boundary(), boundary({ projectId: 'github:other/project' }))
+    ).toBe(false)
   })
 })
 

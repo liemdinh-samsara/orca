@@ -243,6 +243,10 @@ function ParentWorktreeCandidateList({
         (candidate) =>
           candidate.repoId === repoId &&
           !candidate.isArchived &&
+          // Why: a new workspace nests on its own host; cross-host nesting is a manual move.
+          (childBoundary.hostId === undefined ||
+            candidate.hostId === undefined ||
+            candidate.hostId === childBoundary.hostId) &&
           sharesWorktreeLineageBoundary(childBoundary, candidate) &&
           !cyclicLineageIds.has(candidate.id) &&
           (folderSubtreeIds === null || folderSubtreeIds.has(candidate.id))

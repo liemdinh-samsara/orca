@@ -1,3 +1,4 @@
+import { parseExecutionHostId, type ExecutionHostId } from './execution-host'
 import type { WorktreeLineage } from './worktree/lineage-types'
 import type { Worktree } from './worktree/types'
 
@@ -15,13 +16,22 @@ export function sharesWorktreeLineageBoundary(
   child: WorktreeLineageBoundary,
   parent: WorktreeLineageBoundary
 ): boolean {
-  return (
-    child.repoId === parent.repoId &&
-    (child.hostId === undefined || parent.hostId === undefined || child.hostId === parent.hostId) &&
-    (child.projectId === undefined ||
-      parent.projectId === undefined ||
-      child.projectId === parent.projectId)
-  )
+  const sameOrUnknownHost =
+    child.hostId === undefined || parent.hostId === undefined || child.hostId === parent.hostId
+  // Why: one project can be set up on several hosts this desktop drives (a Mac checkout and an
+  // SSH devbox), and its workspaces nest across those setups. A paired runtime owns its own
+  // lineage, so it never nests across hosts. Without a project on both sides, keep repo+host.
+  if (child.projectId !== undefined && parent.projectId !== undefined) {
+    return (
+      child.projectId === parent.projectId &&
+      (sameOrUnknownHost || (!isRuntimeHost(child.hostId) && !isRuntimeHost(parent.hostId)))
+    )
+  }
+  return child.repoId === parent.repoId && sameOrUnknownHost
+}
+
+function isRuntimeHost(hostId: ExecutionHostId | undefined): boolean {
+  return parseExecutionHostId(hostId)?.kind === 'runtime'
 }
 
 export function sharesResolvedWorktreeLineageBoundary(child: Worktree, parent: Worktree): boolean {

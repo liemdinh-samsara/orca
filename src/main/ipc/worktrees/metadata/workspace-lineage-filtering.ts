@@ -143,19 +143,10 @@ export function filterLineageForHost(
     if (parent.status === 'ambiguous' || parent.status === 'contradictory') {
       return null
     }
-    if (
-      child.status === 'owned' &&
-      parent.status === 'owned' &&
-      child.hostId === executionHostId &&
-      parent.hostId === executionHostId
-    ) {
+    // Why: a record is keyed by its child, so a project edge to another host's parent belongs to
+    // the child's host snapshot; the renderer merges snapshots by child host.
+    if (child.status === 'owned' && parent.status === 'owned' && child.hostId === executionHostId) {
       worktreeLineageById[worktreeId] = structuredClone(lineage)
-    } else if (
-      child.status === 'owned' &&
-      parent.status === 'owned' &&
-      child.hostId !== parent.hostId
-    ) {
-      return null
     }
   }
   for (const [childKey, lineage] of Object.entries(store.getAllWorkspaceLineage())) {
@@ -167,19 +158,8 @@ export function filterLineageForHost(
     if (parent.status === 'ambiguous' || parent.status === 'contradictory') {
       return null
     }
-    if (
-      child.status === 'owned' &&
-      parent.status === 'owned' &&
-      child.hostId === executionHostId &&
-      parent.hostId === executionHostId
-    ) {
+    if (child.status === 'owned' && parent.status === 'owned' && child.hostId === executionHostId) {
       workspaceLineageByChildKey[childKey] = structuredClone(lineage)
-    } else if (
-      child.status === 'owned' &&
-      parent.status === 'owned' &&
-      child.hostId !== parent.hostId
-    ) {
-      return null
     }
   }
   return { worktreeLineageById, workspaceLineageByChildKey }

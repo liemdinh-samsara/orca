@@ -90,7 +90,7 @@ export class RuntimeWorktreeLineageController {
     if (!sharesResolvedWorktreeLineageBoundary(child, parent)) {
       throw new RuntimeLineageError(
         'LINEAGE_PARENT_CONTEXT_CONFLICT',
-        'Parent worktree must belong to the same repository, execution host, and project.'
+        'Parent worktree must belong to the same project, or the same repository and execution host.'
       )
     }
     const instanceById = new Map(

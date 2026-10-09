@@ -64,6 +64,36 @@ describe('getWorkspaceDeleteLineage', () => {
     ])
   })
 
+  it('leaves a same-project child on another host out of delete-all', () => {
+    const parent: Worktree = {
+      ...makeWorktree('parent', '/workspaces/parent'),
+      hostId: LOCAL_EXECUTION_HOST_ID,
+      projectId: 'github:acme/mono'
+    }
+    const localChild: Worktree = {
+      ...makeWorktree('local-child', '/workspaces/local-child'),
+      hostId: LOCAL_EXECUTION_HOST_ID,
+      projectId: 'github:acme/mono'
+    }
+    const sshChild: Worktree = {
+      ...makeWorktree('devbox::/home/swissport', '/home/swissport'),
+      repoId: 'devbox',
+      hostId: SSH_HOST,
+      projectId: 'github:acme/mono'
+    }
+
+    const lineage = getWorkspaceDeleteLineage(parent, [parent, localChild, sshChild], {
+      [localChild.id]: makeLineage(localChild, parent),
+      [sshChild.id]: makeLineage(sshChild, parent)
+    })
+
+    expect(lineage.descendants.map((worktree) => worktree.id)).toEqual(['local-child'])
+    expect(lineage.deleteAllTargets.map((worktree) => worktree.id)).toEqual([
+      'local-child',
+      'parent'
+    ])
+  })
+
   it('ignores stale instance links', () => {
     const parent = makeWorktree('parent', '/workspaces/parent')
     const child = makeWorktree('child', '/workspaces/child')

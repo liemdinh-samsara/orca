@@ -126,31 +126,34 @@ describe('recordWorkspaceLineageForCreatedWorktree', () => {
     })
   })
 
-  it('skips both lineage records when the parent belongs to a different repo', () => {
-    const foreignParentId = 'repo-2::/repos/parent'
-    const store = createStore({ metaById: { [foreignParentId]: parentMeta() } })
+  it.each([
+    ['another repo', 'repo-2::/repos/parent', parentMeta()],
+    ['another host', PARENT_ID, parentMeta({ hostId: 'ssh:other-host' })]
+  ])('records lineage for a same-project parent in %s', (_label, parentId, meta) => {
+    const store = createStore({ metaById: { [parentId]: meta } })
 
-    const result = record(store, { parentWorkspace: worktreeWorkspaceKey(foreignParentId) })
+    const result = record(store, { parentWorkspace: worktreeWorkspaceKey(parentId) })
 
-    expect(store.setWorktreeLineage).not.toHaveBeenCalled()
-    expect(result.lineage).toBeNull()
-    expect(store.setWorkspaceLineage).not.toHaveBeenCalled()
-    expect(result.workspaceLineage).toBeNull()
+    expect(result.lineage).toMatchObject({ worktreeId: CHILD_ID, parentWorktreeId: parentId })
+    expect(result.workspaceLineage).toMatchObject({
+      parentWorkspaceKey: worktreeWorkspaceKey(parentId)
+    })
   })
 
   it.each([
-    ['host', parentMeta({ hostId: 'ssh:other-host' })],
-    ['project', parentMeta({ projectId: 'project-2' })]
+    ['another repo', 'repo-2::/repos/parent'],
+    ['the same repo', PARENT_ID]
   ])(
-    'skips both lineage records when the parent %s conflicts, so no cross-host row is persisted',
-    (_label, meta) => {
-      const store = createStore({ metaById: { [PARENT_ID]: meta } })
+    'skips both lineage records when a parent in %s belongs to another project',
+    (_label, parentId) => {
+      const store = createStore({
+        metaById: { [parentId]: parentMeta({ projectId: 'project-2' }) }
+      })
 
-      const result = record(store, { parentWorkspace: worktreeWorkspaceKey(PARENT_ID) })
+      const result = record(store, { parentWorkspace: worktreeWorkspaceKey(parentId) })
 
       expect(store.setWorktreeLineage).not.toHaveBeenCalled()
       expect(result.lineage).toBeNull()
-      // A persisted cross-host row makes filterLineageForHost return null for the entire host.
       expect(store.setWorkspaceLineage).not.toHaveBeenCalled()
       expect(result.workspaceLineage).toBeNull()
     }

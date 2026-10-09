@@ -1,4 +1,5 @@
-import { getWorktreeExecutionHostId } from '../../../../shared/execution-host'
+import { getWorktreeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import { sharesWorktreeLineageBoundary } from '../../../../shared/resolved-worktree-lineage'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
@@ -17,7 +18,7 @@ type ParentCandidateArgs = {
 function getWorktreeOwnerHostId(
   worktree: Worktree,
   repoMap: Map<string, Pick<Repo, 'connectionId' | 'executionHostId'>>
-): string | null {
+): ExecutionHostId | null {
   const repo = repoMap.get(worktree.repoId)
   return repo ? getWorktreeExecutionHostId(worktree, repo) : (worktree.hostId ?? null)
 }
@@ -56,15 +57,17 @@ export function isEligibleWorktreeParent({
   childHostId = getWorktreeOwnerHostId(child, repoMap)
 }: Omit<ParentCandidateArgs, 'worktrees'> & {
   candidateParent: Worktree
-  childHostId?: string | null
+  childHostId?: ExecutionHostId | null
 }): boolean {
+  const parentHostId = getWorktreeOwnerHostId(candidateParent, repoMap)
   return (
-    candidateParent.repoId === child.repoId &&
     childHostId !== null &&
-    getWorktreeOwnerHostId(candidateParent, repoMap) === childHostId &&
-    (child.projectId === undefined ||
-      candidateParent.projectId === undefined ||
-      child.projectId === candidateParent.projectId) &&
+    parentHostId !== null &&
+    // Why: the same rule the backend enforces, so a same-project parent on another host is offered.
+    sharesWorktreeLineageBoundary(
+      { repoId: child.repoId, hostId: childHostId, projectId: child.projectId },
+      { repoId: candidateParent.repoId, hostId: parentHostId, projectId: candidateParent.projectId }
+    ) &&
     !candidateParent.isArchived &&
     canAssignWorktreeParent({
       child,

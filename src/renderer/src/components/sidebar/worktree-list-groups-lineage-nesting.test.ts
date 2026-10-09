@@ -150,6 +150,58 @@ describe('buildRows workspace lineage nesting', () => {
     ])
   })
 
+  it('nests a same-project SSH child under its local parent', () => {
+    const localParent: Worktree = { ...parent, hostId: 'local', projectId: 'github:acme/mono' }
+    const sshLineage = { ...lineage, worktreeId: 'devbox::/home/swissport' }
+    const sshChild: Worktree = {
+      ...child,
+      id: 'devbox::/home/swissport',
+      repoId: 'devbox',
+      hostId: 'ssh:devbox1',
+      projectId: 'github:acme/mono'
+    }
+    const otherProjectChild: Worktree = {
+      ...sshChild,
+      id: 'devbox::/home/other',
+      instanceId: 'other-instance',
+      projectId: 'github:acme/other'
+    }
+    const rows = buildRows(
+      'none',
+      [sshChild, otherProjectChild, localParent],
+      repoMap,
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      {
+        [sshChild.id]: sshLineage,
+        [otherProjectChild.id]: {
+          ...sshLineage,
+          worktreeId: otherProjectChild.id,
+          worktreeInstanceId: 'other-instance'
+        }
+      },
+      new Map([
+        [localParent.id, localParent],
+        [sshChild.id, sshChild],
+        [otherProjectChild.id, otherProjectChild]
+      ]),
+      true
+    )
+
+    expect(
+      rows
+        .filter((row) => row.type === 'item')
+        .map((row) => [row.worktree.hostId, row.worktree.id, row.depth])
+    ).toEqual([
+      ['ssh:devbox1', otherProjectChild.id, 0],
+      ['local', parent.id, 0],
+      ['ssh:devbox1', sshChild.id, 1]
+    ])
+  })
+
   it('nests stable-update resolved legacy lineage when generalized lineage is absent', () => {
     const parentId =
       '32a0226d-9f33-42e8-8b7b-24867dea06d4::/Users/jinwoo/orca/workspaces/orca/assigned-issues'
@@ -317,44 +369,47 @@ describe('buildRows workspace lineage nesting', () => {
     expect(rows.find((row) => row.type === 'item')).toMatchObject({ depth: 0 })
   })
 
+  // Why: repo and host only bound lineage when a side has no project; a shared project spans both.
   it.each([
-    ['repo', { repoId: 'other-repo' }],
-    ['host', { hostId: 'ssh:other-host' as const }],
-    ['project', { projectId: 'github:other/project' }]
-  ])('does not nest resolved lineage across a known %s boundary', (_label, boundary) => {
-    const boundedParent = {
-      ...parent,
-      repoId: 'repo-1',
-      hostId: 'local' as const,
-      projectId: 'github:stablyai/orca',
-      ...boundary
-    }
-    const boundedChild: ResolvedLineageWorktree = {
-      ...child,
-      repoId: 'repo-1',
-      hostId: 'local' as const,
-      projectId: 'github:stablyai/orca',
-      lineage
-    }
-    const rows = buildRows(
-      'none',
-      [boundedChild, boundedParent],
-      repoMap,
-      null,
-      new Set(),
-      undefined,
-      undefined,
-      undefined,
-      {},
-      new Map<string, Worktree>([
-        [boundedParent.id, boundedParent],
-        [boundedChild.id, boundedChild]
-      ]),
-      true
-    )
+    ['repo', { repoId: 'other-repo', projectId: undefined }, undefined],
+    ['host', { hostId: 'ssh:other-host' as const, projectId: undefined }, undefined],
+    ['project', { projectId: 'github:other/project' }, 'github:stablyai/orca']
+  ])(
+    'does not nest resolved lineage across a known %s boundary',
+    (_label, boundary, childProject) => {
+      const boundedParent = {
+        ...parent,
+        repoId: 'repo-1',
+        hostId: 'local' as const,
+        ...boundary
+      }
+      const boundedChild: ResolvedLineageWorktree = {
+        ...child,
+        repoId: 'repo-1',
+        hostId: 'local' as const,
+        projectId: childProject,
+        lineage
+      }
+      const rows = buildRows(
+        'none',
+        [boundedChild, boundedParent],
+        repoMap,
+        null,
+        new Set(),
+        undefined,
+        undefined,
+        undefined,
+        {},
+        new Map<string, Worktree>([
+          [boundedParent.id, boundedParent],
+          [boundedChild.id, boundedChild]
+        ]),
+        true
+      )
 
-    expect(rows.filter((row) => row.type === 'item').map((row) => row.depth)).toEqual([0, 0])
-  })
+      expect(rows.filter((row) => row.type === 'item').map((row) => row.depth)).toEqual([0, 0])
+    }
+  )
 
   it('keeps the hydrated lineage side-map authoritative when inline metadata disagrees', () => {
     const otherParent = {

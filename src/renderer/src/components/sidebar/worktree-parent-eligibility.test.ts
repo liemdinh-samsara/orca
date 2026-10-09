@@ -239,6 +239,28 @@ describe('canAssignWorktreeParent', () => {
     ).toBe(false)
   })
 
+  it('offers a same-project parent from another repo on another host', () => {
+    const child = { ...makeWorktree('devbox::/home/swissport', 'devbox'), projectId: 'project-a' }
+    const macParent = { ...makeWorktree('mac::/Users/peek', 'mac'), projectId: 'project-a' }
+    const otherProject = { ...makeWorktree('mac::/Users/other', 'mac'), projectId: 'project-b' }
+    const noProject = makeWorktree('mac::/Users/legacy', 'mac')
+    const worktrees = [child, macParent, otherProject, noProject]
+    const args = {
+      child,
+      worktrees,
+      lineageById: {},
+      worktreeMap: makeMap(worktrees),
+      repoMap: makeRepoMap([
+        { id: 'devbox', connectionId: 'devbox1', executionHostId: 'ssh:devbox1' },
+        { id: 'mac', connectionId: null, executionHostId: 'local' }
+      ])
+    }
+
+    expect(getEligibleWorktreeParents(args).map((worktree) => worktree.id)).toEqual([macParent.id])
+    expect(isEligibleWorktreeParent({ ...args, candidateParent: macParent })).toBe(true)
+    expect(isEligibleWorktreeParent({ ...args, candidateParent: otherProject })).toBe(false)
+  })
+
   it('excludes archived worktrees from picker candidates', () => {
     const child = makeWorktree('child')
     const archived = makeWorktree('archived')

@@ -316,6 +316,51 @@ describe('registerWorktreeHandlers', () => {
     expect(store.removeWorktreeLineage).not.toHaveBeenCalled()
   })
 
+  it('lists a cross-host project edge with its child host and keeps both hosts authoritative', async () => {
+    const devboxChild = 'devbox::/home/ubuntu/mono'
+    const macParent = 'mac::/Users/me/mono::workspace:peek'
+    const lineage = {
+      [devboxChild]: {
+        worktreeId: devboxChild,
+        worktreeInstanceId: 'devbox-child',
+        parentWorktreeId: macParent,
+        parentWorktreeInstanceId: 'mac-parent',
+        origin: 'manual',
+        capture: { source: 'manual-action', confidence: 'explicit' },
+        createdAt: 1
+      }
+    }
+    store.getRepos.mockReturnValue([
+      { id: 'mac', path: '/Users/me/mono', displayName: 'mac', badgeColor: '#000', addedAt: 0 },
+      {
+        id: 'devbox',
+        path: '/home/ubuntu/mono',
+        displayName: 'devbox',
+        badgeColor: '#000',
+        addedAt: 0,
+        connectionId: 'target-a'
+      }
+    ])
+    store.getWorktreeMeta.mockImplementation((id: string) => ({
+      hostId: id.startsWith('devbox::') ? 'ssh:target-a' : 'local'
+    }))
+    store.getAllWorktreeLineage.mockReturnValue(lineage)
+    const provider = { listWorktrees: vi.fn() }
+    getSshGitProviderMock.mockImplementation((targetId: string) =>
+      targetId === 'target-a' ? provider : undefined
+    )
+
+    await expect(
+      handlers['worktrees:listLineageForHost'](ipcEvent, {
+        executionHostId: toSshExecutionHostId('target-a'),
+        expectedAuthority: getSshProviderAuthority('target-a')
+      })
+    ).resolves.toMatchObject({ authoritative: true, worktreeLineageById: lineage })
+    await expect(
+      handlers['worktrees:listLineageForHost'](ipcEvent, { executionHostId: 'local' })
+    ).resolves.toMatchObject({ authoritative: true, worktreeLineageById: {} })
+  })
+
   it('rejects runtime lineage reads and stale SSH authority after hydration', async () => {
     await expect(
       handlers['worktrees:listLineageForHost'](ipcEvent, {

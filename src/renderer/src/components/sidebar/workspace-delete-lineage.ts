@@ -2,6 +2,14 @@ import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { getProjectedWorktreeLineageChildrenByParentId } from './worktree-lineage-projection'
 
+function isOnOtherHost(worktree: Worktree, parent: Worktree): boolean {
+  return (
+    worktree.hostId !== undefined &&
+    parent.hostId !== undefined &&
+    worktree.hostId !== parent.hostId
+  )
+}
+
 type WorkspaceDeleteLineage = {
   descendants: Worktree[]
   deleteAllTargets: Worktree[]
@@ -50,7 +58,9 @@ export function getWorkspaceDeleteLineage(
     visiting.add(worktreeId)
     const children = childrenByParentId.get(worktreeId) ?? []
     for (const child of children) {
-      if (emitted.has(child.id)) {
+      // Why: a same-project child on another host is only filed here; deleting this workspace
+      // un-nests it instead of removing a checkout on that other machine.
+      if (emitted.has(child.id) || isOnOtherHost(child, parent)) {
         continue
       }
       emitted.add(child.id)

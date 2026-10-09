@@ -37,6 +37,7 @@ codesign -d -r- "$app" 2>&1 | grep designated
 if [ "$install" = 1 ]; then
   stamp="$(date +%Y%m%d-%H%M%S)"
   # Why one step: agent hooks relaunch Orca by bundle id within seconds of a quit, so swap immediately.
+  previous_pid="$(pgrep -f "/Applications/Orca.app/Contents/MacOS/Orca$" | head -1 || true)"
   osascript -e 'tell application "Orca" to quit' || true
   for _ in $(seq 1 40); do
     pgrep -f "/Applications/Orca.app/Contents/MacOS/Orca$" >/dev/null || break
@@ -51,4 +52,9 @@ if [ "$install" = 1 ]; then
   sleep 3
   echo "[install] installed $(defaults read /Applications/Orca.app/Contents/Info.plist CFBundleShortVersionString); previous app in ~/.Trash/Orca-prev-$stamp.app"
   pgrep -fl "/Applications/Orca.app/Contents/MacOS/Orca$" || echo "[install] Orca not running yet; open it from /Applications"
+  # Why: a quit can be held by Orca's own confirmation; the swapped bundle loads only on next launch.
+  if [ -n "$previous_pid" ] && kill -0 "$previous_pid" 2>/dev/null; then
+    echo "[install] WARNING: Orca (pid $previous_pid) did not quit and still runs the previous build." >&2
+    echo "[install] Ask the user to quit Orca (Cmd+Q, answer any quit prompt) and reopen it." >&2
+  fi
 fi

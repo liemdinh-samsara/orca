@@ -128,6 +128,7 @@ This runs `pnpm build`, then electron-builder `--dir` for this Mac's arch with a
 
 - **Signing:** it signs with the self-signed "Orca Local Signing" identity, creating it on first use. Never sign ad-hoc (`--sign -`). Ad-hoc signing ties keychain trust to each build's hash, so the "orca Safe Storage" password prompt returns after every reinstall even with Always Allow. With the stable identity the user clicks Always Allow once.
 - **Install:** it quits Orca and immediately swaps `/Applications/Orca.app`; the old copy goes to `~/.Trash`. The swap happens right away because agent hooks relaunch Orca by bundle ID within seconds. Terminals survive because the terminal daemon keeps running.
+- **Quit refused:** if the script warns that Orca did not quit (its own quit confirmation can hold it), the user is still on the previous build. Don't force-kill their app; tell them to quit and reopen Orca, and say so in the report.
 - **Local builds:** they skip background update checks. "Check for Updates" would still offer the official release and replace the local build, so tell the user not to click it.
 
 For packaged-only proof, run `packaged-proof.sh dist/mac-*/Orca.app "$S/after-….png" …` before installing.

@@ -345,11 +345,30 @@ describe('BrowserSessionRegistry persistence', () => {
     expect(permissionCallback).toHaveBeenLastCalledWith(false)
     expect(checkHandler(null, 'top-level-storage-access', '')).toBe(false)
 
+    // Okta FastPass reaches Okta Verify on localhost; local network access is granted too.
+    requestHandler(guestWc, 'loopback-network', permissionCallback)
+    expect(permissionCallback).toHaveBeenLastCalledWith(true)
+    requestHandler(guestWc, 'local-network-access', permissionCallback)
+    expect(permissionCallback).toHaveBeenLastCalledWith(true)
+    expect(checkHandler(null, 'loopback-network', '')).toBe(true)
+    requestHandler(guestWc, 'local-network', permissionCallback)
+    expect(permissionCallback).toHaveBeenLastCalledWith(true)
+
+    // Only the Okta Verify scheme may leave Orca through an external protocol launch.
+    requestHandler(guestWc, 'openExternal', permissionCallback, {
+      externalURL: 'com-okta-authenticator:/deviceChallenge?challengeRequest=x'
+    })
+    expect(permissionCallback).toHaveBeenLastCalledWith(true)
+    requestHandler(guestWc, 'openExternal', permissionCallback, {
+      externalURL: 'slack://open'
+    })
+    expect(permissionCallback).toHaveBeenLastCalledWith(false)
+
     // Why: the reported symptom was a user-visible denial notice, so pin the notified list here —
     // storage-access must no longer raise one, while the deliberate top-level denial still does.
     expect(
       browserManagerNotifyPermissionDeniedMock.mock.calls.map(([args]) => args.permission)
-    ).toEqual(['geolocation', 'top-level-storage-access'])
+    ).toEqual(['geolocation', 'top-level-storage-access', 'openExternal'])
     expect(defaultSession.setDisplayMediaRequestHandler).toHaveBeenCalled()
     const displayMediaHandler = defaultSession.setDisplayMediaRequestHandler.mock.calls[0][0]
     const displayMediaCallback = vi.fn()

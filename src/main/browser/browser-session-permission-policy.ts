@@ -23,12 +23,40 @@ const AUTO_GRANTED_BROWSER_PERMISSIONS = new Set([
   // handle is gated separately and would survive, but Electron never writes the STORAGE_ACCESS
   // content setting, so cookie access would stay blocked while the promise still resolved — and
   // sites that reload on success would loop.
-  'storage-access'
+  'storage-access',
+  // Why: Chromium's Local Network Access gate blocks public pages from reaching localhost and the
+  // LAN. Okta FastPass signs in by calling Okta Verify on a loopback port, so denying it breaks SSO.
+  'local-network-access',
+  'local-network',
+  'loopback-network'
 ])
+
 // 'top-level-storage-access' is deliberately absent: Chromium gates requestStorageAccessFor() on
 // Related Website Sets rather than cookie policy, and Orca has no such source, so the rationale
 // above does not transfer to it.
 
+// Why: FastPass falls back to launching Okta Verify through its own scheme; other external
+// protocols keep Orca's default denial.
+const AUTHENTICATOR_APP_PROTOCOLS = new Set(['com-okta-authenticator:'])
+
 export function isAutoGrantedBrowserSessionPermission(permission: string): boolean {
   return AUTO_GRANTED_BROWSER_PERMISSIONS.has(permission)
+}
+
+export function allowsAuthenticatorAppLaunch(
+  permission: string,
+  details: object | undefined
+): boolean {
+  if (permission !== 'openExternal' || !details || !('externalURL' in details)) {
+    return false
+  }
+  const { externalURL } = details
+  if (typeof externalURL !== 'string') {
+    return false
+  }
+  try {
+    return AUTHENTICATOR_APP_PROTOCOLS.has(new URL(externalURL).protocol)
+  } catch {
+    return false
+  }
 }

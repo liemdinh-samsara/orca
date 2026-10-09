@@ -8,7 +8,10 @@ import {
   invalidateBrowserSessionProxyApplication
 } from './browser-session-proxy'
 import { hasSystemMediaAccess, requestSystemMediaAccess } from './browser-media-access'
-import { isAutoGrantedBrowserSessionPermission } from './browser-session-permission-policy'
+import {
+  allowsAuthenticatorAppLaunch,
+  isAutoGrantedBrowserSessionPermission
+} from './browser-session-permission-policy'
 import { installBrowserSessionUserAgentPolicy } from './browser-session-ua'
 import { getBrowserProcessUserAgentIdentity } from './browser-process-user-agent'
 import {
@@ -159,7 +162,9 @@ export async function installBrowserSessionPartitionPolicies(
         )
         return
       }
-      const allowed = isAutoGrantedBrowserSessionPermission(permission)
+      const allowed =
+        isAutoGrantedBrowserSessionPermission(permission) ||
+        allowsAuthenticatorAppLaunch(permission, details)
       if (!allowed) {
         const rawUrl = resolvePermissionNoticeUrl(webContents, details)
         browserManager.notifyPermissionDenied({

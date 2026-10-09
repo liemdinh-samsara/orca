@@ -28,6 +28,7 @@ type TabBarItemRowProps = {
   isExpanded: boolean
   dropIndicator: DropIndicator
   includeTopTabBorder: boolean
+  stripOrientation?: 'vertical'
   canToggleViewMode: boolean
   isChatView: boolean
   /** Unified tab whose view mode the terminal tab toggles; absent when it has none. */
@@ -50,6 +51,7 @@ function TabBarItemRow({
   isExpanded,
   dropIndicator,
   includeTopTabBorder,
+  stripOrientation,
   canToggleViewMode,
   isChatView,
   viewModeTabId,
@@ -70,7 +72,8 @@ function TabBarItemRow({
     tabType: item.type,
     label: getTabDragLabel(item, generatedTabTitlesEnabled),
     iconPath: item.type === 'editor' ? item.data.filePath : undefined,
-    color: item.type === 'terminal' ? (item.data.color ?? null) : null
+    color: item.type === 'terminal' ? (item.data.color ?? null) : null,
+    ...(stripOrientation ? { stripOrientation } : {})
   }
   const shared = {
     isActive,

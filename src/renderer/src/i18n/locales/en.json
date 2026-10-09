@@ -18678,6 +18678,12 @@
           "closeOthers": "Close Others",
           "closeTabsToLeft": "Close Tabs To The Left"
         }
+      },
+      "group": {
+        "TabStripOrientationToggle": {
+          "horizontal": "Show tabs on top",
+          "vertical": "Show tabs on the side"
+        }
       }
     },
     "workspace": {

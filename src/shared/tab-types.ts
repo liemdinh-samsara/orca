@@ -91,4 +91,6 @@ export type TabGroup = {
    *  sessions persisted before this field was added still hydrate cleanly —
    *  hydration seeds from activeTabId. */
   recentTabIds?: string[]
+  /** Absent means horizontal; 'horizontal' is written explicitly so merges cannot resurrect 'vertical'. */
+  tabStripOrientation?: 'horizontal' | 'vertical'
 }

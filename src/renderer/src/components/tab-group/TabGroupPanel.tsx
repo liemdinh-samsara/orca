@@ -1,18 +1,13 @@
 import { Suspense, useCallback, useMemo } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { useDroppable } from '@dnd-kit/core'
-import { Ellipsis, X } from 'lucide-react'
 import { useAppStore } from '../../store'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { TabGroupPaneActionsMenu } from './TabGroupPaneActionsMenu'
 import TabBar from '../tab-bar/TabBar'
 
 import { TabBarQuickCommandsButton } from '../tab-bar/TabBarQuickCommandsButton'
+import { TabStripOrientationToggle } from './TabStripOrientationToggle'
+import { cn } from '@/lib/utils'
 import { useTabGroupWorkspaceModel } from './useTabGroupWorkspaceModel'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { resolveGroupTabFromVisibleId } from './tab-group-visible-id'
@@ -75,6 +70,13 @@ export default function TabGroupPanel({
   const rightSidebarOpen = useAppStore((state) => state.rightSidebarOpen)
   const sidebarOpen = useAppStore((state) => state.sidebarOpen)
   const model = useTabGroupWorkspaceModel({ groupId, worktreeId })
+  // Why: only the attached strip can move to the side; the floating panel's titlebar owns its own.
+  const isVerticalTabs =
+    useAppStore(
+      (state) =>
+        state.groupsByWorktree[worktreeId]?.find((group) => group.id === groupId)
+          ?.tabStripOrientation === 'vertical'
+    ) && tabStrip === 'attached'
   const {
     activeTab,
     agentSessionItems,
@@ -240,6 +242,7 @@ export default function TabGroupPanel({
       }}
       tabBarOrder={tabBarOrder}
       hoveredTabInsertion={hoveredTabInsertion}
+      orientation={isVerticalTabs ? 'vertical' : 'horizontal'}
     />
   )
 
@@ -293,7 +296,7 @@ export default function TabGroupPanel({
                 }
               />
             ) : null}
-            <div className="min-w-0 flex-1 h-full">{tabBar}</div>
+            <div className="min-w-0 flex-1 h-full">{isVerticalTabs ? null : tabBar}</div>
             <div
               className="ml-1.5 flex shrink-0 items-center gap-0.5"
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -302,48 +305,19 @@ export default function TabGroupPanel({
                 {isFocused ? (
                   <TabBarQuickCommandsButton worktreeId={worktreeId} groupId={groupId} />
                 ) : null}
+                {isFocused ? (
+                  <TabStripOrientationToggle
+                    worktreeId={worktreeId}
+                    groupId={groupId}
+                    isVertical={isVerticalTabs}
+                    className={menuButtonClassName}
+                  />
+                ) : null}
                 {isFocused && hasSplitGroups ? (
-                  <Tooltip>
-                    <DropdownMenu modal={false}>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={translate(
-                              'auto.components.tab.group.TabGroupPanel.9acaf92093',
-                              'Pane Actions'
-                            )}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                            }}
-                            className={menuButtonClassName}
-                          >
-                            <Ellipsis className="size-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                      </TooltipTrigger>
-                      <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onSelect={() => {
-                            commands.closeGroup()
-                          }}
-                        >
-                          <X className="size-4" />
-                          {translate(
-                            'auto.components.tab.group.TabGroupPanel.closePaneColumn',
-                            'Close split pane'
-                          )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <TooltipContent side="bottom" sideOffset={6}>
-                      {translate(
-                        'auto.components.tab.group.TabGroupPanel.9acaf92093',
-                        'Pane Actions'
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
+                  <TabGroupPaneActionsMenu
+                    className={menuButtonClassName}
+                    onClosePane={commands.closeGroup}
+                  />
                 ) : null}
               </div>
             </div>
@@ -363,11 +337,17 @@ export default function TabGroupPanel({
         </div>
       )}
 
+      {isVerticalTabs ? (
+        // Why: absolute beside an offset body keeps the body the panel's direct child, which split geometry reads.
+        <div className="absolute bottom-0 left-0 top-8 w-52 border-r border-border bg-card">
+          {tabBar}
+        </div>
+      ) : null}
       <div
         ref={setBodyRef}
         data-tab-group-body-id={groupId}
         data-worktree-id={worktreeId}
-        className="relative flex-1 min-h-0 overflow-hidden"
+        className={cn('relative flex-1 min-h-0 overflow-hidden', isVerticalTabs && 'ml-52')}
         style={bodyAnchorStyle}
       >
         {/* Why: empty anchor so the agent-sessions tour reads as a terminal-area tip, not toolbar chrome. */}

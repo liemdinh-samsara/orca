@@ -15,6 +15,8 @@ export type TabDragItemData = {
   iconPath?: string
   color?: string | null
   agent?: TuiAgent | null
+  /** Set for tabs in a vertical list, whose insertion side follows the pointer's y. */
+  stripOrientation?: 'vertical'
 }
 
 export type TabPaneDropData = {

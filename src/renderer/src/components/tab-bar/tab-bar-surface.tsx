@@ -108,6 +108,115 @@ export function renderTabBarSurface({
     activeClientHostedBrowserRowId
   })
 
+  const renderNewTabMenu = (trigger: React.ReactNode): React.JSX.Element => (
+    <DropdownMenu
+      open={newTabMenuOpen}
+      onOpenChange={setNewTabMenuOpen}
+      // Why: modal would disable body pointer events, making the Mobile Emulator "Hide" re-enable toast unclickable.
+      modal={false}
+    >
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={6}
+        className="w-72 max-w-[calc(100vw-1rem)] rounded-[11px] border-border/80 p-1 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
+        onCloseAutoFocus={(event) => {
+          // Why: Radix restores focus to the "+" trigger on close, stealing it from the freshly-mounted terminal.
+          event.preventDefault()
+          runPendingNewTabMenuFocusAfterClose()
+        }}
+      >
+        {!terminalOnly && onOpenEntry ? (
+          <>
+            <TabBarCreateEntry
+              worktreeId={worktreeId}
+              groupId={resolvedGroupId}
+              menuOpen={newTabMenuOpen}
+              menuOptions={createMenuOptions}
+              agentOptions={agentLaunchOptions}
+              onLaunchAgent={launchAgentFromNewTabEntry}
+              onOpenDefaultTerminal={() => {
+                queueNewActiveTerminalFocusAfterNewTabMenuClose()
+                onNewTerminalTab()
+              }}
+              onOpenEntry={onOpenEntry}
+              onQueryChange={setCreateMenuQuery}
+              onQueueSwitchFocus={queueFocusAfterNewTabMenuClose}
+              onSelectMenuOption={handleSelectCreateMenuOption}
+              onDidOpenEntry={() => setNewTabMenuOpen(false)}
+            />
+            {showStaticCreateMenuItems ? <DropdownMenuSeparator /> : null}
+          </>
+        ) : null}
+        {showStaticCreateMenuItems ? (
+          <TabBarStaticCreateMenu
+            props={props}
+            terminalOnly={terminalOnly}
+            mobileEmulatorEnabled={mobileEmulatorEnabled}
+            managedBrowserCreationEnabled={managedBrowserCreationEnabled}
+            mobileEmulatorCreationEnabled={mobileEmulatorCreationEnabled}
+            workspaceHasSimulatorTab={workspaceHasSimulatorTab}
+            showMobileEmulatorIntroCallout={showMobileEmulatorIntroCallout}
+            windowsShellEntries={windowsShellEntries}
+            defaultWindowsPowerShellImplementation={defaultWindowsPowerShellImplementation}
+            pwshAvailable={windowsTerminalCapabilities.pwshAvailable}
+            newTerminalShortcut={newTerminalShortcut}
+            newBrowserShortcut={newBrowserShortcut}
+            newSimulatorShortcut={newSimulatorShortcut}
+            newFileShortcut={newFileShortcut}
+            openMarkdownShortcut={openMarkdownShortcut}
+            queueNewActiveTerminalFocusAfterNewTabMenuClose={
+              queueNewActiveTerminalFocusAfterNewTabMenuClose
+            }
+          />
+        ) : null}
+        {showStaticCreateMenuItems && showAgentLaunchItems ? (
+          <>
+            <DropdownMenuSeparator />
+            <QuickLaunchAgentMenuItems
+              worktreeId={worktreeId}
+              groupId={resolvedGroupId}
+              onFocusTerminal={queueTerminalTabFocusAfterNewTabMenuClose}
+            />
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  if (props.orientation === 'vertical') {
+    return (
+      <div ref={surfaceRef} className="flex h-full min-h-0 w-full flex-col">
+        {renderNewTabMenu(
+          <button
+            type="button"
+            className="flex h-8 w-full shrink-0 items-center gap-1.5 border-b border-border px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
+          >
+            <Plus className="size-3.5" />
+            {translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
+          </button>
+        )}
+        <SortableContext items={sortableIds}>
+          <div className="vertical-tab-strip scrollbar-sleek flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+            <TabStripTooltipProvider>
+              {renderedItems}
+              {clientHostedBrowserRows.length > 0 ? (
+                <ClientHostedBrowserTabRows
+                  rows={clientHostedBrowserRows}
+                  worktreeId={worktreeId}
+                  groupId={resolvedGroupId}
+                  groupActiveTabId={props.groupActiveTabId ?? null}
+                  includeTopTabBorder={false}
+                />
+              ) : null}
+            </TabStripTooltipProvider>
+          </div>
+        </SortableContext>
+      </div>
+    )
+  }
+
   return (
     <div ref={surfaceRef} className="flex items-stretch h-full overflow-hidden flex-1 min-w-0">
       {tabStripOverflowState.hasOverflow ? (
@@ -203,89 +312,17 @@ export function renderTabBarSurface({
           </TooltipContent>
         </Tooltip>
       ) : null}
-      <DropdownMenu
-        open={newTabMenuOpen}
-        onOpenChange={setNewTabMenuOpen}
-        // Why: modal would disable body pointer events, making the Mobile Emulator "Hide" re-enable toast unclickable.
-        modal={false}
-      >
-        <DropdownMenuTrigger asChild>
-          <button
-            className="ml-2 my-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            title={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
-            // Why: aria-label matches the tooltip so E2E can locate the "+" via getByRole('button', { name: 'New tab' }).
-            aria-label={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          sideOffset={6}
-          className="w-72 max-w-[calc(100vw-1rem)] rounded-[11px] border-border/80 p-1 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
-          onCloseAutoFocus={(event) => {
-            // Why: Radix restores focus to the "+" trigger on close, stealing it from the freshly-mounted terminal.
-            event.preventDefault()
-            runPendingNewTabMenuFocusAfterClose()
-          }}
+      {renderNewTabMenu(
+        <button
+          className="ml-2 my-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          title={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
+          // Why: aria-label matches the tooltip so E2E can locate the "+" via getByRole('button', { name: 'New tab' }).
+          aria-label={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
         >
-          {!terminalOnly && onOpenEntry ? (
-            <>
-              <TabBarCreateEntry
-                worktreeId={worktreeId}
-                groupId={resolvedGroupId}
-                menuOpen={newTabMenuOpen}
-                menuOptions={createMenuOptions}
-                agentOptions={agentLaunchOptions}
-                onLaunchAgent={launchAgentFromNewTabEntry}
-                onOpenDefaultTerminal={() => {
-                  queueNewActiveTerminalFocusAfterNewTabMenuClose()
-                  onNewTerminalTab()
-                }}
-                onOpenEntry={onOpenEntry}
-                onQueryChange={setCreateMenuQuery}
-                onQueueSwitchFocus={queueFocusAfterNewTabMenuClose}
-                onSelectMenuOption={handleSelectCreateMenuOption}
-                onDidOpenEntry={() => setNewTabMenuOpen(false)}
-              />
-              {showStaticCreateMenuItems ? <DropdownMenuSeparator /> : null}
-            </>
-          ) : null}
-          {showStaticCreateMenuItems ? (
-            <TabBarStaticCreateMenu
-              props={props}
-              terminalOnly={terminalOnly}
-              mobileEmulatorEnabled={mobileEmulatorEnabled}
-              managedBrowserCreationEnabled={managedBrowserCreationEnabled}
-              mobileEmulatorCreationEnabled={mobileEmulatorCreationEnabled}
-              workspaceHasSimulatorTab={workspaceHasSimulatorTab}
-              showMobileEmulatorIntroCallout={showMobileEmulatorIntroCallout}
-              windowsShellEntries={windowsShellEntries}
-              defaultWindowsPowerShellImplementation={defaultWindowsPowerShellImplementation}
-              pwshAvailable={windowsTerminalCapabilities.pwshAvailable}
-              newTerminalShortcut={newTerminalShortcut}
-              newBrowserShortcut={newBrowserShortcut}
-              newSimulatorShortcut={newSimulatorShortcut}
-              newFileShortcut={newFileShortcut}
-              openMarkdownShortcut={openMarkdownShortcut}
-              queueNewActiveTerminalFocusAfterNewTabMenuClose={
-                queueNewActiveTerminalFocusAfterNewTabMenuClose
-              }
-            />
-          ) : null}
-          {showStaticCreateMenuItems && showAgentLaunchItems ? (
-            <>
-              <DropdownMenuSeparator />
-              <QuickLaunchAgentMenuItems
-                worktreeId={worktreeId}
-                groupId={resolvedGroupId}
-                onFocusTerminal={queueTerminalTabFocusAfterNewTabMenuClose}
-              />
-            </>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   )
 }

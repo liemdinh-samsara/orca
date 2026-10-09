@@ -233,7 +233,12 @@ export function resolveActivePaneColumnSplitTarget({
     // Why: tab-strip drags target reorder/insertion slots. Split creation stays
     // on pane/body edges so hovering over a tab never surprises the user with a
     // new split.
-    if (!panelHit || pointer.y < panelHit.panelRect.top + TAB_GROUP_TAB_STRIP_HEIGHT_PX) {
+    if (
+      !panelHit ||
+      pointer.y < panelHit.panelRect.top + TAB_GROUP_TAB_STRIP_HEIGHT_PX ||
+      // Why: a vertical tab list sits inside the panel's left split zone; reordering there must not split.
+      overData.stripOrientation === 'vertical'
+    ) {
       return null
     }
   }

@@ -21,6 +21,7 @@ export type TabBarItemSurfaceProps = Pick<
   | 'activeSimulatorTabId'
   | 'activeTabType'
   | 'expandedPaneByTabId'
+  | 'orientation'
 >
 
 export type TabBarItemSurfaceRuntime = Pick<
@@ -137,6 +138,7 @@ export function renderTabBarItems({
         isExpanded={item.type === 'terminal' && expandedPaneByTabId[item.id] === true}
         dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
         includeTopTabBorder={includeTopTabBorder}
+        {...(props.orientation === 'vertical' ? { stripOrientation: 'vertical' as const } : {})}
         canToggleViewMode={canToggleViewMode}
         isChatView={isChatView}
         viewModeTabId={viewModeTabId}

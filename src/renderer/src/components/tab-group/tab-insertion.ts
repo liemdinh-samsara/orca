@@ -40,11 +40,15 @@ export function resolveTabInsertion(
   if (!center) {
     return null
   }
-  const midpoint = event.over.rect.left + event.over.rect.width / 2
+  // Why: 'left'/'right' mean insert before/after; a vertical list decides that by the row's y.
+  const isBefore =
+    overData.stripOrientation === 'vertical'
+      ? center.y < event.over.rect.top + event.over.rect.height / 2
+      : center.x < event.over.rect.left + event.over.rect.width / 2
   return {
     groupId: overData.groupId,
     visibleTabId: overData.visibleTabId,
-    side: center.x < midpoint ? 'left' : 'right'
+    side: isBefore ? 'left' : 'right'
   }
 }
 

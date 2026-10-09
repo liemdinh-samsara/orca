@@ -116,6 +116,11 @@ export type TabsSlice = {
   closeTabsToLeft: (tabId: string) => string[]
   ensureWorktreeRootGroup: (worktreeId: string) => string
   focusGroup: (worktreeId: string, groupId: string) => void
+  setTabGroupStripOrientation: (
+    worktreeId: string,
+    groupId: string,
+    orientation: 'horizontal' | 'vertical'
+  ) => void
   closeEmptyGroup: (worktreeId: string, groupId: string) => boolean
   createEmptySplitGroup: (
     worktreeId: string,

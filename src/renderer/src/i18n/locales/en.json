@@ -19007,6 +19007,14 @@
         "inlineVisualsToggleLabel": "Toggle inline visuals",
         "queueFollowUpsCopy": "Messages you send while the agent is working wait as cards you can steer, edit, or delete. Messages with images send right away.",
         "queueFollowUpsToggleLabel": "Toggle queue follow-ups"
+      },
+      "RepositoryWorkspaceModeSection": {
+        "inPlaceTitle": "Create workspaces without git worktrees",
+        "startPathTitle": "Start folder",
+        "inPlaceDescription": "New workspaces share this checkout and its branch instead of creating a git worktree. Useful for large monorepos.",
+        "startPathDescription": "Folder inside each workspace where terminals and agents start. Git still runs from the project root.",
+        "startPathPlaceholder": "Project root",
+        "startPathHint": "Relative to the project root, for example services/api. Leave empty to start at the root."
       }
     },
     "agentChildRow": {

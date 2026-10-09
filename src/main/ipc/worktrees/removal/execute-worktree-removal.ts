@@ -3,6 +3,7 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { RemoveWorktreeResult } from '../../../../shared/worktree/create-types'
 import { assertRemovalHostMatchesRepoRow } from '../repo-host-ownership'
 import { isFolderRepo } from '../../../../shared/repo-kind'
+import { isInPlaceWorkspaceInstanceId } from '../../../../shared/in-place-workspaces'
 import { assertWorktreeUnlockedForRemoval } from '../../../../shared/worktree/removal'
 import { isWindowsAbsolutePathLike } from '../../../../shared/cross-platform-path'
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
@@ -46,7 +47,8 @@ export async function executeWorktreeRemoval(
   removalHostId: ExecutionHostId
 ): Promise<RemoveWorktreeResult> {
   const { mainWindow, store, runtime } = context
-  if (isFolderRepo(repo)) {
+  // Why: an in-place workspace shares the project checkout, so removing it must never reach `git worktree remove`.
+  if (isFolderRepo(repo) || isInPlaceWorkspaceInstanceId(args.worktreeId)) {
     return removeFolderWorkspace(context, args, repo, repoId, removalHostId)
   }
   assertRemovalHostMatchesRepoRow(repo, repoId, removalHostId)

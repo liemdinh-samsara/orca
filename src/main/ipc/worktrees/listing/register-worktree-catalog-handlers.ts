@@ -15,6 +15,7 @@ import {
   stampAndMergeVisibleDetectedWorktree
 } from './ssh-worktree-fallback'
 import { listVisibleFolderWorkspaces } from './folder-workspace-catalog'
+import { appendInPlaceGitWorkspaces } from './in-place-workspace-catalog'
 import {
   applyFreshDetectedWorktreeScanSideEffects,
   listDetectedGitWorktrees,
@@ -171,9 +172,15 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
         const rows = connectionId
           ? gitWorktrees
           : await withUnregisteredRemovalCheckouts(repo.id, gitWorktrees)
-        const worktrees = buildDetectedGitWorktrees(store, repo, rows, metadata)
-          .filter((worktree) => worktree.visible)
-          .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata))
+        const worktrees = appendInPlaceGitWorkspaces(
+          repo,
+          buildDetectedGitWorktrees(store, repo, rows, metadata)
+            .filter((worktree) => worktree.visible)
+            .map((worktree) =>
+              stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata)
+            ),
+          metadata
+        )
         return connectionId ? worktrees : markLocalWorktreesUnderRemoval(worktrees, pendingAtScan)
       } catch (err) {
         warnOnce(
@@ -268,9 +275,13 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
       const rows = connectionId
         ? gitWorktrees
         : await withUnregisteredRemovalCheckouts(repo.id, gitWorktrees)
-      const worktrees = buildDetectedGitWorktrees(store, repo, rows, metadata)
-        .filter((worktree) => worktree.visible)
-        .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata))
+      const worktrees = appendInPlaceGitWorkspaces(
+        repo,
+        buildDetectedGitWorktrees(store, repo, rows, metadata)
+          .filter((worktree) => worktree.visible)
+          .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata)),
+        metadata
+      )
       return connectionId ? worktrees : markLocalWorktreesUnderRemoval(worktrees, pendingAtScan)
     } catch (err) {
       warnOnce(

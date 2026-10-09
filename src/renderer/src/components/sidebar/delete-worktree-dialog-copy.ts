@@ -1,8 +1,9 @@
 import { isFolderRepo } from '../../../../shared/repo-kind'
+import { isInPlaceWorkspaceInstanceId } from '../../../../shared/in-place-workspaces'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 
-type WorktreeRepoRef = Pick<Worktree, 'repoId'>
+type WorktreeRepoRef = Pick<Worktree, 'repoId'> & Partial<Pick<Worktree, 'id'>>
 
 export function isFolderWorkspaceDelete(
   repoMap: ReadonlyMap<string, Repo>,
@@ -10,6 +11,10 @@ export function isFolderWorkspaceDelete(
 ): boolean {
   if (!worktree) {
     return false
+  }
+  // Why: an in-place workspace shares its checkout, so deleting it only forgets the sidebar entry.
+  if (worktree.id && isInPlaceWorkspaceInstanceId(worktree.id)) {
+    return true
   }
   const repo = repoMap.get(worktree.repoId)
   return repo ? isFolderRepo(repo) : false

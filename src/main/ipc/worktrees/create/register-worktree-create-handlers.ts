@@ -17,6 +17,7 @@ import {
   finishAutomationWorkspaceProvenanceRequest
 } from '../../../automations/workspace-provenance'
 import { isFolderRepo } from '../../../../shared/repo-kind'
+import { createsWorkspacesInPlace } from '../../../../shared/in-place-workspaces'
 import {
   createRemoteWorktree,
   createLocalWorktree,
@@ -70,7 +71,7 @@ export function registerWorktreeCreateHandlers(context: WorktreeIpcContext): voi
         })
         try {
           // Why: wrap only the helpers; the pre-validation throws above are IPC-shape bugs, not the git/filesystem failures the funnel tracks.
-          if (isFolderRepo(repo)) {
+          if (createsWorkspacesInPlace(repo)) {
             // A folder workspace is a registration, not a filesystem create, so it is host-agnostic.
             result = createFolderWorkspace(createArgs, repo, store)
           } else {
@@ -109,7 +110,7 @@ export function registerWorktreeCreateHandlers(context: WorktreeIpcContext): voi
         // Why: reaching here means create succeeded (helpers throw); skip a separate workspace_initialized (telemetry-plan.md§Deferred); never send the branch name.
         telemetry.succeeded(result.timing)
 
-        if (isFolderRepo(repo)) {
+        if (createsWorkspacesInPlace(repo)) {
           notifyWorktreesChanged(mainWindow, repo.id)
         }
 

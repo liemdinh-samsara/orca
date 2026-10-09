@@ -23,6 +23,7 @@ import { areWorktreePathsEqual, mergeWorktree } from '../ipc/worktree-logic'
 import { pruneLineageForMissingRepoWorktrees } from '../worktree-lineage-pruning'
 import { getRepoOwnedWorktreeMeta } from '../worktree-metadata-ownership'
 import { resolveLocalProjectRuntimesForRepos } from '../project-runtime-git-options'
+import { appendInPlaceGitWorkspaces } from '../ipc/worktrees/listing/in-place-workspace-catalog'
 import type { RuntimeWorktreeScanResult } from './repo-worktree-resolution-scan'
 
 /**
@@ -138,7 +139,7 @@ export async function resolveRepoWorktreeRows(
     pruneLineageForMissingRepoWorktrees(store, repo, gitWorktrees)
   }
   const expectedHostId = getRepoExecutionHostId(repo)
-  return gitWorktrees.map((gitWorktree) => {
+  const rows: RepoWorktreeRow[] = gitWorktrees.map((gitWorktree) => {
     const worktreeId = `${repo.id}::${gitWorktree.path}`
     // Why: lineage validation needs a durable instance ID even when the runtime sees a workspace before renderer discovery-stamp.
     const existingMeta = metaById[worktreeId]
@@ -171,6 +172,24 @@ export async function resolveRepoWorktreeRows(
       comment: merged.comment
     }
   })
+  const inPlaceWorkspaces = appendInPlaceGitWorkspaces(repo, rows, metaById).slice(rows.length)
+  return [
+    ...rows,
+    ...inPlaceWorkspaces.map((worktree) => ({
+      ...worktree,
+      hostId: worktree.hostId ?? expectedHostId,
+      parentWorktreeId: null,
+      childWorktreeIds: [],
+      lineage: null,
+      git: {
+        path: worktree.path,
+        head: worktree.head,
+        branch: worktree.branch,
+        isBare: worktree.isBare,
+        isMainWorktree: worktree.isMainWorktree
+      }
+    }))
+  ]
 }
 
 /**

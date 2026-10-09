@@ -1,4 +1,5 @@
 import type { DetectedWorktreeListResult, Worktree } from '../../shared/worktree/types'
+import { appendInPlaceGitWorkspaces } from '../ipc/worktrees/listing/in-place-workspace-catalog'
 import {
   getLocalWorktreeCatalogVersion,
   localWorktreeCatalogVersionAt
@@ -186,6 +187,19 @@ export class RuntimeManagedWorktreeQueries {
       )
       return scan.ok ? result : applyMetadataFallbackVisibility(result)
     })
+    const inPlaceDetected = appendInPlaceGitWorkspaces(repo, detected, metaById)
+      .slice(detected.length)
+      .map((worktree) =>
+        this.toDetected(
+          repo,
+          { ...worktree, hostId: worktree.hostId ?? expectedHostId },
+          matcher,
+          sourceDefaultsSupported,
+          visibilitySettings,
+          metaById[worktree.id] ?? null
+        )
+      )
+    detected.push(...inPlaceDetected)
     return {
       repoId: repo.id,
       authoritative: scan.ok && !scan.superseded,

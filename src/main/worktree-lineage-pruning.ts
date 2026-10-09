@@ -4,7 +4,7 @@ import type { WorkspaceLineage, WorktreeLineage } from '../shared/worktree/linea
 import type { GitWorktreeInfo } from '../shared/worktree/types'
 import { getRepoExecutionHostId } from '../shared/execution-host'
 import { isWorkspaceKey, parseWorkspaceKey, worktreeWorkspaceKey } from '../shared/workspace-scope'
-import { splitWorktreeId } from '../shared/worktree/id'
+import { splitWorktreeIdForFilesystem } from '../shared/worktree/id'
 import { worktreeRetentionPathComparisonKey } from './worktree-retention-path-comparison'
 import type { Store } from './persistence'
 
@@ -72,7 +72,8 @@ export function pruneLineageForMissingRepoWorktrees(
     if (liveIds.has(worktreeId) || preservedMetadataCandidateIds?.has(worktreeId)) {
       return true
     }
-    const worktreePath = splitWorktreeId(worktreeId)?.worktreePath
+    // Why: an in-place workspace id carries a `::workspace:<uuid>` suffix but lives on its checkout path.
+    const worktreePath = splitWorktreeIdForFilesystem(worktreeId)?.worktreePath
     if (!worktreePath) {
       return false
     }

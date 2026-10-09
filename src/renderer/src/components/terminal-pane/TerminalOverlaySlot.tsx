@@ -1,6 +1,7 @@
 import { memo, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAppStore } from '../../store'
+import { resolveWorkspaceTerminalDefaultCwd } from '../../lib/workspace-start-cwd'
 import { isProvenProcessExit } from '../../../../shared/terminal-exit-cause'
 import { RetainedPaneHost } from '../tab-group/RetainedPaneHost'
 import type { ActivityTerminalPortalTarget } from '../activity/activity-terminal-portal'
@@ -49,12 +50,16 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     }
   }, [isVisible, shouldMeasureHiddenStartup])
 
+  const defaultCwd = useAppStore((state) =>
+    resolveWorkspaceTerminalDefaultCwd(state.repos, worktreeId, worktreePath)
+  )
+
   const terminalPane = (
     <TerminalPane
       key={`${terminalTabId}-${terminalGeneration ?? 0}`}
       tabId={terminalTabId}
       worktreeId={worktreeId}
-      cwd={startupCwd ?? worktreePath}
+      cwd={startupCwd ?? defaultCwd}
       isActive={isActive || activityTerminalPortal?.active === true}
       // Why: split-group changes reparent TabGroupPanel subtrees. Keeping the
       // TerminalPane mounted here preserves alt-screen TUI state while this

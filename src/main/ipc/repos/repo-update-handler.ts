@@ -16,6 +16,7 @@ import {
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { notifyReposChanged } from './repos-changed-notification'
+import { normalizeWorkspaceStartPath } from '../../../shared/workspace-start-path'
 
 export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle(
@@ -37,6 +38,8 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
             | 'worktreeBasePath'
             | 'kind'
             | 'symlinkPaths'
+            | 'inPlaceWorkspaces'
+            | 'workspaceStartPath'
             | 'issueSourcePreference'
             | 'forkSyncMode'
             | 'externalWorktreeVisibilityPromptDismissedAt'
@@ -96,6 +99,18 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
         const v = updates.symlinkPaths as unknown
         if (!Array.isArray(v) || !v.every((e) => typeof e === 'string')) {
           delete updates.symlinkPaths
+        }
+      }
+      if ('inPlaceWorkspaces' in updates && typeof updates.inPlaceWorkspaces !== 'boolean') {
+        delete updates.inPlaceWorkspaces
+      }
+      if ('workspaceStartPath' in updates && updates.workspaceStartPath !== undefined) {
+        const v: unknown = updates.workspaceStartPath
+        const normalized = typeof v === 'string' ? normalizeWorkspaceStartPath(v) : null
+        if (normalized === null) {
+          delete updates.workspaceStartPath
+        } else {
+          updates.workspaceStartPath = normalized || undefined
         }
       }
       if ('worktreeBasePath' in updates && updates.worktreeBasePath !== undefined) {

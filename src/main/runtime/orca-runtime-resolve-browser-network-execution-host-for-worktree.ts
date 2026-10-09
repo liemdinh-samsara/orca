@@ -23,6 +23,7 @@ import type { Worktree } from '../../shared/worktree/types'
 import { folderWorkspaceToWorktree } from '../../shared/folder-workspace-worktree'
 import type { TerminalWorkspaceLaunchScope } from './runtime-legacy-worker-terminal-recovery-types'
 import { resolveTerminalStartupCwd } from '../../shared/terminal-startup-cwd'
+import { resolveProjectStartFolderCwd } from '../project-start-folder-cwd'
 import type { ResolvedTerminalWorkspaceLaunchTarget } from './orca-runtime-core'
 import { AGENT_HOOK_RUNTIME_ENV_KEYS } from './orca-runtime-core'
 import { ensureJcodeRuntimeDir } from '../../shared/jcode-runtime-dir'
@@ -106,10 +107,14 @@ export class OrcaRuntimeWithResolveBrowserNetworkExecutionHostForWorktree extend
   }
 
   protected resolveWorkspaceTerminalStartupCwd(
-    workspace: Pick<TerminalWorkspaceLaunchScope, 'path'>,
+    workspace: Pick<TerminalWorkspaceLaunchScope, 'path'> &
+      Partial<Pick<TerminalWorkspaceLaunchScope, 'repo'>>,
     requestedCwd?: string | null
   ): string | undefined {
-    return resolveTerminalStartupCwd(workspace.path, requestedCwd)
+    return (
+      resolveTerminalStartupCwd(workspace.path, requestedCwd) ??
+      resolveProjectStartFolderCwd(workspace.path, workspace.repo)
+    )
   }
 
   protected async resolveTerminalWorkspaceLaunchScope(

@@ -148,6 +148,8 @@ export class RepoLifecycleOperations {
         | 'folderUpgradeGitRootPath'
         | 'executionHostId'
         | 'symlinkPaths'
+        | 'inPlaceWorkspaces'
+        | 'workspaceStartPath'
         | 'issueSourcePreference'
         | 'forkSyncMode'
         | 'externalWorktreeVisibilityPromptDismissedAt'

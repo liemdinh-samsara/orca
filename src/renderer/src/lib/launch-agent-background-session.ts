@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { resolveWorkspaceTerminalDefaultCwd } from './workspace-start-cwd'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
 import type {
   LaunchAgentBackgroundSessionArgs,
@@ -169,7 +170,7 @@ export async function launchAgentBackgroundSession(
       const result = await window.api.pty.spawn({
         cols: 120,
         rows: 40,
-        cwd: worktree.path,
+        cwd: resolveWorkspaceTerminalDefaultCwd(store.repos, worktree.id, worktree.path),
         command: startupPlan.launchCommand,
         ...(!sshConnectionId && isWslUncPath(worktree.path) ? { shellOverride: 'wsl.exe' } : {}),
         // Why: the relay types, waits for the shell and stages long lines on the host that owns the PTY.

@@ -107,7 +107,7 @@ describe('repos:add + repos:clone', () => {
     )
   })
 
-  it('canonicalizes local git repos:add to the detected root path', async () => {
+  it('keeps Git at the detected root and starts in the selected subfolder', async () => {
     vi.mocked(getGitRepoRoot).mockReturnValue('/tmp/from-add')
 
     const result = await handlers.get('repos:add')!(null, {
@@ -118,7 +118,8 @@ describe('repos:add + repos:clone', () => {
     expect(mockStore.addRepo).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/tmp/from-add',
-        displayName: 'from-add'
+        displayName: 'web',
+        workspaceStartPath: 'packages/web'
       })
     )
     expect(result).toHaveProperty('repo.path', '/tmp/from-add')

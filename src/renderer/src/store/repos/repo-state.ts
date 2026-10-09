@@ -42,6 +42,8 @@ export type RepoUpdate = Partial<
     | 'worktreeBasePath'
     | 'kind'
     | 'symlinkPaths'
+    | 'inPlaceWorkspaces'
+    | 'workspaceStartPath'
     | 'issueSourcePreference'
     | 'forkSyncMode'
     | 'externalWorktreeVisibilityPromptDismissedAt'

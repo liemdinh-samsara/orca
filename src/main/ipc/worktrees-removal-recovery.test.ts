@@ -694,6 +694,28 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
+  it('forgets an in-place workspace on a git project without touching its shared checkout', async () => {
+    const worktreeId = 'repo-git::/workspace/monolith::workspace:child-1'
+    store.getRepo.mockReturnValue({
+      id: 'repo-git',
+      path: '/workspace/monolith',
+      displayName: 'monolith',
+      badgeColor: '#000',
+      addedAt: 0,
+      kind: 'git',
+      inPlaceWorkspaces: true
+    })
+
+    await handlers['worktrees:remove'](null, { worktreeId, force: true })
+
+    expect(listWorktreesMock).not.toHaveBeenCalled()
+    expect(removeWorktreeMock).not.toHaveBeenCalled()
+    expect(store.removeWorktreeMeta).toHaveBeenCalledWith(worktreeId, 'local')
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith('worktrees:changed', {
+      repoId: 'repo-git'
+    })
+  })
+
   it('purges a folder workspace after a rejected best-effort PTY sweep', async () => {
     const worktreeId = 'repo-folder::/workspace/folder::workspace:child-1'
     store.getRepo.mockReturnValue({

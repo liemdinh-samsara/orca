@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto'
+import { realpathSync } from 'node:fs'
 import type { Store } from '../../persistence'
 import type { Repo } from '../../../shared/repo-types'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
-import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
+import {
+  normalizeRuntimePathForComparison,
+  relativePathInsideRoot
+} from '../../../shared/cross-platform-path'
+import { normalizeWorkspaceStartPath } from '../../../shared/workspace-start-path'
 import { awaitWindowsHostGitEnvironmentReady } from '../../git/runner'
 import { inspectGitRepoForRegistration, getGitRepoRoot, getRepoName } from '../../git/repo'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
@@ -26,6 +31,8 @@ export async function addLocalRepoFromPath(
   }
 
   const resolvedPath = gitInfo?.rootPath ?? path
+  // Why: adding a monolith subfolder keeps Git at the root but starts terminals and agents in that folder.
+  const workspaceStartPath = gitInfo ? resolveSubfolderStartPath(resolvedPath, path) : ''
   const pathKey = normalizeRuntimePathForComparison(path)
   const existing = store
     .getRepos()
@@ -78,11 +85,12 @@ export async function addLocalRepoFromPath(
   const repo: Repo = {
     id: randomUUID(),
     path: resolvedPath,
-    displayName: displayName?.trim() || getRepoName(resolvedPath),
+    displayName: displayName?.trim() || getRepoName(workspaceStartPath ? path : resolvedPath),
     badgeColor: DEFAULT_REPO_BADGE_COLOR,
     ...detected,
     addedAt: Date.now(),
     kind: repoKind,
+    ...(workspaceStartPath ? { workspaceStartPath } : {}),
     ...(repoKind === 'git'
       ? {
           externalWorktreeVisibilityLegacy: false,
@@ -95,4 +103,17 @@ export async function addLocalRepoFromPath(
   store.addRepo(repo)
   await prepareLocalWorktreeRootForRepo(store, repo)
   return { repo, alreadyExisted: false }
+}
+
+function resolveSubfolderStartPath(gitRoot: string, selectedPath: string): string {
+  let relativePath = relativePathInsideRoot(gitRoot, selectedPath)
+  if (relativePath === null) {
+    try {
+      // `--show-toplevel` reports the real path, so a symlinked spelling only matches once resolved.
+      relativePath = relativePathInsideRoot(gitRoot, realpathSync(selectedPath))
+    } catch {
+      relativePath = null
+    }
+  }
+  return relativePath ? (normalizeWorkspaceStartPath(relativePath) ?? '') : ''
 }

@@ -1,6 +1,7 @@
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 import type { Repo } from '../../../../shared/repo-types'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { createsWorkspacesInPlace } from '../../../../shared/in-place-workspaces'
 import { getSelectedRepoSshGate } from '../../lib/new-workspace-ssh-gate'
 import { translate } from '@/i18n/i18n'
 
@@ -51,6 +52,15 @@ export function getRepoHeaderCreateState(input: {
       ),
       requiresSshReconnect: true
     }
+  }
+
+  if (createsWorkspacesInPlace(input.repo)) {
+    const label = translate(
+      'auto.components.sidebar.repo.header.create.state.62e71f2d5d',
+      'Create workspace for {{value0}}',
+      { value0: input.label }
+    )
+    return { disabled: false, tooltip: label, ariaLabel: label, requiresSshReconnect: false }
   }
 
   return {

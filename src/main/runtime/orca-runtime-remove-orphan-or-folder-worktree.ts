@@ -4,6 +4,7 @@ import { parseExecutionHostId } from '../../shared/execution-host'
 import { deleteRemoteWorktreeHistory } from '../remote-worktree-history-cleanup'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
 import { isFolderRepo } from '../../shared/repo-kind'
+import { isInPlaceWorkspaceInstanceId } from '../../shared/in-place-workspaces'
 import { getRuntimeFolderWorkspaceRootId } from './runtime-folder-workspace'
 import { killAllProcessesForWorktree } from './worktree-teardown'
 import { teardownFolderWorkspacePtys } from './folder-workspace-pty-teardown'
@@ -88,7 +89,8 @@ export async function removeOrphanOrFolderWorktree({
     }
   }
 
-  if (!isFolderRepo(repo)) {
+  // Why: an in-place workspace shares the project checkout, so it must never reach Git removal.
+  if (!isFolderRepo(repo) && !isInPlaceWorkspaceInstanceId(removalTarget.id)) {
     return undefined
   }
   if (removalTarget.id === getRuntimeFolderWorkspaceRootId(repo)) {

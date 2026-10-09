@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { getLocalWorktreeCatalogVersion } from '../../../local-worktree-scan-generation'
 import type { RemoveWorktreeResult } from '../../../../shared/worktree/create-types'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { isInPlaceWorkspaceInstanceId } from '../../../../shared/in-place-workspaces'
 import { withWorktreeSpan } from '../../../observability/instrumentation'
 import { areWorktreePathsEqual, parseWorktreeId } from '../../worktree-logic'
 import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
@@ -31,6 +32,10 @@ export function registerWorktreeRemovalHandlers(context: WorktreeIpcContext): vo
     if (!repo) {
       throw new Error(`Repo not found: ${repoId}`)
     }
+    // Why: an in-place workspace shares the project checkout; worktrees nested under it are not its own.
+    if (isInPlaceWorkspaceInstanceId(args.worktreeId)) {
+      return []
+    }
     return previewNestedWorktreeRemoval(context, repo, worktreePath, getRepoExecutionHostId(repo))
   })
 
@@ -59,16 +64,17 @@ export function registerWorktreeRemovalHandlers(context: WorktreeIpcContext): vo
 
     // Why: concurrent stale-toast/double-click/sidebar races can hit the same worktree; share the op so only one path touches Git and disk.
     const removal = withWorktreeSpan({ stage: 'remove', path: worktreePath }, async () => {
-      const nestedPreservedBranches = args.approvedNestedWorktrees
-        ? await removeApprovedNestedWorktrees({
-            context,
-            repo,
-            worktreePath,
-            hostId: removalHostId,
-            removalArgs: args,
-            remove
-          })
-        : []
+      const nestedPreservedBranches =
+        args.approvedNestedWorktrees && !isInPlaceWorkspaceInstanceId(args.worktreeId)
+          ? await removeApprovedNestedWorktrees({
+              context,
+              repo,
+              worktreePath,
+              hostId: removalHostId,
+              removalArgs: args,
+              remove
+            })
+          : []
       const expectedCheckout = args.approvedNestedWorktrees?.find((item) =>
         areWorktreePathsEqual(item.path, worktreePath)
       )

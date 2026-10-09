@@ -7,6 +7,28 @@ export function getRepositoryGitWorktreeSearchEntries(repo: Repo): SettingsSearc
   return [
     {
       title: translate(
+        'components.settings.RepositoryWorkspaceModeSection.inPlaceTitle',
+        'Create workspaces without git worktrees'
+      ),
+      description: translate(
+        'components.settings.RepositoryWorkspaceModeSection.inPlaceDescription',
+        'New workspaces share this checkout and its branch instead of creating a git worktree. Useful for large monorepos.'
+      ),
+      keywords: [repo.displayName, 'monolith', 'monorepo', 'in place', 'worktree', 'sub project']
+    },
+    {
+      title: translate(
+        'components.settings.RepositoryWorkspaceModeSection.startPathTitle',
+        'Start folder'
+      ),
+      description: translate(
+        'components.settings.RepositoryWorkspaceModeSection.startPathDescription',
+        'Folder inside each workspace where terminals and agents start. Git still runs from the project root.'
+      ),
+      keywords: [repo.displayName, 'cwd', 'working directory', 'subfolder', 'terminal', 'monorepo']
+    },
+    {
+      title: translate(
         'auto.components.settings.repository.search.externalWorktrees',
         'External worktrees'
       ),

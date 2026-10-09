@@ -13,6 +13,7 @@ export type WorktreeProvisionTerminalOptions = {
   direction?: 'horizontal' | 'vertical'
   activate?: boolean
   surfaceOwner?: false
+  cwd?: string
 }
 
 export type WorktreeTerminalProvisioningHost = {
@@ -169,6 +170,8 @@ export async function provisionWorktreeTerminals(
             title: 'Setup',
             command,
             env,
+            // Why: setup scripts expect the workspace root even when the project has a start folder.
+            cwd: args.worktreePath,
             ...surfacing
           }))
       setupTerminalHandle = setupTerminal.handle

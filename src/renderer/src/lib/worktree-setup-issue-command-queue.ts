@@ -1,6 +1,7 @@
 import type { WorktreeSetupLaunch } from '../../../shared/worktree/launch-types'
 import { buildSetupRunnerCommand } from './setup-runner'
 import { useAppStore } from '@/store'
+import { resolveWorkspaceRootCwdOverride } from './workspace-start-cwd'
 import type {
   InitialTerminalOptions,
   WorktreeActivationStore
@@ -32,8 +33,11 @@ export function queueSetupAndIssueCommands(
       env: setup.envVars
     }
     if (mode === 'new-tab') {
+      // Why: setup scripts expect the workspace root even when the project starts terminals in a subfolder.
+      const setupCwd = resolveWorkspaceRootCwdOverride(useAppStore.getState().repos, worktreeId)
       const setupTab = store.createTab(worktreeId, undefined, undefined, {
         recordInteraction: false,
+        ...(setupCwd ? { startupCwd: setupCwd } : {}),
         ...(opts?.activateCreatedTabs === false ? { activate: false } : {})
       })
       // Why: createTab auto-activates the new tab; revert so focus stays on the primary terminal while Setup runs in the background.

@@ -56,6 +56,8 @@ export function createRepoUpdateSchema<T extends Readonly<Record<string, z.ZodTy
       worktreeBasePath: OptionalString,
       kind: z.enum(['git', 'folder']).optional(),
       symlinkPaths: z.array(z.string()).optional(),
+      inPlaceWorkspaces: z.boolean().optional(),
+      workspaceStartPath: OptionalString,
       issueSourcePreference: z.enum(['auto', 'upstream', 'origin']).optional(),
       ghAccount: z
         .unknown()

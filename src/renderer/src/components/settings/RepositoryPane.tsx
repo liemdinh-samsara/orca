@@ -11,6 +11,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { RepositoryHooksSection } from './RepositoryHooksSection'
 import { McpConfigSection } from './McpConfigSection'
 import { WorktreeSymlinksSection } from './WorktreeSymlinksSection'
+import { RepositoryWorkspaceModeSection } from './RepositoryWorkspaceModeSection'
 import { SparsePresetSettingsSection } from './SparsePresetSettingsSection'
 import { RepositorySourceControlAiSection } from './RepositorySourceControlAiSection'
 import { SearchableSetting } from './SearchableSetting'
@@ -181,6 +182,11 @@ export function RepositoryPane({
       'auto.components.settings.repository.search.keepForkUpToDate',
       'Keep Fork Up to Date'
     ),
+    translate(
+      'components.settings.RepositoryWorkspaceModeSection.inPlaceTitle',
+      'Create workspaces without git worktrees'
+    ),
+    translate('components.settings.RepositoryWorkspaceModeSection.startPathTitle', 'Start folder'),
     translate('auto.components.settings.repository.search.094adbe930', 'Default Worktree Base'),
     translate('auto.components.settings.repository.search.443d127b5a', 'Worktree Location'),
     translate('auto.components.settings.repository.search.externalWorktrees', 'External worktrees'),
@@ -339,6 +345,12 @@ export function RepositoryPane({
             />
 
             <RepositoryGitHubAccountSection
+              repo={repo}
+              updateRepo={updateSelectedRepo}
+              forceVisible={forceFullPaneForRepoMatch}
+            />
+
+            <RepositoryWorkspaceModeSection
               repo={repo}
               updateRepo={updateSelectedRepo}
               forceVisible={forceFullPaneForRepoMatch}

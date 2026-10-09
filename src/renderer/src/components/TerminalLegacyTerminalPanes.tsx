@@ -4,6 +4,8 @@ import { TerminalRestoringPlaceholder } from './terminal-pane/TerminalRestoringP
 import { findActivityTerminalPortal } from './activity/activity-terminal-portal'
 import { shouldMountBackgroundWorktreeTab } from './terminal/background-terminal-worktree-mount'
 import type { TerminalController } from './use-terminal-controller'
+import { useAppStore } from '../store'
+import { resolveWorkspaceTerminalDefaultCwd } from '../lib/workspace-start-cwd'
 
 export function TerminalLegacyTerminalPanes({
   controller
@@ -28,6 +30,7 @@ export function TerminalLegacyTerminalPanes({
     worktreeFiles,
     workspaceSurfaces
   } = controller
+  const repos = useAppStore((state) => state.repos)
   return (
     <div
       className={`relative flex-1 min-h-0 overflow-hidden ${
@@ -90,7 +93,10 @@ export function TerminalLegacyTerminalPanes({
                     key={`${tab.id}-${tab.generation ?? 0}`}
                     tabId={tab.id}
                     worktreeId={workspace.id}
-                    cwd={tab.startupCwd ?? workspace.path}
+                    cwd={
+                      tab.startupCwd ??
+                      resolveWorkspaceTerminalDefaultCwd(repos, workspace.id, workspace.path)
+                    }
                     isActive={isActiveTerminalTab || activityTerminalPortal?.active === true}
                     isVisible={isActiveTerminalTab || isActivityPortalTab}
                     isWorktreeActive={isVisible || isActivityPortalTab}

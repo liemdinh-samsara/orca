@@ -3,6 +3,7 @@ import {
   snapshotPendingWorktreeRemovals,
   withUnregisteredRemovalCheckouts
 } from '../../../worktree-removal-listing'
+import { appendInPlaceDetectedGitWorkspaces } from './in-place-workspace-catalog'
 import {
   getRepoExecutionHostId,
   getSshTargetIdForExecutionHost
@@ -194,10 +195,20 @@ export async function listDetectedWorktreesForCapturedRepo(
       source: 'git',
       catalogVersion: localWorktreeCatalogVersionAt(scan.generation),
       worktrees: connectionId
-        ? buildDetectedGitWorktrees(store, repo, gitWorktrees, allMeta)
+        ? appendInPlaceDetectedGitWorkspaces(
+            store,
+            repo,
+            buildDetectedGitWorktrees(store, repo, gitWorktrees, allMeta),
+            allMeta ?? {}
+          )
         : // Why always marked: the desktop renderer ships with this main process.
           projectPendingWorktreeRemovals(
-            buildDetectedGitWorktrees(store, repo, localRows, allMeta),
+            appendInPlaceDetectedGitWorkspaces(
+              store,
+              repo,
+              buildDetectedGitWorktrees(store, repo, localRows, allMeta),
+              allMeta ?? {}
+            ),
             (worktree) => worktree.id,
             true,
             pendingAtScan

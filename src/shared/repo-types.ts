@@ -68,6 +68,10 @@ export type Repo = {
   worktreeBaseRef?: string
   /** Optional repo-scoped workspace root override. Relative paths resolve from `path`. */
   worktreeBasePath?: string
+  /** New workspaces share the project checkout instead of running `git worktree add`. */
+  inPlaceWorkspaces?: boolean
+  /** Folder relative to each workspace root where terminals and agents start. Git stays at the root. */
+  workspaceStartPath?: string
   hookSettings?: RepoHookSettings
   /** SSH target ID for remote repos. null/undefined = local. */
   connectionId?: string | null

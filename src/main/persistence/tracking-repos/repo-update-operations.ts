@@ -90,6 +90,8 @@ export class RepoUpdatePersistenceOperations {
         | 'folderUpgradeGitRootPath'
         | 'executionHostId'
         | 'symlinkPaths'
+        | 'inPlaceWorkspaces'
+        | 'workspaceStartPath'
         | 'issueSourcePreference'
         | 'forkSyncMode'
         | 'externalWorktreeVisibilityPromptDismissedAt'

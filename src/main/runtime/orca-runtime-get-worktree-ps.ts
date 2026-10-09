@@ -1,4 +1,5 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
+import { resolveProjectStartFolderCwd } from '../project-start-folder-cwd'
 import { resolveStructuredCodexAccountKind } from './structured-agent-account-home'
 import { collectRuntimeWorktreeAgentSources } from './runtime-worktree-agent-sources'
 import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './orca-runtime-start-tui-idle-visible-read-probe'
@@ -215,8 +216,13 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStartTuiIdleVis
       logger,
       // Resolves folder workspaces as well as git worktrees, so a chat session
       // in a plain folder lands in the folder rather than failing to resolve.
-      resolveWorkspacePath: async (workspaceId) =>
-        (await this.resolveRuntimeFileTarget(`id:${workspaceId}`)).worktree.path,
+      resolveWorkspacePath: async (workspaceId) => {
+        const { worktree } = await this.resolveRuntimeFileTarget(`id:${workspaceId}`)
+        return (
+          resolveProjectStartFolderCwd(worktree.path, this.store?.getRepo(worktree.repoId)) ??
+          worktree.path
+        )
+      },
       resolveClaudeCommand: () =>
         resolveStructuredAgentCommand('claude', this.requireStore().getSettings()),
       resolveCodexCommand: (options) =>

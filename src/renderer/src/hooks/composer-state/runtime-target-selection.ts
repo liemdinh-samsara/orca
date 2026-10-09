@@ -9,6 +9,7 @@ import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { resolveWorkspaceCreationTarget } from '@/lib/project-host-workspace-target'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { createsWorkspacesInPlace } from '../../../../shared/in-place-workspaces'
 import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { getLocalRepoProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import { getAgentLaunchPlatformForRepo } from '@/lib/agent-launch-platform'
@@ -119,7 +120,10 @@ export function useComposerRuntimeTargetSelection(input: ComposerRuntimeTargetSe
       ? selectedWorkspaceTarget.target.repo
       : eligibleRepos.find((repo) => repo.id === repoId)
 
-  const selectedRepoIsGit = selectedRepo ? isGitRepoKind(selectedRepo) : false
+  // Why: an in-place project creates workspaces like a folder project, so branch/base/setup fields don't apply.
+  const selectedRepoIsGit = selectedRepo
+    ? isGitRepoKind(selectedRepo) && !createsWorkspacesInPlace(selectedRepo)
+    : false
 
   const selectedRepoExecutionHostId = selectedRepo ? getRepoExecutionHostId(selectedRepo) : null
 

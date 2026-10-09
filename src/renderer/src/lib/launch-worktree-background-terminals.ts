@@ -1,4 +1,5 @@
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { resolveWorkspaceTerminalDefaultCwd } from './workspace-start-cwd'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { singlePaneLayoutSnapshot } from '@/store/slices/terminal-helpers'
@@ -117,11 +118,19 @@ async function spawnPane(args: {
   placement: TerminalPanePlacement
   command?: string
   env?: Record<string, string>
+  /** Setup scripts run from the workspace root even when the project has a start folder. */
+  useRootCwd?: boolean
 }): Promise<SpawnedPane> {
   const result = await window.api.pty.spawn({
     cols: 120,
     rows: 40,
-    cwd: args.worktree.path,
+    cwd: args.useRootCwd
+      ? args.worktree.path
+      : resolveWorkspaceTerminalDefaultCwd(
+          useAppStore.getState().repos,
+          args.worktree.id,
+          args.worktree.path
+        ),
     ...(args.command ? { command: args.command } : {}),
     env: buildPaneEnv(args.worktree.id, args.tabId, args.leafId, args.env),
     connectionId: args.connectionId,
@@ -140,6 +149,7 @@ async function createBackgroundTab(args: {
   worktree: Worktree
   connectionId: string | null
   launch: BackgroundTerminalLaunch
+  useRootCwd?: boolean
 }): Promise<BackgroundTab> {
   const store = useAppStore.getState()
   const tab = store.createTab(args.worktree.id, undefined, undefined, {
@@ -166,7 +176,8 @@ async function createBackgroundTab(args: {
       leafId,
       placement: { kind: 'new-tab', row: terminalPanePlacementRow(created) },
       command: args.launch.command,
-      env: args.launch.env
+      env: args.launch.env,
+      ...(args.useRootCwd ? { useRootCwd: true } : {})
     })
   } catch (error) {
     store.closeTab(tab.id, { recordInteraction: false, reason: 'cleanup' })
@@ -199,6 +210,7 @@ async function addSetupSplit(args: {
   const setupPane = await spawnPane({
     worktree: args.worktree,
     connectionId: args.connectionId,
+    useRootCwd: true,
     tabId: args.tab.tabId,
     leafId: setupLeafId,
     placement: {
@@ -300,6 +312,7 @@ export async function launchWorktreeBackgroundTerminals(
     await createBackgroundTab({
       worktree,
       connectionId,
+      useRootCwd: true,
       launch: {
         title: getSetupTabTitle(),
         command: buildSetupCommand(args.setup),

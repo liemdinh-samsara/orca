@@ -3,7 +3,7 @@ import { OrcaRuntimeWithGetWorktreeTerminalProvisioningHost } from './orca-runti
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import type { CreateWorktreeResult } from '../../shared/worktree/create-types'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
-import { isFolderRepo } from '../../shared/repo-kind'
+import { createsWorkspacesInPlace } from '../../shared/in-place-workspaces'
 import { resolveWorktreeCreateRoute } from '../worktree-create-execution-host-route'
 import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
 import { createRuntimeFolderWorktree } from './runtime-folder-worktree-create'
@@ -85,7 +85,7 @@ export class OrcaRuntimeWithCreateManagedWorktree extends OrcaRuntimeWithGetWork
     const effectiveDraftPaste = args.startupDraftPaste ?? draftStartup?.draftPaste
     // Match IPC routing: executionHostId-only SSH repos must not create locally.
     const createRoute = resolveWorktreeCreateRoute(repo)
-    if (isFolderRepo(repo)) {
+    if (createsWorkspacesInPlace(repo)) {
       // A folder workspace is a registration, not a filesystem create, so it is host-agnostic.
       return createRuntimeFolderWorktree({
         request: args,

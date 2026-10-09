@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Builds one self-contained before/after HTML page (images inlined) from a manifest.
 
-    build-report.py <manifest.json> <out.html>
+    build-report.py <manifest.json> <out.html> [--fragment]
+
+--fragment omits the doctype/html/head/body wrapper; Claude artifacts add their own skeleton.
 
 Manifest (image paths are relative to the manifest file):
 {
@@ -85,6 +87,7 @@ lb.addEventListener('click',()=>lb.style.display='none');
 
 def main() -> None:
     manifest_path, out_path = sys.argv[1], sys.argv[2]
+    fragment = "--fragment" in sys.argv[3:]
     base_dir = os.path.dirname(os.path.abspath(manifest_path))
     with open(manifest_path) as handle:
         manifest = json.load(handle)
@@ -100,16 +103,22 @@ def main() -> None:
             + "</table></section>"
         )
     notes = f"<section>{manifest['notes']}</section>" if manifest.get("notes") else ""
+    head = f"<title>{html.escape(manifest['title'])}</title><style>{STYLE}</style>"
+    if not fragment:
+        head = (
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f"{head}</head><body>"
+        )
     page = (
-        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        f"<title>{html.escape(manifest['title'])}</title><style>{STYLE}</style></head><body><main>"
+        f"{head}<main>"
         f"<h1>{html.escape(manifest['title'])}</h1>"
         f'<p class="sub">{manifest.get("subtitle", "")} &middot; click a screenshot to enlarge.</p>'
         + "".join(section(base_dir, item) for item in manifest["sections"])
         + table
         + notes
-        + f'</main><div class="lb" id="lb"><img alt=""></div><script>{SCRIPT}</script></body></html>'
+        + f'</main><div class="lb" id="lb"><img alt=""></div><script>{SCRIPT}</script>'
+        + ("" if fragment else "</body></html>")
     )
     with open(out_path, "w") as handle:
         handle.write(page)

@@ -68,7 +68,7 @@ For packaged behavior:
   --wait-for '[aria-label="Update available"]' --timeout 60000 --report-js 'window.api.updater.getStatus()'
 ```
 
-`packaged-proof.sh` hides dialogs and toasts before the screenshot, because a hidden window ignores clicks and Escape. Pass `--keep-overlays` if the overlay *is* the thing being proven. Crop with `sips -c <h> <w> --cropOffset <y> <x> in.png --out out.png` when the relevant bit is small.
+`packaged-proof.sh` hides dialogs and toasts before the screenshot, because a hidden window ignores clicks and Escape. Pass `--keep-overlays` if the overlay *is* the thing being proven. Crop with `sips -c <h> <w> --cropOffset <y> <x> in.png --out out.png` when the relevant bit is small. sips ignores an offset of `0 0` and crops the center, so use `1 1` to crop from the top-left.
 
 Open each BEFORE image with the Read tool. A screenshot of the wrong state, such as an onboarding modal or an empty pane, proves nothing.
 
@@ -137,8 +137,10 @@ For packaged-only proof, run `packaged-proof.sh dist/mac-*/Orca.app "$S/after-â€
 Write `$S/manifest.json` covering every section: what changed, before/after image pairs with captions quoting the recorded state, the test table, and manual checks. The format is in the header of `scripts/build-report.py`. Then build the page:
 
 ```bash
-python3 .claude/skills/orca-test-and-verify/scripts/build-report.py "$S/manifest.json" "$S/orca-proof.html"
+python3 .claude/skills/orca-test-and-verify/scripts/build-report.py "$S/manifest.json" "$S/orca-proof.html" --fragment
 ```
+
+`--fragment` leaves out the `<html>`/`<body>` wrapper, which a Claude artifact adds itself. Drop it for the S3 upload, which serves the file as-is.
 
 Publish it:
 

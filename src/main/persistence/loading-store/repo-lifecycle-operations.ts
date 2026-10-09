@@ -1,5 +1,6 @@
 import type { ProjectHostSetup, ProjectHostSetupUpdateArgs } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
+import { applyNewProjectWorkspaceDefault } from '../../../shared/in-place-workspaces'
 import type { GhAccountBinding } from '../../../shared/github/account-binding'
 import {
   removeRepoFromHostWorkspaceSessions,
@@ -51,6 +52,8 @@ export class RepoLifecycleOperations {
 
   addRepo(repo: Repo): void {
     bumpLocalWorktreeScanGeneration(repo.id)
+    // Why: every add path funnels here, and callers keep returning the object they registered.
+    applyNewProjectWorkspaceDefault(repo)
     getRepoOrderOperations(this).addRepo(repo)
   }
 

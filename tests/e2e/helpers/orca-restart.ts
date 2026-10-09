@@ -271,7 +271,11 @@ export async function attachRepoAndOpenTerminal(page: Page, repoPath: string): P
             }
             // Why: this restart fixture uses the global e2e repo, whose seeded Git
             // worktree is external to Orca's workspace root after the visibility rollout.
-            await store.getState().updateRepo(repo.id, { externalWorktreeVisibility: 'show' })
+            await store.getState().updateRepo(repo.id, {
+              externalWorktreeVisibility: 'show',
+              // Why: new projects default to in-place workspaces; worktree specs need git worktrees.
+              inPlaceWorkspaces: false
+            })
             return true
           }, repoId)
         ),

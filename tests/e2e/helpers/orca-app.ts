@@ -347,7 +347,11 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
             }
             // Why: the fixture deliberately creates external Git worktrees. New
             // repos hide those by default after the visibility rollout.
-            await store.getState().updateRepo(repo.id, { externalWorktreeVisibility: 'show' })
+            await store.getState().updateRepo(repo.id, {
+              externalWorktreeVisibility: 'show',
+              // Why: new projects default to in-place workspaces; worktree specs need git worktrees.
+              inPlaceWorkspaces: false
+            })
             return true
           }, seededRepoId),
         {

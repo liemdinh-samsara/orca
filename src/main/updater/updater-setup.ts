@@ -14,6 +14,7 @@ import type {
   RemoteServerUpdateSupport
 } from '../../shared/remote-server-update'
 import { getLinuxPackageType } from '../linux-update-package-type'
+import { isLocalBuildAppVersion } from '../../shared/app-version'
 import { createUpdaterDiagnosticLogger } from '../linux-package-install-diagnostic'
 import { registerAutoUpdaterHandlers } from '../updater-events'
 import { getServeUpdateHandoffFailure } from '../serve-update-handoff'
@@ -221,6 +222,12 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
         this.userInitiatedCheck = value
       }
     })
+
+    // Why: a hand-packaged build is replaced by hand; background checks would only offer the release build over it.
+    // Handlers stay registered so "Check for Updates" still works on request.
+    if (isLocalBuildAppVersion(app.getVersion())) {
+      return
+    }
 
     void this.checkForUpdateNudge()
     this.scheduleUpdateNudgeCheck()

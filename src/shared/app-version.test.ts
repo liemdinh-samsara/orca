@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   compareAppVersions,
+  isLocalBuildAppVersion,
   isPerfPrereleaseAppVersion,
   isPrereleaseAppVersion,
   isValidAppVersion,
@@ -22,6 +23,14 @@ describe('app version comparison', () => {
     expect(isPrereleaseAppVersion('1.5.0')).toBe(false)
     expect(isPerfPrereleaseAppVersion('1.5.0-rc.1.perf')).toBe(true)
     expect(isPerfPrereleaseAppVersion('1.5.0-rc.1')).toBe(false)
+  })
+
+  it('recognizes hand-packaged local build versions', () => {
+    expect(isLocalBuildAppVersion('1.4.214-local.1791504809000.81fd59dab3e4')).toBe(true)
+    expect(isLocalBuildAppVersion('1.4.159-rc.0.local.123.abc')).toBe(true)
+    expect(isLocalBuildAppVersion('1.4.214')).toBe(false)
+    expect(isLocalBuildAppVersion('1.4.214-rc.1')).toBe(false)
+    expect(isLocalBuildAppVersion('1.4.214-local')).toBe(false)
   })
 })
 

@@ -40,6 +40,13 @@ export function isPerfPrereleaseAppVersion(value: string): boolean {
   return parsed?.prerelease.some((identifier) => identifier.toLowerCase() === 'perf') ?? false
 }
 
+/** Matches the `local.<timestamp>.<commit>` suffix that hand-packaged builds carry (config/scripts/build-mac-local.mjs). */
+export function isLocalBuildAppVersion(value: string): boolean {
+  const prerelease = parseVersion(value)?.prerelease ?? []
+  const localIndex = prerelease.indexOf('local')
+  return localIndex !== -1 && /^\d+$/.test(prerelease[localIndex + 1] ?? '')
+}
+
 function compareIdentifiers(left: string, right: string): number {
   const leftNumeric = /^\d+$/.test(left)
   const rightNumeric = /^\d+$/.test(right)

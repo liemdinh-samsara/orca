@@ -66,6 +66,25 @@ describe('updater', () => {
     expect(setLastUpdateCheckAt).not.toHaveBeenCalled()
   })
 
+  it('skips background checks and nudges on a hand-packaged local build', async () => {
+    appMock.getVersion.mockReturnValue('1.4.214-local.1791504809000.81fd59dab3e4')
+    const mainWindow = { webContents: { send: vi.fn() } }
+    fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })
+    shouldApplyNudgeMock.mockReturnValue(true)
+
+    const { setupAutoUpdater } = await loadUpdaterModule()
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now() - 25 * 60 * 60 * 1000
+    })
+    await vi.advanceTimersByTimeAsync(48 * 60 * 60 * 1000)
+
+    expect(autoUpdaterMock.on).toHaveBeenCalled()
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(fetchNudgeMock).not.toHaveBeenCalled()
+    expect(powerMonitorOnMock).not.toHaveBeenCalled()
+  })
+
   it('starts nudge polling only after updater initialization is complete', async () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })

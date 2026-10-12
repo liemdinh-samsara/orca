@@ -54,6 +54,17 @@ export function buildSshTargetSavePayload(form: EditingTarget): SshTargetSavePay
     }
   }
 
+  const projectPathPrefix = form.projectPathPrefix.trim() || undefined
+  if (projectPathPrefix && !/^(\/|~(\/|$))/.test(projectPathPrefix)) {
+    return {
+      ok: false,
+      error: translate(
+        'auto.components.settings.SshPane.projectPathPrefixInvalid',
+        'Project path prefix must start with / or ~'
+      )
+    }
+  }
+
   const identityFile = form.identityFile.trim() || undefined
   const proxyCommand = form.proxyCommand.trim() || undefined
   const jumpHost = form.jumpHost.trim() || undefined
@@ -73,7 +84,8 @@ export function buildSshTargetSavePayload(form: EditingTarget): SshTargetSavePay
     ...(jumpHost ? { jumpHost } : {}),
     ...(systemSshConnectionReuse === false ? { systemSshConnectionReuse } : {}),
     ...(remoteRuntime ? { remoteRuntime } : {}),
-    ...(form.allowRemoteCliControl ? { allowRemoteCliControl: true } : {})
+    ...(form.allowRemoteCliControl ? { allowRemoteCliControl: true } : {}),
+    ...(projectPathPrefix ? { projectPathPrefix } : {})
   }
 
   return {
@@ -91,6 +103,7 @@ export function buildSshTargetSavePayload(form: EditingTarget): SshTargetSavePay
         systemSshConnectionReuse,
         remoteRuntime,
         allowRemoteCliControl: form.allowRemoteCliControl || undefined,
+        projectPathPrefix,
         source: 'manual'
       }
     }

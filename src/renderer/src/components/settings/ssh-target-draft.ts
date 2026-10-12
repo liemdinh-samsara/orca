@@ -26,6 +26,7 @@ export type EditingTarget = {
   relayKeepAliveUntilReset: boolean
   remoteRuntime: SshRemoteRuntimeChoice
   allowRemoteCliControl: boolean
+  projectPathPrefix: string
 }
 
 export const EMPTY_FORM: EditingTarget = {
@@ -42,7 +43,8 @@ export const EMPTY_FORM: EditingTarget = {
   relayGracePeriodSeconds: String(DEFAULT_BOUNDED_SSH_RELAY_GRACE_PERIOD_SECONDS),
   relayKeepAliveUntilReset: DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS === 0,
   remoteRuntime: 'auto',
-  allowRemoteCliControl: false
+  allowRemoteCliControl: false,
+  projectPathPrefix: ''
 }
 
 export function getEditingTargetForSshTarget(target: SshTarget): EditingTarget {
@@ -68,7 +70,8 @@ export function getEditingTargetForSshTarget(target: SshTarget): EditingTarget {
     relayKeepAliveUntilReset:
       (target.relayGracePeriodSeconds ?? DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS) === 0,
     remoteRuntime: target.remoteRuntime ?? 'auto',
-    allowRemoteCliControl: target.allowRemoteCliControl === true
+    allowRemoteCliControl: target.allowRemoteCliControl === true,
+    projectPathPrefix: target.projectPathPrefix ?? ''
   }
 }
 
@@ -177,7 +180,8 @@ export function hasAdvancedConnectionValues(form: EditingTarget): boolean {
     form.jumpHost.trim().length > 0 ||
     !form.systemSshConnectionReuse ||
     form.remoteRuntime !== 'auto' ||
-    form.allowRemoteCliControl
+    form.allowRemoteCliControl ||
+    form.projectPathPrefix.trim().length > 0
   )
 }
 
@@ -196,7 +200,8 @@ export function isSshTargetFormDirty(current: EditingTarget, baseline: EditingTa
     current.relayGracePeriodSeconds !== baseline.relayGracePeriodSeconds ||
     current.relayKeepAliveUntilReset !== baseline.relayKeepAliveUntilReset ||
     current.remoteRuntime !== baseline.remoteRuntime ||
-    current.allowRemoteCliControl !== baseline.allowRemoteCliControl
+    current.allowRemoteCliControl !== baseline.allowRemoteCliControl ||
+    current.projectPathPrefix !== baseline.projectPathPrefix
   )
 }
 

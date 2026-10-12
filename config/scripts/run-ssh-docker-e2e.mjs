@@ -59,6 +59,7 @@ const result = spawnSync(
     'tests/e2e/ssh-ai-vault-session-history.spec.ts',
     'tests/e2e/ssh-codex-display-artifacts-repro.spec.ts',
     'tests/e2e/ssh-cross-host-workspace-nesting.spec.ts',
+    'tests/e2e/ssh-project-path-prefix-setup.spec.ts',
     'tests/e2e/ssh-cold-activation-restore.spec.ts',
     'tests/e2e/ssh-cold-hydration-gap-tab-seeding.spec.ts',
     'tests/e2e/ssh-emptied-worktree-reactivation.spec.ts',

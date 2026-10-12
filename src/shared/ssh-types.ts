@@ -72,6 +72,9 @@ export type SshTarget = {
   /** Grace period in seconds before relay shuts down after disconnect.
    *  0 disables expiry. Default: 0 (until reset). Max: 604800 (7 days). */
   relayGracePeriodSeconds?: number
+  /** Where projects live on this host: a project under the local home maps to the same path under
+   *  this prefix. Undefined means the host's home folder. */
+  projectPathPrefix?: string
   /** Lets this host's relayed `orca` CLI control this Orca beyond its own terminals (other hosts,
    *  orchestration, files). Off by default: the host is a guest, not an owner. */
   allowRemoteCliControl?: boolean

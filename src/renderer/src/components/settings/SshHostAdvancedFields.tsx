@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { SettingsSwitch } from './SettingsFormControls'
+import { SshProjectPathPrefixField } from './SshProjectPathPrefixField'
 import type { EditingTarget, SshRemoteRuntimeChoice } from './ssh-target-draft'
 import { translate } from '@/i18n/i18n'
 
@@ -150,6 +151,11 @@ export function SshHostAdvancedFields({
               )}
             />
           </div>
+          <SshProjectPathPrefixField
+            value={form.projectPathPrefix}
+            disabled={disabled}
+            onChange={(projectPathPrefix) => onFormChange((f) => ({ ...f, projectPathPrefix }))}
+          />
           <SshRemoteRuntimeField
             value={form.remoteRuntime}
             disabled={disabled}

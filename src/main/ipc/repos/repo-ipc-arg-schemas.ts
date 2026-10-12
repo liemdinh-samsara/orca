@@ -52,6 +52,11 @@ export const ProjectHostSetupExistingFolderIpcArgs = z.object({
   setupMethod: z.enum(['imported-existing-folder', 'cloned']).optional()
 })
 
+export const ProjectHostMappedSetupIpcArgs = z.object({
+  projectId: z.string().min(1),
+  hostId: z.string().min(1)
+})
+
 const LocalWindowsRuntimePreferenceIpcArgs = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('inherit-global') }),
   z.object({ kind: z.literal('windows-host') }),

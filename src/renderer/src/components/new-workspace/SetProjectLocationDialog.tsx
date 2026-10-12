@@ -21,6 +21,8 @@ type BrowseField = 'existing' | 'clone'
 
 type SetProjectLocationDialogProps = {
   option: NeedsSetupProjectHostOption | null
+  /** The mapped path Orca expected, prefilled when nothing was found there. */
+  suggestedPath?: string | null
   projectName: string
   projectKind: RepoKind
   defaultCloneUrl: string
@@ -30,6 +32,7 @@ type SetProjectLocationDialogProps = {
 
 export function SetProjectLocationDialog({
   option,
+  suggestedPath = null,
   projectName,
   projectKind,
   defaultCloneUrl,
@@ -70,8 +73,9 @@ export function SetProjectLocationDialog({
       >
         {activeOption ? (
           <SetProjectLocationDialogBody
-            key={activeOption.id}
+            key={`${activeOption.id}:${suggestedPath ?? ''}`}
             option={activeOption}
+            suggestedPath={suggestedPath}
             projectName={projectName}
             projectKind={projectKind}
             defaultCloneUrl={defaultCloneUrl}
@@ -86,6 +90,7 @@ export function SetProjectLocationDialog({
 
 function SetProjectLocationDialogBody({
   option,
+  suggestedPath,
   projectName,
   projectKind,
   defaultCloneUrl,
@@ -93,6 +98,7 @@ function SetProjectLocationDialogBody({
   onReady
 }: {
   option: NeedsSetupProjectHostOption
+  suggestedPath: string | null
   projectName: string
   projectKind: RepoKind
   defaultCloneUrl: string
@@ -101,9 +107,9 @@ function SetProjectLocationDialogBody({
 }): React.JSX.Element {
   const setupProjectExistingFolder = useAppStore((state) => state.setupProjectExistingFolder)
   const setupProjectClone = useAppStore((state) => state.setupProjectClone)
-  const [view, setView] = useState<DialogView>('choose')
+  const [view, setView] = useState<DialogView>(suggestedPath ? 'existing' : 'choose')
   const [browseField, setBrowseField] = useState<BrowseField>('existing')
-  const [setupPath, setSetupPath] = useState('')
+  const [setupPath, setSetupPath] = useState(suggestedPath ?? '')
   const [setupKind, setSetupKind] = useState<RepoKind>(projectKind)
   const [cloneUrl, setCloneUrl] = useState(defaultCloneUrl)
   const [cloneDestination, setCloneDestination] = useState('')
@@ -261,6 +267,15 @@ function SetProjectLocationDialogBody({
             />
           ) : null}
         </div>
+      ) : null}
+      {view === 'existing' && suggestedPath ? (
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'auto.components.new.workspace.SetProjectLocationDialog.mappedPathMissing',
+            'Nothing was found at the matching path on {{host}}. Check the path or browse for the project.',
+            { host: option.label }
+          )}
+        </p>
       ) : null}
       {view === 'existing' ? (
         <ExistingFolderForm

@@ -15,6 +15,8 @@ import type {
   ProjectHostSetupCreateResult,
   ProjectHostSetupDeleteArgs,
   ProjectHostSetupDeleteResult,
+  ProjectHostMappedSetupArgs,
+  ProjectHostMappedSetupOutcome,
   ProjectHostSetupExistingFolderArgs,
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
@@ -177,6 +179,10 @@ export type RepoSlice = {
   setupProjectExistingFolder: (
     args: ProjectHostSetupExistingFolderArgs
   ) => Promise<ProjectHostSetupResult | null>
+  /** Sets an SSH host up where the project's other checkout implies; null when that call failed. */
+  setupProjectMappedFolder: (
+    args: ProjectHostMappedSetupArgs
+  ) => Promise<ProjectHostMappedSetupOutcome | null>
   createProjectHostSetup: (
     args: ProjectHostSetupCreateArgs
   ) => Promise<ProjectHostSetupCreateResult | null>

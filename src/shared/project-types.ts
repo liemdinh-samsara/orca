@@ -76,6 +76,20 @@ export type ProjectHostSetupExistingFolderArgs = {
   setupMethod?: RepoProjectHostSetupMethod
 }
 
+export type ProjectHostMappedSetupArgs = {
+  projectId: string
+  hostId: ExecutionHostId
+}
+
+/** `suggestedPath` is the mapped location, offered for manual setup when it could not be used. */
+export type ProjectHostMappedSetupOutcome =
+  | { status: 'ready'; result: ProjectHostSetupResult }
+  | {
+      status: 'unavailable'
+      reason: 'unsupported-host' | 'not-connected' | 'no-mappable-setup' | 'not-found'
+      suggestedPath?: string
+    }
+
 export type ProjectHostSetupCreateArgs = {
   projectId: string
   hostId: ExecutionHostId

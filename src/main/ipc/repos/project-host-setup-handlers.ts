@@ -1,20 +1,18 @@
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
 import type { Store } from '../../persistence'
-import type { Repo } from '../../../shared/repo-types'
 import type {
   ProjectHostSetupCreateArgs,
   ProjectHostSetupCreateResult,
   ProjectHostSetupDeleteArgs,
   ProjectHostSetupDeleteResult,
+  ProjectHostMappedSetupArgs,
+  ProjectHostMappedSetupOutcome,
   ProjectHostSetupExistingFolderArgs,
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult
 } from '../../../shared/project-types'
-import { getProjectIdForProviderIdentity } from '../../../shared/project-host-setup-projection'
-import { getProjectHostSetupForRepo } from '../../../shared/project-host-setup-lookup'
-import { getRepoExecutionHostId, parseExecutionHostId } from '../../../shared/execution-host'
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { emitRepoAdded } from './repo-added-telemetry'
@@ -22,59 +20,26 @@ import { notifyReposChanged } from './repos-changed-notification'
 import {
   ProjectHostSetupCreateIpcArgs,
   ProjectHostSetupDeleteIpcArgs,
+  ProjectHostMappedSetupIpcArgs,
   ProjectHostSetupExistingFolderIpcArgs,
   ProjectHostSetupUpdateIpcArgs,
   parseProjectGroupIpcArgs
 } from './repo-ipc-arg-schemas'
-import { addLocalRepoFromPath } from './local-repo-registration'
-import { addRemoteRepoFromPath } from './remote-repo-registration'
+import { setupExistingFolderOnHost } from './project-host-existing-folder-setup'
+import { setupProjectAtMappedPath } from './project-host-mapped-setup'
 
-function buildProjectHostSetupResult(store: Store, repo: Repo): ProjectHostSetupResult {
-  const setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
-  const project = store.getProjects().find((entry) => entry.id === setup.projectId)
-  if (!project) {
-    throw new Error(`Project setup was created without a project record: ${setup.projectId}`)
-  }
-  return { project, setup, repo }
-}
-
-function alignRepoWithRequestedProject(
+async function finishFolderSetup(
+  mainWindow: BrowserWindow,
   store: Store,
-  repo: Repo,
-  projectId: string,
-  setupMethod: ProjectHostSetupExistingFolderArgs['setupMethod'] = 'imported-existing-folder',
-  requestedProviderIdentity?: ProjectHostSetupExistingFolderArgs['projectProviderIdentity']
-): ProjectHostSetupResult {
-  let setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
-  if (setup.projectId !== projectId) {
-    const project = store.getProjects().find((entry) => entry.id === projectId)
-    // Why: the selected project can exist only on the source host, so its structured identity travels with the request.
-    const identity = project?.providerIdentity ?? requestedProviderIdentity
-    if (!identity || getProjectIdForProviderIdentity(identity) !== projectId) {
-      throw new Error('Imported folder does not match the selected project identity.')
-    }
-    // Why: stamp the selected project's provider identity when the folder lacks upstream, so projection can merge it.
-    const updated = store.updateRepo(repo.id, {
-      upstream: {
-        owner: identity.owner,
-        repo: identity.repo,
-        ...(identity.host ? { host: identity.host } : {})
-      }
-    })
-    if (!updated) {
-      throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)
-    }
-    repo = updated
-    setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
+  result: ProjectHostSetupResult,
+  alreadyExisted: boolean
+): Promise<void> {
+  invalidateAuthorizedRootsCache()
+  notifyReposChanged(mainWindow)
+  emitRepoAdded('folder_picker', alreadyExisted)
+  if (alreadyExisted) {
+    await prepareLocalWorktreeRootForRepo(store, result.repo)
   }
-  const updated = store.updateRepo(repo.id, { projectHostSetupMethod: setupMethod })
-  if (!updated) {
-    throw new Error(
-      `Project setup repo disappeared before setup metadata could be linked: ${repo.id}`
-    )
-  }
-  repo = updated
-  return buildProjectHostSetupResult(store, repo)
 }
 
 export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, store: Store): void {
@@ -144,51 +109,26 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
         rawArgs,
         'project_host_setup_invalid_args'
       )
-      const parsedHost = parseExecutionHostId(args.hostId)
-      if (!parsedHost) {
-        throw new Error(`Unsupported host: ${args.hostId}`)
+      const { result, alreadyExisted } = await setupExistingFolderOnHost(store, args)
+      await finishFolderSetup(mainWindow, store, result, alreadyExisted)
+      return result
+    }
+  )
+
+  ipcMain.handle(
+    'projectHostSetups:setupMappedFolder',
+    async (_event, rawArgs: ProjectHostMappedSetupArgs): Promise<ProjectHostMappedSetupOutcome> => {
+      const args = parseProjectGroupIpcArgs(
+        ProjectHostMappedSetupIpcArgs,
+        rawArgs,
+        'project_host_setup_mapped_invalid_args'
+      )
+      const outcome = await setupProjectAtMappedPath(store, args)
+      if (outcome.status === 'ready') {
+        await finishFolderSetup(mainWindow, store, outcome.result, outcome.alreadyExisted)
+        return { status: 'ready', result: outcome.result }
       }
-      const result =
-        parsedHost.kind === 'local'
-          ? await addLocalRepoFromPath(store, args.path, args.kind)
-          : parsedHost.kind === 'ssh'
-            ? await addRemoteRepoFromPath(store, {
-                connectionId: parsedHost.targetId,
-                remotePath: args.path,
-                displayName: args.displayName,
-                kind: args.kind
-              })
-            : {
-                error:
-                  'Runtime hosts must be set up through the runtime projectHostSetup.setupExistingFolder RPC.'
-              }
-      if ('error' in result) {
-        throw new Error(result.error)
-      }
-      let aligned: ProjectHostSetupResult
-      try {
-        aligned = alignRepoWithRequestedProject(
-          store,
-          result.repo,
-          args.projectId,
-          args.setupMethod,
-          args.projectProviderIdentity
-        )
-      } catch (err) {
-        // Why: an import that cannot be linked must not leave a new repo registration or authorization root behind.
-        if (!result.alreadyExisted) {
-          store.removeProjectForHost(result.repo.id, getRepoExecutionHostId(result.repo))
-          invalidateAuthorizedRootsCache()
-        }
-        throw err
-      }
-      invalidateAuthorizedRootsCache()
-      notifyReposChanged(mainWindow)
-      emitRepoAdded('folder_picker', result.alreadyExisted)
-      if (result.alreadyExisted) {
-        await prepareLocalWorktreeRootForRepo(store, aligned.repo)
-      }
-      return aligned
+      return outcome
     }
   )
 }

@@ -110,6 +110,10 @@ export default function NewWorkspaceComposerCard(
   // Why sticky: the dialog animates itself closed off its own `option` prop, so unmounting it
   // when the option clears would cut that animation short.
   const [setLocationDialogMounted, setSetLocationDialogMounted] = React.useState(false)
+  const [setLocationSuggestedPath, setSetLocationSuggestedPath] = React.useState<string | null>(
+    null
+  )
+  const setupProjectMappedFolder = useAppStore((state) => state.setupProjectMappedFolder)
 
   const selectedRepo = eligibleRepos.find((candidate) => candidate.id === repoId)
   const selectedRepoName = selectedRepo?.displayName ?? selectedRepo?.path ?? 'This project'
@@ -215,11 +219,21 @@ export default function NewWorkspaceComposerCard(
   }, [onAddProjectOverride, openModal])
   const handleSetLocation = React.useCallback(
     (option: NeedsProjectHostOption): void => {
-      setSetLocationDialogMounted(true)
-      setSetLocationOption(option)
-      onNestedDialogOpenChange?.(true)
+      void setupProjectMappedFolder({ projectId: option.projectId, hostId: option.hostId }).then(
+        (outcome) => {
+          if (outcome?.status === 'ready') {
+            onProjectHostSetupChange?.(outcome.result.setup.id)
+            return
+          }
+          // Why: the dialog is the fallback when the mapped path is missing or unmappable.
+          setSetLocationSuggestedPath(outcome?.suggestedPath ?? null)
+          setSetLocationDialogMounted(true)
+          setSetLocationOption(option)
+          onNestedDialogOpenChange?.(true)
+        }
+      )
     },
-    [onNestedDialogOpenChange]
+    [onNestedDialogOpenChange, onProjectHostSetupChange, setupProjectMappedFolder]
   )
   const handleSetLocationClose = React.useCallback((): void => {
     setSetLocationOption(null)
@@ -369,6 +383,7 @@ export default function NewWorkspaceComposerCard(
         <React.Suspense fallback={null}>
           <SetProjectLocationDialog
             option={setLocationOption}
+            suggestedPath={setLocationSuggestedPath}
             projectName={selectedProjectName}
             projectKind={selectedRepoIsGit ? 'git' : 'folder'}
             defaultCloneUrl={defaultCloneUrl}

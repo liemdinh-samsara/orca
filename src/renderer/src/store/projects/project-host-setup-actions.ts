@@ -17,6 +17,7 @@ import type { RepoSlice } from '../repos/repo-state'
 import { ERROR_TOAST_DURATION } from '../repos/repo-state'
 import { repoWithFetchedOwner } from '../repos/owner-routing'
 import { normalizeProjectRow } from '../../../../shared/project-catalog-row-normalization'
+import { mergeProjectHostSetupResult } from './project-host-setup-result-merge'
 import {
   assertProjectHostSetupMutationRuntimeCapabilities,
   getProjectSetupRuntimeTarget,
@@ -56,29 +57,9 @@ export function createProjectHostSetupActions(
                 )
               ).result
         const repo = repoWithFetchedOwner(result.repo, target)
-        const repoHostId = getRepoExecutionHostId(repo)
         const setup = setupWithFetchedOwner(result.setup, target)
         const project = normalizeProjectRow(result.project)
-        set((s) => {
-          const nextRepos = s.repos.some((entry) =>
-            repoMatchesHostIdentity(entry, repo.id, repoHostId)
-          )
-            ? s.repos.map((entry) =>
-                repoMatchesHostIdentity(entry, repo.id, repoHostId) ? repo : entry
-              )
-            : [...s.repos, repo]
-          const nextProjects = s.projects.some((entry) => entry.id === project.id)
-            ? s.projects.map((entry) => (entry.id === project.id ? project : entry))
-            : [...s.projects, project]
-          const nextSetups = s.projectHostSetups.some((entry) => entry.id === setup.id)
-            ? s.projectHostSetups.map((entry) => (entry.id === setup.id ? setup : entry))
-            : [...s.projectHostSetups, setup]
-          return {
-            repos: nextRepos,
-            projects: nextProjects,
-            projectHostSetups: nextSetups
-          }
-        })
+        set((s) => mergeProjectHostSetupResult(s, { repo, project, setup }))
         toast.success(translate('auto.store.slices.repos.8bb3ad7935', 'Project added'), {
           description: repo.displayName
         })

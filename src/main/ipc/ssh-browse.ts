@@ -70,6 +70,22 @@ export function registerSshBrowseHandler(
 
 type SshBrowseConnection = NonNullable<ReturnType<SshConnectionManager['getConnection']>>
 
+/** The host's resolved spelling of `dirPath`, or null when it is not a directory there. */
+export async function resolveRemoteDirectory(
+  conn: SshBrowseConnection,
+  dirPath: string
+): Promise<string | null> {
+  try {
+    return (await browseWithPosixShell(conn, dirPath)).resolvedPath
+  } catch (error) {
+    // Why: only a command that ran and failed means "missing"; transport errors stay errors.
+    if (error instanceof RemoteBrowseError) {
+      return null
+    }
+    throw error
+  }
+}
+
 function browseWithPosixShell(
   conn: SshBrowseConnection,
   dirPath: string

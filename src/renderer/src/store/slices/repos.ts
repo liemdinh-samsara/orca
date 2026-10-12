@@ -12,6 +12,7 @@ import { createProjectGroupMutationActions } from '../project-groups/project-gro
 import { createFolderWorkspaceMutationActions } from '../folder-workspaces/folder-workspace-mutations'
 import { createRepoAddActions } from '../repos/repo-add-actions'
 import { createProjectHostSetupActions } from '../projects/project-host-setup-actions'
+import { createProjectHostMappedSetupActions } from '../projects/project-host-mapped-setup-actions'
 import { createRepoRemovalActions } from '../repos/repo-removal'
 import { createProjectUpdateActions } from '../projects/project-update'
 import { createRepoUpdateActions } from '../repos/repo-update'
@@ -29,6 +30,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   const folderWorkspaceMutations = createFolderWorkspaceMutationActions(set, get)
   const repoAddActions = createRepoAddActions(set, get)
   const projectHostSetupActions = createProjectHostSetupActions(set, get)
+  const projectHostMappedSetupActions = createProjectHostMappedSetupActions(set, get)
   const repoRemoval = createRepoRemovalActions(set, get)
   const projectUpdate = createProjectUpdateActions(set, get)
   const repoUpdate = createRepoUpdateActions(set, get)
@@ -74,6 +76,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     moveProjectToGroup: projectGroupMutations.moveProjectToGroup,
     addRepoPath: repoAddActions.addRepoPath,
     setupProjectExistingFolder: projectHostSetupActions.setupProjectExistingFolder,
+    setupProjectMappedFolder: projectHostMappedSetupActions.setupProjectMappedFolder,
     createProjectHostSetup: projectHostSetupActions.createProjectHostSetup,
     updateProjectHostSetup: projectHostSetupActions.updateProjectHostSetup,
     deleteProjectHostSetup: projectHostSetupActions.deleteProjectHostSetup,

@@ -4,6 +4,7 @@ import {
   type BrowserRouteElectronSession,
   type BrowserRouteSessionRegistryDependencies
 } from './browser-route-session-registry'
+import { BROWSER_ROUTE_PROXY_BYPASS_RULES } from './browser-route-session-policy'
 
 const identity = {
   orcaProfileId: 'orca-profile-a',
@@ -185,7 +186,7 @@ describe('BrowserRouteSessionRegistry', () => {
     expect(session.setProxy).toHaveBeenCalledWith({
       mode: 'fixed_servers',
       proxyRules: 'socks5://127.0.0.1:43123',
-      proxyBypassRules: '<-loopback>'
+      proxyBypassRules: BROWSER_ROUTE_PROXY_BYPASS_RULES
     })
     expect(session.resolveProxy).toHaveBeenCalledWith('http://browser-route-probe.invalid/')
     expect(registry.isAllowedPartition(handle.partition)).toBe(true)

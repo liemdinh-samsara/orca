@@ -1,5 +1,19 @@
 const PROXY_PROBE_URL = 'http://browser-route-probe.invalid/'
 
+// Why: Okta FastPass signs in by calling Okta Verify on this desktop's loopback. Routed through the
+// SSH host those calls find nothing, and Okta falls back to an app launch its policies can reject.
+export const OKTA_VERIFY_LOOPBACK_PORTS: readonly number[] = [
+  8769, 65111, 65112, 65121, 65122, 65123
+]
+
+/** Loopback goes to the SSH host (its dev servers), except the desktop authenticator's ports. */
+export const BROWSER_ROUTE_PROXY_BYPASS_RULES = [
+  '<-loopback>',
+  ...OKTA_VERIFY_LOOPBACK_PORTS.flatMap((port) =>
+    ['localhost', '127.0.0.1', '[::1]'].map((host) => `${host}:${port}`)
+  )
+].join(';')
+
 export type BrowserRouteElectronSession = {
   setProxy(config: {
     mode: 'fixed_servers'
@@ -34,7 +48,7 @@ export async function prepareBrowserRouteSessionPolicy(input: {
     proxySetup = session.setProxy({
       mode: 'fixed_servers',
       proxyRules: `socks5://${input.proxyEndpoint.host}:${input.proxyEndpoint.port}`,
-      proxyBypassRules: '<-loopback>'
+      proxyBypassRules: BROWSER_ROUTE_PROXY_BYPASS_RULES
     })
     await input.dependencies.setupPolicies({
       partition: input.partition,

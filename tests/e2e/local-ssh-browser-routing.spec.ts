@@ -19,6 +19,7 @@ import {
   SSH_REMOTE_ONLY_COOKIE_VALUE,
   SSH_REMOTE_ONLY_ORIGIN
 } from './helpers/ssh-remote-only-browser-fixture'
+import { OKTA_VERIFY_LOOPBACK_PORTS } from '../../src/main/browser/browser-route-session-policy'
 import {
   installBrowserPaneMountCensus,
   readBrowserPaneMountCensus,
@@ -281,6 +282,42 @@ function censusFor(
   return census.filter((entry) => entry.overlayTabId === tabId)
 }
 
+/** Stands in for Okta Verify on a free one of its loopback ports, on the desktop itself. */
+async function startDesktopAuthenticatorStub(): Promise<{ server: Server; port: number }> {
+  // Why reversed: 8769 is the real Okta Verify's default port on a developer's machine.
+  for (const port of OKTA_VERIFY_LOOPBACK_PORTS.toReversed()) {
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' })
+      response.end('desktop-authenticator')
+    })
+    const bound = await new Promise<boolean>((resolve) => {
+      server.once('error', () => resolve(false))
+      server.listen(port, '127.0.0.1', () => resolve(true))
+    })
+    if (bound) {
+      return { server, port }
+    }
+  }
+  throw new Error('every Okta Verify loopback port is taken on this desktop')
+}
+
+/** Fetches from inside one tab's guest: the body, `opaque` for no-cors, or the failure. */
+async function fetchFromTab(
+  page: Page,
+  tabId: string,
+  url: string,
+  mode: 'cors' | 'no-cors' = 'cors'
+): Promise<string> {
+  const script = `fetch(${JSON.stringify(url)}, { mode: ${JSON.stringify(mode)}, cache: 'no-store' })
+    .then((r) => (r.type === 'opaque' ? 'opaque' : r.text()), (e) => 'failed: ' + e.message)`
+  return page
+    .locator(`[data-browser-overlay-tab-id="${tabId}"] webview`)
+    .evaluate<string, string, Electron.WebviewTag>(
+      (node, code) => node.executeJavaScript(code),
+      script
+    )
+}
+
 test('routes SSH-workspace browsing through the SSH host, fail-closed across a real drop', async ({
   orcaPage
 }, testInfo) => {
@@ -368,6 +405,28 @@ test('routes SSH-workspace browsing through the SSH host, fail-closed across a r
       loginRequests.find((entry) => entry.path === '/login')?.cookie ?? null,
       'the first request must arrive without the planted cookie'
     ).toBeNull()
+
+    // (3b) Okta FastPass calls Okta Verify on this desktop's loopback, so its ports skip the route
+    // while every other loopback port still reaches the SSH host.
+    const authenticator = await startDesktopAuthenticatorStub()
+    try {
+      expect(
+        await fetchFromTab(orcaPage, loginTab.id, `http://127.0.0.1:${authenticator.port}/probe`),
+        'an SSH-routed page must reach Okta Verify on this desktop'
+      ).toBe('desktop-authenticator')
+    } finally {
+      authenticator.server.close()
+    }
+    await fetchFromTab(
+      orcaPage,
+      loginTab.id,
+      'http://127.0.0.1:18080/echo/routed-loopback',
+      'no-cors'
+    )
+    expect(
+      readSshRemoteOnlyRequests(target).map((entry) => entry.path),
+      'other loopback ports must keep reaching the SSH host'
+    ).toContain('/echo/routed-loopback')
 
     // A second tab on the same partition proves the cookie jar is shared before the drop.
     const echoTab = await createBrowserTab(orcaPage, worktreeId, ECHO_URL, 'SSH echo')

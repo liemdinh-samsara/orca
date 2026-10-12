@@ -22,13 +22,17 @@ export async function createFloatingWorkspaceTerminalTab(
   store: FloatingWorkspaceTerminalStore,
   shellOverride?: string,
   /** A split group's own "+"; omitted, the tab lands in the focused group. */
-  groupId?: string
+  groupId?: string,
+  /** Omitted, the tab starts in the floating workspace's configured folder. */
+  startupCwd?: string
 ): Promise<TerminalTab | null> {
   const targetGroupId = groupId ?? store.activeGroupIdByWorktree[FLOATING_TERMINAL_WORKTREE_ID]
 
   // Why: the floating workspace is a local scratchpad; a focused remote runtime
   // must not own its SSH/tmux terminals or prune them via session snapshots.
-  const tab = store.createTab(FLOATING_TERMINAL_WORKTREE_ID, targetGroupId, shellOverride)
+  const tab = startupCwd
+    ? store.createTab(FLOATING_TERMINAL_WORKTREE_ID, targetGroupId, shellOverride, { startupCwd })
+    : store.createTab(FLOATING_TERMINAL_WORKTREE_ID, targetGroupId, shellOverride)
   focusTerminalTabSurface(tab.id)
   return tab
 }

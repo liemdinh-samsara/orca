@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   TAB_CREATE_MENU_QUERY_MAX_BYTES,
+  buildLocalTerminalMenuOption,
   buildTabCreateMenuOptions,
   findMatchingTabCreateMenuOptions,
   isTabCreateMenuQueryTooLarge,
@@ -51,6 +52,17 @@ describe('tab create menu options', () => {
     expect(
       findMatchingTabCreateMenuOptions('browser', defaultOptions).map((option) => option.kind)
     ).toEqual(['new-browser'])
+  })
+
+  it('finds the local terminal entry by "local" ahead of the default terminal', () => {
+    const options = [...defaultOptions, buildLocalTerminalMenuOption()]
+
+    expect(findMatchingTabCreateMenuOptions('local', options).map((option) => option.kind)).toEqual(
+      ['new-local-terminal']
+    )
+    expect(
+      findMatchingTabCreateMenuOptions('local terminal', options).map((option) => option.kind)
+    ).toEqual(['new-local-terminal'])
   })
 
   it('keeps terminal and markdown results when client-impossible actions are omitted', () => {

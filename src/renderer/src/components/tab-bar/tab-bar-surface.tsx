@@ -19,7 +19,7 @@ import type { useTabStripOverflowNavigation } from './tab-strip-overflow-navigat
 import type { useTabStripDragScrollHandlers } from './tab-strip-drag-scroll'
 import type { TabBarProps } from './tab-bar-props'
 import type { TabBarRuntimeModel } from './use-tab-bar-runtime-model'
-import type { TabBarCreateMenuController } from './use-tab-bar-create-menu-controller'
+import type { TabBarCreateMenu } from './use-tab-bar-local-terminal-menu'
 import type { TabBarItemProjection } from './use-tab-bar-item-projection'
 import type { TabBarItemActions } from './use-tab-bar-item-actions'
 import { renderTabBarItems } from './tab-bar-item-surface'
@@ -42,7 +42,7 @@ export function renderTabBarSurface({
 }: {
   props: TabBarProps
   runtime: TabBarRuntimeModel
-  createMenu: TabBarCreateMenuController
+  createMenu: TabBarCreateMenu
   itemProjection: TabBarItemProjection
   tabStripNavigation: ReturnType<typeof useTabStripOverflowNavigation>
   tabStripDragScroll: ReturnType<typeof useTabStripDragScrollHandlers>
@@ -86,7 +86,8 @@ export function renderTabBarSurface({
     queueNewActiveTerminalFocusAfterNewTabMenuClose,
     queueTerminalTabFocusAfterNewTabMenuClose,
     queueFocusAfterNewTabMenuClose,
-    showStaticCreateMenuItems
+    showStaticCreateMenuItems,
+    openLocalTerminal
   } = createMenu
   const { orderedItems, sortableIds, dropIndicatorByVisibleId } = itemProjection
   const clientHostedBrowserRows = props.clientHostedBrowserRows ?? EMPTY_CLIENT_HOSTED_ROWS
@@ -165,6 +166,7 @@ export function renderTabBarSurface({
             newSimulatorShortcut={newSimulatorShortcut}
             newFileShortcut={newFileShortcut}
             openMarkdownShortcut={openMarkdownShortcut}
+            onNewLocalTerminal={openLocalTerminal}
             queueNewActiveTerminalFocusAfterNewTabMenuClose={
               queueNewActiveTerminalFocusAfterNewTabMenuClose
             }

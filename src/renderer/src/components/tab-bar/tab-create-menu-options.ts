@@ -6,6 +6,7 @@ import { isClipboardTextByteLengthOverLimit } from '../../../../shared/clipboard
 export type TabCreateMenuOptionKind =
   | 'go-to-simulator'
   | 'new-browser'
+  | 'new-local-terminal'
   | 'new-markdown'
   | 'new-simulator'
   | 'new-terminal'
@@ -166,6 +167,25 @@ export function buildTabCreateMenuOptions(
   }
 
   return options
+}
+
+export function buildLocalTerminalMenuOption(): TabCreateMenuOption {
+  return {
+    id: 'new-local-terminal',
+    kind: 'new-local-terminal',
+    label: translate(
+      'auto.components.tab.bar.tab.create.menu.options.localTerminal',
+      'New Local Terminal'
+    ),
+    keywords: [
+      translate('auto.components.tab.bar.tab.create.menu.options.5501c2fb7a', 'terminal'),
+      translate('auto.components.tab.bar.tab.create.menu.options.localKeyword', 'local'),
+      translate(
+        'auto.components.tab.bar.tab.create.menu.options.thisComputerKeyword',
+        'this computer'
+      )
+    ]
+  }
 }
 
 export function findMatchingTabCreateMenuOptions(

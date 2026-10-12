@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultSettings } from '../../../shared/constants'
 import type { Tab } from '../../../shared/tab-types'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
+import type { AppState } from '@/store/types'
 import {
   countVisibleFloatingWorkspaceItems,
   createFloatingWorkspaceBrowserTab,
@@ -465,6 +466,26 @@ describe('createFloatingWorkspaceTerminalTab', () => {
     // Why: createTab itself activates the new tab within the floating group.
     expect(store.activateTab).not.toHaveBeenCalled()
     expect(focusTerminalTabSurfaceMock).toHaveBeenCalledWith('floating-tab-1')
+  })
+
+  it('starts the terminal in a requested folder', async () => {
+    const tab = makeTab('floating-tab-cwd')
+    const createTab = vi.fn<AppState['createTab']>().mockReturnValue(tab)
+    const store = {
+      activeGroupIdByWorktree: { [FLOATING_TERMINAL_WORKTREE_ID]: 'floating-group' },
+      createTab
+    }
+
+    await createFloatingWorkspaceTerminalTab(store, undefined, undefined, '/Users/me/co/mono')
+
+    expect(createTab).toHaveBeenCalledWith(
+      FLOATING_TERMINAL_WORKTREE_ID,
+      'floating-group',
+      undefined,
+      {
+        startupCwd: '/Users/me/co/mono'
+      }
+    )
   })
 
   it('ignores the active runtime and keeps floating workspace terminals local', async () => {

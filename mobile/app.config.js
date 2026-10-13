@@ -13,6 +13,7 @@ const APS_ENVIRONMENT =
 
 module.exports = ({ config }) => ({
   ...config,
+  extra: { ...config.extra, apsEnvironment: APS_ENVIRONMENT },
   ios: {
     ...config.ios,
     entitlements: { ...config.ios?.entitlements, 'aps-environment': APS_ENVIRONMENT }

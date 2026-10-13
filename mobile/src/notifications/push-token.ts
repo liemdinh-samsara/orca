@@ -1,3 +1,4 @@
+import Constants from 'expo-constants'
 import * as Notifications from 'expo-notifications'
 import type {
   MobilePushApnsEnvironment,
@@ -13,8 +14,16 @@ export type MobilePushToken = {
   readonly apnsEnvironment?: MobilePushApnsEnvironment
 }
 
-// Dev-client builds are debug and get sandbox APNs; TestFlight and App Store are release.
+// The aps-environment entitlement baked in at build time (app.config.js) decides which APNs host
+// accepts the token, so it wins; __DEV__ only covers a shell built without that config.
 function apnsEnvironment(): MobilePushApnsEnvironment {
+  const apsEnvironment: unknown = Constants.expoConfig?.extra?.apsEnvironment
+  if (apsEnvironment === 'production') {
+    return 'production'
+  }
+  if (apsEnvironment === 'development') {
+    return 'sandbox'
+  }
   return typeof __DEV__ !== 'undefined' && __DEV__ ? 'sandbox' : 'production'
 }
 

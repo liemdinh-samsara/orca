@@ -130,6 +130,10 @@ When adding or changing a Git command:
 
 Source-control and review changes must consider GitLab and other supported git providers, not only GitHub. Keep provider-specific behavior behind explicit checks, and avoid GitHub-only naming for generic review concepts.
 
+## Fork APNs Key (self-hosted push gateway)
+
+The fork's mobile build is `com.liemdinh.orca.mobile` (team `9K6DARFCBM`), so Stably's push gateway cannot reach it. Its APNs auth key (works for sandbox and production) is Key ID `9UXQQWRM98`, stored at `~/.config/orca-push/AuthKey_9UXQQWRM98.p8` (mode 600), with a backup in the owner's Chrome password manager. Apple lets the `.p8` be downloaded once, so never delete both copies. Never commit the key or paste its contents.
+
 ## GitHub CLI Usage
 
 Be mindful of the user's `gh` CLI API rate limit — batch requests where possible and avoid unnecessary calls. All code, commands, and scripts must be compatible with macOS, Linux, and Windows.

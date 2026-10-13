@@ -7,6 +7,9 @@ vi.mock('expo-notifications', () => ({
   addPushTokenListener: vi.fn()
 }))
 
+const constantsMock = vi.hoisted(() => ({ expoConfig: undefined as unknown }))
+vi.mock('expo-constants', () => ({ default: constantsMock }))
+
 const dev = globalThis as { __DEV__?: boolean }
 
 beforeEach(() => {
@@ -15,6 +18,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete dev.__DEV__
+  constantsMock.expoConfig = undefined
 })
 
 describe('getDevicePushToken', () => {
@@ -34,6 +38,25 @@ describe('getDevicePushToken', () => {
       apnsEnvironment: environment
     })
   })
+
+  it.each([
+    ['production', false, 'production'],
+    ['development', false, 'sandbox'],
+    ['production', true, 'production'],
+    ['development', true, 'sandbox']
+  ])(
+    'follows the build-time aps-environment %s over __DEV__=%s: %s',
+    async (apsEnvironment, isDev, environment) => {
+      dev.__DEV__ = isDev
+      constantsMock.expoConfig = { extra: { apsEnvironment } }
+      vi.mocked(Notifications.getDevicePushTokenAsync).mockResolvedValue({
+        type: 'ios',
+        data: 'a'.repeat(64)
+      } as never)
+
+      await expect(getDevicePushToken()).resolves.toMatchObject({ apnsEnvironment: environment })
+    }
+  )
 
   it('omits apnsEnvironment for Android, where FCM has no environment split', async () => {
     vi.mocked(Notifications.getDevicePushTokenAsync).mockResolvedValue({

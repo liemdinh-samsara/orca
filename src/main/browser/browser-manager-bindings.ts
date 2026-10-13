@@ -3,6 +3,7 @@ import { setupGuestContextMenu } from './browser-guest-context-menu'
 import { setupGrabShortcutForwarding } from './browser-guest-grab-shortcuts'
 import { setupGuestMouseWheelZoomForwarding } from './browser-guest-wheel-zoom'
 import { setupGuestShortcutForwarding } from './browser-guest-shortcut-forwarding'
+import { setupGuestSideButtonNavigation } from './browser-guest-side-button-navigation'
 import { BrowserManagerGrab } from './browser-manager-grab'
 
 export abstract class BrowserManagerBindings extends BrowserManagerGrab {
@@ -46,20 +47,28 @@ export abstract class BrowserManagerBindings extends BrowserManagerGrab {
       this.shortcutForwardingCleanupByTabId.delete(browserTabId)
     }
 
-    this.shortcutForwardingCleanupByTabId.set(
+    const resolveRenderer = (tabId: string): Electron.WebContents | null =>
+      resolveRendererWebContents(this.rendererWebContentsIdByTabId, tabId)
+    const removeShortcutForwarding = setupGuestShortcutForwarding({
       browserTabId,
-      setupGuestShortcutForwarding({
-        browserTabId,
-        guest,
-        resolveRenderer: (tabId) =>
-          resolveRendererWebContents(this.rendererWebContentsIdByTabId, tabId),
-        shouldForwardDictationShortcut: () => this.shouldForwardDictationShortcut?.() ?? false,
-        isMobileEmulatorEnabled: () => this.settingsResolver?.().mobileEmulatorEnabled !== false,
-        getKeybindings: () => this.settingsResolver?.().keybindings,
-        resolveWorktreeId: (tabId) => this.worktreeIdByTabId.get(tabId) ?? null,
-        resolveWorkspaceId: (tabId) => this.workspaceIdByPageId.get(tabId) ?? null
-      })
-    )
+      guest,
+      resolveRenderer,
+      shouldForwardDictationShortcut: () => this.shouldForwardDictationShortcut?.() ?? false,
+      isMobileEmulatorEnabled: () => this.settingsResolver?.().mobileEmulatorEnabled !== false,
+      getKeybindings: () => this.settingsResolver?.().keybindings,
+      resolveWorktreeId: (tabId) => this.worktreeIdByTabId.get(tabId) ?? null,
+      resolveWorkspaceId: (tabId) => this.workspaceIdByPageId.get(tabId) ?? null
+    })
+    // Why: mouse side buttons are the pointer form of the browser.back/forward chords forwarded above.
+    const removeSideButtonNavigation = setupGuestSideButtonNavigation({
+      browserTabId,
+      guest,
+      resolveRenderer
+    })
+    this.shortcutForwardingCleanupByTabId.set(browserTabId, () => {
+      removeShortcutForwarding()
+      removeSideButtonNavigation()
+    })
   }
 
   protected setupMouseWheelZoomForwarding(browserTabId: string, guest: Electron.WebContents): void {

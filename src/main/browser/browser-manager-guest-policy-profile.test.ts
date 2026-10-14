@@ -152,7 +152,8 @@ describe('guest policy profiles', () => {
 
     browserManager.attachGuestPolicies(guest as never)
 
-    expect(listenerCount(guest, 'dom-ready')).toBe(1)
+    // Link routing and the markdown viewer.
+    expect(listenerCount(guest, 'dom-ready')).toBe(2)
     expect(listenerCount(guest, 'frame-created')).toBe(1)
     expect(listenerCount(guest, 'did-create-window')).toBe(1)
     expect(guest.debugger.on).toHaveBeenCalledWith('detach', expect.any(Function))
@@ -204,7 +205,7 @@ describe('guest policy profiles', () => {
     // The manager's own bookkeeping was reached too: a second attach is refused while the id is
     // still marked policy-attached, and accepted once its teardown has run.
     browserManager.attachGuestPolicies(guest as never)
-    expect(listenerCount(guest, 'dom-ready')).toBe(1)
+    expect(listenerCount(guest, 'dom-ready')).toBe(2)
   })
 
   // The seam the whole split rests on: one public door answers for both halves, and each page id

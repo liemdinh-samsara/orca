@@ -5,6 +5,7 @@ import { defineConfig, type UserConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createBootstrapFatalExitBanner } from './config/build-plugins/bootstrap-fatal-exit-banner'
+import { createGuestScriptBundlePlugin } from './config/build-plugins/guest-script-bundle'
 import { createPdfjsViewerAssetsPlugin } from './config/build-plugins/pdfjs-viewer-assets'
 import {
   CLI_MAIN_ENTRY_NAMES,
@@ -209,6 +210,7 @@ const MAIN_MINIFY: 'oxc' | false = process.env.ORCA_UNMINIFIED_MAIN === '1' ? fa
 
 export const electronViteConfig: UserConfig = {
   main: {
+    plugins: [createGuestScriptBundlePlugin()],
     build: {
       // Why: 'esbuild' makes rolldown disable its own minifier and re-print every
       // chunk through esbuild, which is undeclared here and only resolves via

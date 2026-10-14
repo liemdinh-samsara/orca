@@ -17963,6 +17963,12 @@
           "deleteColumn": "Delete column",
           "deleteTable": "Delete table"
         }
+      },
+      "browser": {
+        "markdownViewer": {
+          "showSource": "Show source",
+          "showRendered": "Show rendered"
+        }
       }
     }
   },

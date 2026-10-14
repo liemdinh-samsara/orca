@@ -5,6 +5,7 @@ import {
 } from './browser-manager-types'
 import { BrowserManagerGuestCleanup } from './browser-manager-guest-cleanup'
 import { installDocPreviewGuestPolicy } from './doc-preview-guest-policy'
+import { installGuestMarkdownViewer } from './browser-guest-markdown-viewer'
 
 export abstract class BrowserManagerGuestPolicy extends BrowserManagerGuestCleanup {
   attachGuestPolicies(
@@ -31,12 +32,17 @@ export abstract class BrowserManagerGuestPolicy extends BrowserManagerGuestClean
     guest.setBackgroundThrottling(false)
     const disposePopupPolicy = this.installGuestPopupPolicy(guest, !inheritedOwnerContext)
     const disposeNavigationPolicy = this.installGuestNavigationPolicy(guest)
+    // Why not popups: like link routing, sign-in child windows keep native behavior.
+    const disposeMarkdownViewer = inheritedOwnerContext
+      ? () => {}
+      : installGuestMarkdownViewer(guest)
 
     // Why: store cleanup so unregisterGuest can drop these listeners on teardown and let the WebContents wrapper GC.
     this.policyCleanupByGuestId.set(guest.id, () => {
       disposeDetachTracking()
       disposePopupPolicy()
       disposeNavigationPolicy()
+      disposeMarkdownViewer()
     })
   }
 

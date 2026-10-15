@@ -140,3 +140,63 @@ describe('fetchCodexRateLimits credit balance', () => {
     expect(result.extraUsage).toMatchObject({ unit: 'credits', unlimited: true, enabled: true })
   })
 })
+
+describe('fetchCodexRateLimits monthly credit limit', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    readFileMock.mockRejectedValue(new Error('no auth fixture'))
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  // Shape captured from codex-cli 0.162.1 on a Business workspace, whose `/status` shows
+  // "Monthly credit limit: 98% left (resets 5:00 PM on 31 Oct), 1,583 of 75,000 credits used".
+  const businessWorkspaceRateLimits = {
+    limitId: 'codex',
+    primary: null,
+    secondary: null,
+    credits: { hasCredits: true, unlimited: false, balance: null },
+    individualLimit: {
+      limit: '75000',
+      used: '1583.476898431778',
+      remainingPercent: 98,
+      resetsAt: 1793491200
+    },
+    spendControlReached: false,
+    planType: 'business'
+  }
+
+  it('maps the individual monthly credit limit into the monthly window', async () => {
+    const result = await fetchWithRateLimits(businessWorkspaceRateLimits)
+
+    expect(result).toMatchObject({ status: 'ok', session: null, weekly: null })
+    expect(result.monthly).toMatchObject({
+      windowMinutes: 43_200,
+      resetsAt: Date.parse('2026-11-01T00:00:00Z')
+    })
+    expect(result.monthly?.usedPercent).toBeCloseTo(2.11, 2)
+  })
+
+  it('falls back to the remaining percent when the credit amounts are unparseable', async () => {
+    const result = await fetchWithRateLimits({
+      ...businessWorkspaceRateLimits,
+      individualLimit: { limit: 'n/a', used: null, remainingPercent: 98, resetsAt: 1793491200 }
+    })
+
+    expect(result.monthly?.usedPercent).toBe(2)
+  })
+
+  it('omits the monthly window when the account has no individual limit', async () => {
+    const result = await fetchWithRateLimits({
+      primary: { usedPercent: 20, windowDurationMins: 300 },
+      individualLimit: null
+    })
+
+    expect(result.monthly ?? null).toBeNull()
+  })
+})

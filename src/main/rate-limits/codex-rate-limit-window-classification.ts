@@ -1,5 +1,6 @@
 export const CODEX_SESSION_WINDOW_MINUTES = 300
 export const CODEX_WEEKLY_WINDOW_MINUTES = 10080
+export const CODEX_MONTHLY_WINDOW_MINUTES = 43_200
 
 // Why: tolerate the one-minute drift seen in older Codex bucket lengths without absorbing other durations.
 const CODEX_WINDOW_DURATION_TOLERANCE_MINUTES = 1
@@ -19,6 +20,15 @@ export type CodexRateLimitWindowsSnapshot = {
     unlimited?: boolean
     balance?: string | number
   } | null
+  /** Business/Enterprise per-member monthly credit limit (`/status` "Monthly credit limit"). */
+  individualLimit?: CodexIndividualLimitSnapshot | null
+}
+
+export type CodexIndividualLimitSnapshot = {
+  limit?: unknown
+  used?: unknown
+  remainingPercent?: unknown
+  resetsAt?: unknown
 }
 
 type MappableCodexRateWindowSnapshot = CodexRateWindowSnapshot & { usedPercent: number }

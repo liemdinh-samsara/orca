@@ -366,7 +366,7 @@ import {
   ManagedServerSelector,
   ManagedServerUpdate
 } from './managed-server-params'
-import { NativeChatSession, NativeChatUnsubscribe } from './native-chat-params'
+import { NativeChatSession, NativeChatSkills, NativeChatUnsubscribe } from './native-chat-params'
 import {
   NotificationGetMissedSinceParams,
   NotificationRegisterPushParams,
@@ -1028,6 +1028,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'mobileWeb.bundle.manifest': null,
   'mobileWeb.bundle.range': MobileWebBundleChunkParamsSchema,
   'nativeChat.readSession': NativeChatSession,
+  'nativeChat.skills': NativeChatSkills,
   'nativeChat.subscribe': NativeChatSession,
   'nativeChat.unsubscribe': NativeChatUnsubscribe,
   'network.browserTunnel': BrowserNetworkTunnelAttachParams,

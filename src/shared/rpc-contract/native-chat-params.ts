@@ -48,3 +48,12 @@ export const NativeChatUnsubscribe = z.object({
 })
 
 export const MOBILE_NATIVE_CHAT_MAX_WINDOW = 2000
+
+// Why: the phone's `/` menu needs the skills a chat's agent can run in its workspace;
+// the host scans (repo + home roots) and answers names only, never paths.
+export const NativeChatSkills = z
+  .object({
+    worktreeId: z.string().min(1).max(2048),
+    agent: z.string().min(1).max(64)
+  })
+  .strict()

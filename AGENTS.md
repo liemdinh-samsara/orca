@@ -49,6 +49,16 @@ Avoid type assertions except `as const`. Unavoidable casts need a line-specific 
 - **Design system**: `pnpm run lint:design-system` for the full renderer report (not a gate); the changed-lines gate above is what CI enforces
 - **Real Claude CLI**: when you change Claude structured-session code (`src/main/claude/claude-structured-*`), run `ORCA_REAL_CLAUDE_CLI_TEST=1 pnpm test src/main/claude/claude-structured-real-cli.test.ts src/main/claude/claude-structured-real-cli-fold.test.ts`; it uses your real Claude login
 
+## Prove Every App Change In The Running App
+
+Tests passing is not proof. For every change to the Orca app (desktop or `mobile/`):
+
+1. **Run it and exercise the change.** Mobile changes: iOS Simulator. Desktop changes: the app launched in the background per Electron UI Validation above. Create a throwaway test workspace inside Orca (delete it after) so the change is exercised against real session state, not a mock.
+2. **Capture BEFORE and AFTER** screenshots (or video) of the same flow, so the change is visible side by side.
+3. **Upload a report with the result and that proof.** On the owner's personal computer (any non-Samsara machine) use the `/liem-upload-report` skill; on a Samsara computer use the `samsara-upload-report` skill. Pick by the machine making the change, and put the report URL in your final message.
+
+If the change cannot be exercised (for example no simulator or device is available), say so plainly in the report and the final message instead of claiming it works.
+
 # Writing Pull Requests
 
 Fill in [`.github/pull_request_template.md`](./.github/pull_request_template.md), written for a reviewer who has never seen this code:

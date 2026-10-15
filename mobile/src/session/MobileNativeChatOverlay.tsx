@@ -7,6 +7,7 @@ import type { MobileNativeChatController } from './use-mobile-native-chat-contro
 import { useMobileNativeChatStreamingBubble } from './use-mobile-native-chat-streaming-bubble'
 import { useMobileNativeChatComposerTray } from './use-mobile-native-chat-composer-tray'
 import { useMobileNativeChatVisualRenderer } from './MobileNativeChatVisual'
+import { useMobileNativeChatHostSkills } from './use-mobile-native-chat-skills'
 import { MobileNativeChatVisualContext } from './mobile-native-chat-visual-context'
 
 type Props = {
@@ -62,6 +63,13 @@ export function MobileNativeChatOverlay({
     controller.nativeChatStreamScopeKey,
     controller.nativeChatStreamLive
   )
+  // A structured chat reports its own `/` menu; a terminal-backed one asks the host for skills.
+  const hostSkills = useMobileNativeChatHostSkills({
+    client: controller.client,
+    worktreeId: controller.worktreeId,
+    agent: controller.nativeChatStructured ? null : controller.nativeChatAgent,
+    composerText: controller.chatComposerText
+  })
   const queued = controller.nativeChatQueued
   const composerTray = useMobileNativeChatComposerTray({
     queued: {
@@ -95,6 +103,7 @@ export function MobileNativeChatOverlay({
           agentWorking={controller.nativeChatAgentWorking}
           canStop={controller.nativeChatCanStop}
           structuredActivityUi={controller.nativeChatStructured}
+          sessionCommands={controller.nativeChatSessionCommands ?? hostSkills}
           turnIndicator={controller.nativeChatTurnIndicator}
           workingStartedAt={controller.nativeChatWorkingStartedAt}
           settledTurns={controller.nativeChatSettledTurns}

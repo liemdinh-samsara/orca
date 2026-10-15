@@ -11,6 +11,8 @@ import type {
   NativeChatSettledTurns
 } from '../../../src/shared/native-chat-turn-status'
 import type { NativeChatTurnJournal } from '../../../src/shared/native-chat-turn-membership'
+import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
+import type { RpcClient } from '../transport/rpc-client'
 import type { MobileNativeChatSendOutcome } from './mobile-native-chat-send'
 import type { MobileNativeChatCommandRefusalCauses } from './use-mobile-native-chat-send-error'
 import type { MobileStructuredQueuedMessageControls } from './use-mobile-structured-queued-message-controls'
@@ -84,6 +86,11 @@ export type MobileNativeChatController = {
   /** Host-held queued drafts shown as cards above the composer (structured lane; any host
    *  that publishes them). */
   nativeChatQueued: MobileStructuredQueuedMessageControls
+  /** The structured session's own `/` menu entries; undefined for a terminal-backed chat. */
+  nativeChatSessionCommands: readonly AgentSessionSlashCommand[] | undefined
+  /** The host connection and workspace this chat belongs to. */
+  client: RpcClient | null
+  worktreeId: string
   /** Running child work shown in a strip above the composer; null off the structured lane. */
   nativeChatBackgroundTasks: MobileStructuredBackgroundTasks | null
   nativeChatFilePaths: string[]

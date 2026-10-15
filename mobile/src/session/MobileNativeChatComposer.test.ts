@@ -421,6 +421,38 @@ describe('MobileNativeChatComposer', () => {
     expect(texts).not.toContain('/cost')
   })
 
+  it('offers the skills a structured session reported when the user types a slash', async () => {
+    await act(async () => {
+      renderer = create(
+        createElement(MobileNativeChatComposer, {
+          value: '/liem',
+          onChangeText: vi.fn(),
+          onSend: vi.fn().mockResolvedValue(true),
+          sendSurfaceId: 'tab-a',
+          getSendCompletionGeneration: getCurrentSendCompletionGeneration,
+          agent: 'claude',
+          structuredCommands: [],
+          sessionCommands: [
+            { name: 'compact', kind: 'command' },
+            { name: 'liem-upload-report', kind: 'skill', description: 'Publish a report' },
+            { name: 'review', kind: 'skill' }
+          ]
+        })
+      )
+    })
+    const input = renderer!.root.find((node) => node.type === 'TextInput') as {
+      props: { onSelectionChange: (e: { nativeEvent: { selection: { end: number } } }) => void }
+    }
+    await act(async () => input.props.onSelectionChange({ nativeEvent: { selection: { end: 5 } } }))
+    const texts = renderer!.root
+      .findAll((node) => node.type === 'Text')
+      .map((node) => (node.props as { children?: unknown }).children)
+
+    expect(texts).toContain('/liem-upload-report')
+    expect(texts).toContain('Publish a report')
+    expect(texts).not.toContain('/review')
+  })
+
   it('wires the mic for hold vs toggle dictation like the terminal composer', async () => {
     const onMicPress = vi.fn()
     const onMicPressIn = vi.fn()

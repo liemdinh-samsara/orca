@@ -43,6 +43,7 @@ import {
   makeUnifiedTab
 } from './store-test-helpers'
 import {
+  canReopenClosedTab,
   pushRecentlyClosedTabKind,
   remapClosedTerminalTabSnapshotCwds,
   restoreRecentlyClosedTabPosition
@@ -416,5 +417,102 @@ describe('reopenClosedTab cross-type MRU', () => {
   it('returns false when no tab was ever closed', () => {
     const store = makeSeededStore()
     expect(store.getState().reopenClosedTab(WT)).toBe(false)
+  })
+})
+
+describe('canReopenClosedTab', () => {
+  it('follows a browser tab through close and reopen', () => {
+    const store = makeSeededStore()
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+
+    const browser = store.getState().createBrowserTab(WT, 'https://example.com', { title: 'Ex' })
+    store.getState().closeBrowserTab(browser.id)
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(true)
+
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+  })
+
+  it('ignores kind entries whose snapshot has drained, like reopenClosedTab', () => {
+    const store = makeSeededStore()
+    store.setState({
+      recentlyClosedTabKindsByWorktree: { [WT]: ['browser', 'editor'] },
+      recentlyClosedBrowserTabsByWorktree: { [WT]: [] },
+      recentlyClosedEditorTabsByWorktree: { [WT]: [] }
+    })
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+    expect(store.getState().reopenClosedTab(WT)).toBe(false)
+  })
+
+  it('is false for a terminal snapshot on a remote-runtime worktree', () => {
+    const store = createTestStore()
+    seedStore(store, {
+      worktreesByRepo: {
+        repo1: [
+          makeWorktree({ id: WT, repoId: 'repo1', path: '/path/wt1', hostId: 'runtime:env-1' })
+        ]
+      },
+      activeWorktreeId: WT
+    })
+    store.setState({
+      recentlyClosedTerminalTabsByWorktree: { [WT]: [{ startupCwd: '/path/wt1/api' }] },
+      recentlyClosedTabKindsByWorktree: { [WT]: ['terminal'] }
+    })
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+    expect(store.getState().reopenClosedTab(WT)).toBe(false)
+  })
+})
+
+describe('reopenClosedBrowserTab placement', () => {
+  function openSidePaneBrowser(store: ReturnType<typeof createTestStore>) {
+    const terminalGroupId = store.getState().ensureWorktreeRootGroup(WT)
+    store.getState().createTab(WT, terminalGroupId)
+    const browser = store.getState().createBrowserTab(WT, 'https://example.com/docs', {
+      placement: 'side-pane',
+      targetGroupId: terminalGroupId
+    })
+    const sideGroupId = store
+      .getState()
+      .unifiedTabsByWorktree[WT]?.find((tab) => tab.entityId === browser.id)?.groupId
+    return { terminalGroupId, sideGroupId, browser }
+  }
+
+  function browserGroupIds(store: ReturnType<typeof createTestStore>): string[] {
+    return (store.getState().unifiedTabsByWorktree[WT] ?? [])
+      .filter((tab) => tab.contentType === 'browser')
+      .map((tab) => tab.groupId)
+  }
+
+  it('returns a tab to the pane it was closed from', () => {
+    const store = makeSeededStore()
+    const { sideGroupId, browser } = openSidePaneBrowser(store)
+    store
+      .getState()
+      .createBrowserTab(WT, 'https://example.com/keep', { targetGroupId: sideGroupId })
+
+    store.getState().closeBrowserTab(browser.id)
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+
+    expect(browserGroupIds(store)).toEqual([sideGroupId, sideGroupId])
+  })
+
+  it('opens in the side pane again when closing its last tab removed that pane', () => {
+    const store = makeSeededStore()
+    const { terminalGroupId, sideGroupId, browser } = openSidePaneBrowser(store)
+
+    store.getState().closeBrowserTab(browser.id)
+    store.getState().closeEmptyGroup(WT, sideGroupId!)
+    expect(store.getState().groupsByWorktree[WT]?.map((group) => group.id)).toEqual([
+      terminalGroupId
+    ])
+
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+
+    const [reopenedGroupId] = browserGroupIds(store)
+    expect(reopenedGroupId).not.toBe(terminalGroupId)
+    expect(
+      store.getState().groupsByWorktree[WT]?.find((group) => group.id === reopenedGroupId)
+        ?.tabStripOrientation
+    ).toBe('vertical')
   })
 })

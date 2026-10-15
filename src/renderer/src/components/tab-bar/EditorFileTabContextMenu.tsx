@@ -31,6 +31,7 @@ import {
 } from '@/lib/reveal-in-file-manager'
 import { TabWorkspaceLayoutMenuSection } from './TabWorkspaceLayoutMenuSection'
 import { TAB_CONTEXT_MENU_CONTENT_CLASS } from './tab-context-menu-sizing'
+import { ReopenClosedTabMenuItem } from './ReopenClosedTabMenuItem'
 
 type EditorFileTabContextMenuProps = {
   open: boolean
@@ -188,6 +189,8 @@ export function EditorFileTabContextMenu({
             'Close Tabs To The Left'
           )}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <ReopenClosedTabMenuItem worktreeId={file.worktreeId} />
         <DropdownMenuSeparator />
         {canShowMarkdownPreview ? (
           <>

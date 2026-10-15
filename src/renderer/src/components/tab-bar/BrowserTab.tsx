@@ -38,6 +38,7 @@ import { useTabStripSlotProps } from './use-tab-strip-slot-props'
 import { TabWorkspaceLayoutMenuSection } from './TabWorkspaceLayoutMenuSection'
 import { useTabStripPointerActivation } from './tab-strip-pointer-activation'
 import { TAB_CONTEXT_MENU_CONTENT_CLASS } from './tab-context-menu-sizing'
+import { ReopenClosedTabMenuItem } from './ReopenClosedTabMenuItem'
 import { cn } from '@/lib/utils'
 import { BrowserFavicon } from '@/components/browser-favicon'
 
@@ -306,6 +307,8 @@ export default function BrowserTab({
             <ExternalLink className="size-3.5" />
             {translate('auto.components.tab.bar.BrowserTab.6e0bc8f3a8', 'Open In Browser')}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <ReopenClosedTabMenuItem worktreeId={tab.worktreeId} />
         </DropdownMenuContent>
       </DropdownMenu>
     </>

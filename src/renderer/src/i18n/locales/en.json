@@ -18697,6 +18697,9 @@
         "EditorFileTabContextMenu": {
           "closeOthers": "Close Others",
           "closeTabsToLeft": "Close Tabs To The Left"
+        },
+        "ReopenClosedTabMenuItem": {
+          "label": "Reopen Closed Tab"
         }
       },
       "group": {

@@ -24,6 +24,7 @@ import type { TabBarItemProjection } from './use-tab-bar-item-projection'
 import type { TabBarItemActions } from './use-tab-bar-item-actions'
 import { renderTabBarItems } from './tab-bar-item-surface'
 import { TabBarStaticCreateMenu } from './tab-bar-static-create-menu'
+import { TabStripBlankAreaMenu } from './TabStripBlankAreaMenu'
 import ClientHostedBrowserTabRows from './ClientHostedBrowserTabRows'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
 
@@ -200,7 +201,10 @@ export function renderTabBarSurface({
           </button>
         )}
         <SortableContext items={sortableIds}>
-          <div className="vertical-tab-strip scrollbar-sleek flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+          <TabStripBlankAreaMenu
+            worktreeId={worktreeId}
+            className="vertical-tab-strip scrollbar-sleek flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
+          >
             <TabStripTooltipProvider>
               {renderedItems}
               {clientHostedBrowserRows.length > 0 ? (
@@ -213,7 +217,7 @@ export function renderTabBarSurface({
                 />
               ) : null}
             </TabStripTooltipProvider>
-          </div>
+          </TabStripBlankAreaMenu>
         </SortableContext>
       </div>
     )

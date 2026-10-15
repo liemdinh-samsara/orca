@@ -39,6 +39,13 @@ export function createBrowserTabFocusActions(
       const pages = entryToRestore.pages
       const sessionProfileId = snap.sessionProfileId ?? null
       const sessionPartition = snap.sessionPartition ?? null
+      const closedGroupId = entryToRestore.position?.groupId
+      // Why: closing a pane's last tab removes the pane; reopen then lands where a new browser tab would.
+      const placement =
+        closedGroupId &&
+        get().groupsByWorktree[worktreeId]?.some((group) => group.id === closedGroupId)
+          ? { targetGroupId: closedGroupId }
+          : { placement: 'side-pane' as const }
 
       if (pages.length === 0) {
         const restored = get().createBrowserTab(worktreeId, snap.url, {
@@ -47,7 +54,7 @@ export function createBrowserTabFocusActions(
           sessionProfileId,
           sessionPartition,
           ...(snap.docLocation ? { docLocation: snap.docLocation } : {}),
-          targetGroupId: entryToRestore.position?.groupId
+          ...placement
         })
         restoreRecentlyClosedTabPosition(get, worktreeId, restored.id, entryToRestore.position)
         return (
@@ -62,7 +69,7 @@ export function createBrowserTabFocusActions(
         activate: true,
         sessionProfileId,
         sessionPartition,
-        targetGroupId: entryToRestore.position?.groupId,
+        ...placement,
         browserRuntimeEnvironmentId: firstPage.browserRuntimeEnvironmentId,
         ...(firstPage.docLocation ? { docLocation: firstPage.docLocation } : {})
       })

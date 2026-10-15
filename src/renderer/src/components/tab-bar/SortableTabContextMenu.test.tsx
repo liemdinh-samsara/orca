@@ -17,6 +17,9 @@ const storeMock = vi.hoisted(() => ({
   } as Record<string, unknown>
 }))
 
+// Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
+vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
+
 vi.mock('@/hooks/useShortcutLabel', () => ({
   formatShortcutLabel: () => '⌘D',
   useOptionalShortcutLabel: () => '⌘D'

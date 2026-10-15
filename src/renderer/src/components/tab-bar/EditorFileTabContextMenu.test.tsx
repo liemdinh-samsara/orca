@@ -4,6 +4,9 @@ const shortcutLabelMock = vi.hoisted(() => vi.fn())
 const revealInFileManager = vi.hoisted(() => vi.fn())
 const storeSettings = vi.hoisted((): { activeRuntimeEnvironmentId?: string } => ({}))
 
+// Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
+vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
+
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: function DropdownMenu(props: { children?: unknown }) {
     return { type: 'DropdownMenu', props }

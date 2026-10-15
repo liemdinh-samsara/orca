@@ -100,6 +100,24 @@ export function remapClosedTerminalTabSnapshotCwds(
   })
 }
 
+/** Whether reopenClosedTab would restore something: some queued kind still has a snapshot. */
+export function canReopenClosedTab(state: AppState, worktreeId: string): boolean {
+  const kinds = state.recentlyClosedTabKindsByWorktree[worktreeId] ?? []
+  return kinds.some((kind) => {
+    if (kind === 'browser') {
+      return (state.recentlyClosedBrowserTabsByWorktree[worktreeId]?.length ?? 0) > 0
+    }
+    if (kind === 'editor') {
+      return (state.recentlyClosedEditorTabsByWorktree[worktreeId]?.length ?? 0) > 0
+    }
+    // Why: mirrors reopenClosedTerminalTab, which skips remote-owned worktrees.
+    return (
+      (state.recentlyClosedTerminalTabsByWorktree[worktreeId]?.length ?? 0) > 0 &&
+      !getExplicitRuntimeEnvironmentIdForWorktree(state, worktreeId)?.trim()
+    )
+  })
+}
+
 export type RecentlyClosedTabsSlice = {
   /** Newest-first snapshots of user-closed terminal tabs, per worktree. */
   recentlyClosedTerminalTabsByWorktree: Record<string, ClosedTerminalTabSnapshot[]>

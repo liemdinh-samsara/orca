@@ -286,6 +286,7 @@ export function useMobileStructuredAgentSession(args: {
     respondQuestion,
     queued,
     commandRefusalCauses,
-    backgroundTasks
+    backgroundTasks,
+    sessionCommands: state.commands ?? undefined
   }
 }

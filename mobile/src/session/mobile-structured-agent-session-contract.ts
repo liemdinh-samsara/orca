@@ -1,3 +1,4 @@
+import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
 import type { MobileNativeChatSendOutcome } from './mobile-native-chat-send'
 import type { MobileNativeChatVisualSource } from './mobile-native-chat-visual-read'
 import type { MobileChatPermission } from './mobile-native-chat-permission'
@@ -37,4 +38,6 @@ export type StructuredMobileSession = ReturnType<typeof useMobileStructuredAgent
     backgroundTasks: MobileStructuredBackgroundTasks
     /** Where this chat's `::orca-visual` lines read their HTML from; null without a client. */
     visualSource: MobileNativeChatVisualSource | null
+    /** The `/` menu the session's agent reports; undefined until the host reports one. */
+    sessionCommands: readonly AgentSessionSlashCommand[] | undefined
   }

@@ -11,8 +11,9 @@ import {
 } from 'react-native'
 import { ArrowUp, ImagePlus, Mic, Square, X } from 'lucide-react-native'
 import { colors, radii, spacing } from '../theme/mobile-theme'
-import { structuredSlashCommands } from '../../../src/shared/structured-agent-session-composer'
 import type { AgentSessionConversationCommand } from '../../../src/shared/agent-session-conversation-command'
+import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
+import { mobileSlashCommands } from './mobile-native-chat-session-catalog'
 import {
   applyAutocomplete,
   detectAutocompleteTrigger,
@@ -30,7 +31,6 @@ import {
 } from './MobileNativeChatSessionOptionPickers'
 import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
 import { mobileNativeChatInputStyles } from './mobile-native-chat-input-styles'
-import { getMobileNativeChatCommands } from './mobile-native-chat-send-classification'
 import { keepHeldPressThroughLongPress } from './held-press-long-press'
 
 const NO_FILE_PATHS: string[] = []
@@ -40,6 +40,8 @@ type Props = {
   /** Lets the owner focus the field, e.g. after Edit moves a queued message into it. */
   inputRef?: React.Ref<TextInput>
   structuredCommands?: readonly AgentSessionConversationCommand[]
+  /** The host-reported `/` entries: the structured session's own menu, or a terminal chat's skills. */
+  sessionCommands?: readonly AgentSessionSlashCommand[]
   /** Controlled composer text — owned by the parent so dictation can write to it. */
   value: string
   onChangeText: (text: string) => void
@@ -85,6 +87,7 @@ export function MobileNativeChatComposer({
   getComposerEditGeneration,
   agent,
   structuredCommands,
+  sessionCommands,
   sessionOptions,
   onAttachImage,
   attachments = NO_ATTACHMENTS,
@@ -137,12 +140,7 @@ export function MobileNativeChatComposer({
       return []
     }
     if (trigger.kind === 'slash') {
-      const commands =
-        structuredCommands !== undefined
-          ? structuredSlashCommands(structuredCommands, agent)
-          : agent
-            ? getMobileNativeChatCommands(agent)
-            : []
+      const commands = mobileSlashCommands({ agent, structuredCommands, sessionCommands })
       // Why: Codex's catalog is 45 commands and this list is a plain ScrollView
       // (~5 rows visible), so an uncapped `/` would mount every row and
       // re-reconcile them on each streaming tick right above the transcript.
@@ -155,7 +153,7 @@ export function MobileNativeChatComposer({
       kind: 'file' as const,
       path
     }))
-  }, [trigger, filePaths, agent, structuredCommands])
+  }, [trigger, filePaths, agent, structuredCommands, sessionCommands])
 
   useEffect(() => {
     if (trigger?.kind === 'file') {

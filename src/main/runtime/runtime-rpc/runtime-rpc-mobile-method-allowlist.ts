@@ -217,6 +217,7 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'session.tabs.unsubscribeAll',
   ...MOBILE_AGENT_SESSION_RPC_METHODS,
   'nativeChat.readSession',
+  'nativeChat.skills',
   'nativeChat.subscribe',
   'nativeChat.unsubscribe',
   'settings.get',

@@ -6,8 +6,6 @@ import {
   type UsagePercentageDisplay
 } from '../../../../shared/usage-percentage-display'
 import type { StatusBarUsageMode } from '../../../../shared/status-bar-usage-mode'
-import { formatCurrencyAmount } from '../../../../shared/currency-format'
-import { formatCreditCount } from '../../../../shared/credit-count-format'
 import {
   ProviderIcon,
   USAGE_URGENT_PERCENT,
@@ -21,6 +19,12 @@ import { formatRateLimitWindowChipLabel } from '@/lib/window-label-formatter'
 import { formatUsagePercentageLabel } from './usage-percentage-label'
 import { translate } from '@/i18n/i18n'
 import { isCursorUsageBucket } from '../../../../shared/cursor-usage-buckets'
+import {
+  formatCompactExtraUsage,
+  getCreditOnlyUsageSummary,
+  hasUsageWindowData,
+  type UsageCreditSummary
+} from './usage-credit-summary'
 
 function MiniBar({
   usedPct,
@@ -65,7 +69,7 @@ function WindowLabel({
 // the roster trigger and ProviderDetailsMenu so the dot's has-data condition
 // and markup can't drift between the two.
 export function ProviderLetterBadge({ p }: { p: ProviderRateLimits }): React.JSX.Element {
-  const hasData = Boolean(p.session || p.weekly || p.fableWeekly || p.monthly || p.buckets?.length)
+  const hasData = hasUsageWindowData(p) || getCreditOnlyUsageSummary(p) !== null
   return (
     <span className="inline-flex items-center gap-1 text-muted-foreground">
       <span
@@ -81,7 +85,9 @@ export type UsageTone = 'urgent' | 'warning' | 'normal'
 /** Urgency by consumption, matching the usage bar colors, whatever % display the user chose. */
 export function getUsageTone(p: ProviderRateLimits): UsageTone {
   const tightest = getTightestUsageSection(p)
-  const used = tightest ? clampUsedPercent(tightest.window.usedPercent) : 0
+  const used = clampUsedPercent(
+    tightest?.window.usedPercent ?? getCreditOnlyUsageSummary(p)?.spentPercent ?? 0
+  )
   return used >= USAGE_URGENT_PERCENT
     ? 'urgent'
     : used >= USAGE_WARNING_PERCENT
@@ -110,9 +116,12 @@ export function UsageOverflowChip({
     .map((p) => {
       const tightest = getTightestUsageSection(p)
       const name = getProviderDisplayName(p.provider)
+      const credit = getCreditOnlyUsageSummary(p)
       return tightest
         ? `${name} ${formatUsagePercentageLabel(tightest.window.usedPercent, display)}`
-        : name
+        : credit
+          ? `${name} ${credit.text}`
+          : name
     })
     .join(', ')
   return (
@@ -283,22 +292,23 @@ function isExtraUsageActive(p: ProviderRateLimits): boolean {
   )
 }
 
-function formatCompactExtraUsage(balance: ProviderRateLimits['extraUsage']): string {
-  if (!balance) {
-    return ''
-  }
-  if (balance.unit === 'credits') {
-    return balance.unlimited
-      ? translate('auto.components.status.bar.StatusBar.4025a6f62f', 'Unlimited')
-      : translate('auto.components.status.bar.StatusBar.a95969101f', '{{value0}} credits', {
-          value0: formatCreditCount(balance.balance)
-        })
-  }
-  return balance.balance === null
-    ? ''
-    : translate('auto.components.status.bar.StatusBar.4fba7dc1e7', '{{value0}} bal', {
-        value0: formatCurrencyAmount(balance.balance, balance.currencyCode)
-      })
+function CreditUsage({
+  credit,
+  showBar,
+  display
+}: {
+  credit: UsageCreditSummary
+  showBar: boolean
+  display: UsagePercentageDisplay
+}): React.JSX.Element {
+  return (
+    <>
+      {showBar && credit.spentPercent !== null ? (
+        <MiniBar usedPct={clampUsedPercent(credit.spentPercent)} display={display} />
+      ) : null}
+      <span className="tabular-nums">{credit.text}</span>
+    </>
+  )
 }
 
 export function ProviderSegment({
@@ -326,9 +336,10 @@ export function ProviderSegment({
   }
 
   const tightest = mode === 'compact' ? getUsageHeadlineSection(p) : getTightestUsageSection(p)
+  const credit = getCreditOnlyUsageSummary(p)
 
   // Fetching with no prior data
-  if (p.status === 'fetching' && !tightest) {
+  if (p.status === 'fetching' && !tightest && !credit) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
         <ProviderIcon provider={provider} />
@@ -347,7 +358,7 @@ export function ProviderSegment({
   }
 
   // Error with no data
-  if (p.status === 'error' && !tightest) {
+  if (p.status === 'error' && !tightest && !credit) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
         <ProviderIcon provider={provider} />
@@ -378,6 +389,9 @@ export function ProviderSegment({
           display={display}
           showLabel={!compact}
         />
+      ) : null}
+      {credit ? (
+        <CreditUsage credit={credit} showBar={mode === 'verbose' && !compact} display={display} />
       ) : null}
       {showBalance && p.extraUsage ? (
         <>

@@ -1,5 +1,6 @@
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { getCreditOnlyUsageSummary, hasUsageWindowData } from './usage-credit-summary'
 
 export type UsageProviderSettings = Pick<
   GlobalSettings,
@@ -42,13 +43,7 @@ type UsageProviderSnapshots = {
 type UsageProviderId = ProviderRateLimits['provider']
 
 function hasUsageData(provider: ProviderRateLimits): boolean {
-  return Boolean(
-    provider.session ||
-    provider.weekly ||
-    provider.fableWeekly ||
-    provider.monthly ||
-    (provider.buckets && provider.buckets.length > 0)
-  )
+  return hasUsageWindowData(provider) || getCreditOnlyUsageSummary(provider) !== null
 }
 
 function isProviderSnapshotPending(provider: ProviderRateLimits | null | undefined): boolean {

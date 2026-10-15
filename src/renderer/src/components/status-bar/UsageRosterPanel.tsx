@@ -17,6 +17,7 @@ import { getProviderDisplayName } from './usage-error-copy'
 import { formatPlanLabel, usageTextColorClass } from './usage-roster-formatting'
 import { getUsageRosterRowState, type UsageRosterRowState } from './usage-roster-row-state'
 import type { StatusBarUsageMode } from '../../../../shared/status-bar-usage-mode'
+import { getCreditOnlyUsageSummary } from './usage-credit-summary'
 
 type ProviderId = ProviderRateLimits['provider']
 export type UsageSection = { label: string; window: RateLimitWindow }
@@ -145,6 +146,19 @@ export function UsageRow({
   const plan = formatPlanLabel(p.planType)
   const reset = hasUsage ? soonestResetLabel(sections, now) : null
   const tightest = mode === 'compact' ? getUsageHeadlineSection(p) : null
+  const credit = hasUsage ? null : getCreditOnlyUsageSummary(p)
+  const creditSection: UsageSection | null =
+    credit?.spentPercent != null
+      ? {
+          label: translate('auto.components.status.bar.tooltip.7404abbece', 'Usage credits'),
+          window: {
+            usedPercent: credit.spentPercent,
+            windowMinutes: 0,
+            resetsAt: null,
+            resetDescription: null
+          }
+        }
+      : null
 
   return (
     <div data-usage-mode={mode} className="flex min-w-0 flex-1 flex-col gap-1">
@@ -156,7 +170,11 @@ export function UsageRow({
           {name}
           {plan ? <span className="font-normal text-muted-foreground"> · {plan}</span> : null}
         </span>
-        {!hasUsage ? (
+        {credit ? (
+          <span className="ml-auto shrink-0 tabular-nums text-[11px] text-foreground">
+            {credit.text}
+          </span>
+        ) : !hasUsage ? (
           <>
             <span className="min-w-0 truncate text-[11px] text-muted-foreground">
               {state.statusLabel}
@@ -180,6 +198,15 @@ export function UsageRow({
           <span className="shrink-0 text-[11px] text-muted-foreground">{reset}</span>
         ) : null}
       </div>
+      {creditSection && mode === 'verbose' ? (
+        <div className="flex items-center pl-[30px]">
+          <UsageMetric
+            section={creditSection}
+            label={translate('components.status.bar.UsageRosterPanel.creditsLabel', 'credits')}
+            display={display}
+          />
+        </div>
+      ) : null}
       {hasUsage && mode === 'verbose' ? (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-[30px]">
           {sections.map((section) => (
@@ -301,7 +328,10 @@ export function UsageRosterPanel({
       </div>
       <div className="border-t border-border/70" />
       {sorted.map((p) => {
-        const state = getUsageRosterRowState(p, usedSections(p).length > 0)
+        const state = getUsageRosterRowState(
+          p,
+          usedSections(p).length > 0 || getCreditOnlyUsageSummary(p) !== null
+        )
         const showSignInAction = state.kind === 'sign-in' && canSignIn(p.provider)
         const rowNode = (
           <UsageRow

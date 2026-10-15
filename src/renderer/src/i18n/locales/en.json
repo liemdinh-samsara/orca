@@ -18994,6 +18994,12 @@
       "bar": {
         "workspaceSpace": {
           "otherTopLevelItems": "Other top-level items ({{value0}})"
+        },
+        "UsageRosterPanel": {
+          "creditsLabel": "credits"
+        },
+        "usageCreditSummary": {
+          "spentOfLimit": "{{spent}} / {{limit}}"
         }
       }
     },

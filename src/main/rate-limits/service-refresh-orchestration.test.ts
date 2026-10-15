@@ -242,6 +242,42 @@ describe('RateLimitService', () => {
     expect(state.claude?.error).toBe('still failing')
   })
 
+  it('keeps a recent credit-only snapshot through a transient failure', async () => {
+    const service = new RateLimitService()
+    const internal = serviceInternals(service)
+    const creditOnly: ProviderRateLimits = {
+      provider: 'claude',
+      session: null,
+      weekly: null,
+      extraUsage: {
+        unit: 'currency',
+        balance: 980.4,
+        currencyCode: 'USD',
+        enabled: true,
+        disabledReason: null,
+        spent: 19.6,
+        spendLimit: 1000,
+        spentPercent: 1.96,
+        resetsAt: null
+      },
+      updatedAt: Date.now(),
+      error: null,
+      status: 'ok'
+    }
+
+    vi.mocked(fetchClaudeRateLimits)
+      .mockResolvedValueOnce(creditOnly)
+      .mockResolvedValueOnce(errorProvider('claude', 'temporary failure'))
+    vi.mocked(fetchCodexRateLimits).mockResolvedValue(okProvider('codex', 44, Date.now()))
+
+    await internal.fetchAll()
+    await internal.fetchAll()
+
+    const state = service.getState()
+    expect(state.claude?.status).toBe('error')
+    expect(state.claude?.extraUsage).toMatchObject({ spent: 19.6, spendLimit: 1000 })
+  })
+
   it('bypasses the debounce for explicit manual refreshes', async () => {
     const service = new RateLimitService()
 

@@ -34,6 +34,8 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       previous?.weekly ||
       previous?.fableWeekly ||
       previous?.monthly ||
+      // Why: spend-billed plans (Claude Enterprise usage credits) report only a balance.
+      previous?.extraUsage ||
       (previous?.buckets && previous.buckets.length > 0)
     )
 

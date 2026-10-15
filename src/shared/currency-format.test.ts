@@ -27,4 +27,10 @@ describe('formatCurrencyAmount', () => {
   it('treats non-finite amounts as zero', () => {
     expect(formatCurrencyAmount(Number.NaN, 'USD')).toMatch(/0[.,]00/)
   })
+
+  it('drops the cents of whole amounts only when asked', () => {
+    expect(formatCurrencyAmount(1000, 'USD', { dropWholeCents: true })).not.toMatch(/[.,]00$/)
+    expect(formatCurrencyAmount(19.6, 'USD', { dropWholeCents: true })).toMatch(/19[.,]60/)
+    expect(formatCurrencyAmount(1000, 'USD')).toMatch(/[.,]00$/)
+  })
 })

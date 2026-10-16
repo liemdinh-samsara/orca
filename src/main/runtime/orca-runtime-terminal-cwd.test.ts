@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import type { Repo } from '../../shared/repo-types'
 import { OrcaRuntimeService } from './orca-runtime'
 
 vi.mock('electron', () => ({
@@ -11,13 +15,18 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') }
 }))
 
-function stubLaunchScope(runtime: OrcaRuntimeService, path = '/repo/app'): void {
+function stubLaunchScope(
+  runtime: OrcaRuntimeService,
+  path = '/repo/app',
+  repo: Repo | null = null
+): void {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this stub exposes the runtime protected launch-scope method with its actual return shape.
   const internals = runtime as unknown as {
     resolveTerminalWorkspaceLaunchScope: (selector: string) => Promise<{
       id: string
       path: string
       connectionId: string | null
-      repo: null
+      repo: Repo | null
       folderWorkspace: null
     }>
   }
@@ -25,7 +34,7 @@ function stubLaunchScope(runtime: OrcaRuntimeService, path = '/repo/app'): void 
     id: 'wt-1',
     path,
     connectionId: null,
-    repo: null,
+    repo,
     folderWorkspace: null
   })
 }
@@ -157,4 +166,61 @@ describe('OrcaRuntimeService terminal startup cwd', () => {
       })
     )
   })
+})
+
+describe('project start folder terminal startup', () => {
+  const directories: string[] = []
+  afterEach(() => {
+    for (const path of directories.splice(0)) {
+      rmSync(path, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    { exists: true, requested: undefined, expected: 'start' },
+    { exists: false, requested: undefined, expected: 'root' },
+    { exists: true, requested: 'explicit', expected: 'explicit' }
+  ])(
+    'uses $expected cwd (start folder exists=$exists)',
+    async ({ exists, requested, expected }) => {
+      const path = mkdtempSync(join(tmpdir(), 'orca-start-cwd-'))
+      directories.push(path)
+      const startPath = join(path, 'packages', 'web')
+      if (exists) {
+        mkdirSync(startPath, { recursive: true })
+      }
+      const repo: Repo = {
+        id: 'repo-1',
+        path,
+        displayName: 'app',
+        badgeColor: 'blue',
+        addedAt: 0,
+        kind: 'git',
+        workspaceStartPath: 'packages/web'
+      }
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this spawn uses only optional project resolution and settings on the store.
+      const runtime = new OrcaRuntimeService({
+        getProjects: () => [],
+        getSettings: () => ({})
+      } as never)
+      stubLaunchScope(runtime, path, repo)
+      const spawn = vi.fn().mockResolvedValue({ id: 'pty-1' })
+      runtime.setPtyController({
+        spawn,
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const requestedCwd = requested ? join(path, requested) : undefined
+
+      await runtime.createTerminal('id:wt-1', requestedCwd ? { cwd: requestedCwd } : {})
+
+      expect(spawn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cwd: expected === 'start' ? startPath : expected === 'root' ? path : requestedCwd,
+          worktreeId: 'wt-1'
+        })
+      )
+    }
+  )
 })

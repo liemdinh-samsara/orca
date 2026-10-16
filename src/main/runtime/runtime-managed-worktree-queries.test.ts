@@ -385,3 +385,52 @@ describe('RuntimeManagedWorktreeQueries.listDetected overtaken scan', () => {
     expect(result).toMatchObject({ authoritative: false, source: 'metadata-fallback' })
   })
 })
+
+describe('in-place detected runtime workspaces', () => {
+  it('appends instance metadata as visible selected checkouts in an authoritative git scan', async () => {
+    const repo = folderRepo({ kind: 'git', inPlaceWorkspaces: true })
+    const rootId = `${repo.id}::${repo.path}`
+    const instanceId = `${rootId}::workspace:11111111-2222-3333-4444-555555555555`
+    const metaById = {
+      [instanceId]: metadata({ displayName: 'api', instanceId: 'api-instance', hostId: 'local' })
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the listing uses only these store methods; pruning is mocked above.
+    const store = {
+      getRepos: () => [repo],
+      getRepo: () => repo,
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (id: string) => metaById[id],
+      setWorktreeMeta: vi.fn((_id, updates) => metadata(updates)),
+      getAllWorktreeLineage: () => ({}),
+      getSettings: () => settings
+    } as unknown as RuntimeStore
+    const scanRepo = vi.fn(async () => ({
+      ok: true as const,
+      worktrees: [
+        {
+          path: repo.path,
+          head: 'root-head',
+          branch: 'refs/heads/main',
+          isBare: false,
+          isMainWorktree: true
+        }
+      ]
+    }))
+
+    const result = await queries(store, { scanRepo }).listDetected(repo)
+
+    expect(result.authoritative).toBe(true)
+    expect(result.worktrees.map((row) => row.id)).toEqual([rootId, instanceId])
+    expect(result.worktrees[1]).toMatchObject({
+      id: instanceId,
+      path: repo.path,
+      displayName: 'api',
+      instanceId: 'api-instance',
+      hostId: 'local',
+      visible: true,
+      selectedCheckout: true,
+      branch: 'refs/heads/main',
+      head: 'root-head'
+    })
+  })
+})

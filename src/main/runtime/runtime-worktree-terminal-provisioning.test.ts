@@ -20,7 +20,7 @@ function fakeHost() {
       created += 1
       return { handle: `term_${created}` }
     }),
-    splitTerminal: vi.fn(),
+    splitTerminal: vi.fn(async () => ({ handle: 'term_split' })),
     setTabTitle: vi.fn(async (_handle: string, _title: string) => {}),
     setTabColor: vi.fn(async (_handle: string, _color: string) => {}),
     getSettings: () => ({}),
@@ -93,4 +93,63 @@ describe('default tabs beside the agent a create started', () => {
     )
     warn.mockRestore()
   })
+})
+
+describe('setup terminal cwd', () => {
+  it('creates a Setup tab at the workspace root', async () => {
+    const host = fakeHost()
+    const result = await provisionWorktreeTerminals(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeHost implements all host methods reached by setup provisioning.
+      host as unknown as WorktreeTerminalProvisioningHost,
+      {
+        worktreeSelector: 'id:wt-1',
+        worktreeId: 'wt-1',
+        worktreePath: '/worktrees/wt-1',
+        setup: { runnerScriptPath: '/tmp/setup.sh', envVars: {} },
+        hasStartupTerminal: true,
+        primaryTerminalHandle: 'term_agent',
+        setupCommandPlatform: 'posix'
+      }
+    )
+    expect(result).toEqual({ setupSpawned: true, setupTerminalHandle: 'term_1' })
+    expect(host.createTerminal).toHaveBeenCalledWith(
+      'id:wt-1',
+      expect.objectContaining({
+        title: 'Setup',
+        cwd: '/worktrees/wt-1'
+      })
+    )
+    expect(host.splitTerminal).not.toHaveBeenCalled()
+  })
+
+  it.each(['split-vertical', 'split-horizontal'] as const)(
+    'currently passes no cwd to a %s setup split',
+    async (setupLaunchMode) => {
+      const host = {
+        ...fakeHost(),
+        getSettings: () => ({ setupScriptLaunchMode: setupLaunchMode })
+      }
+      const result = await provisionWorktreeTerminals(
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeHost implements all host methods reached by setup provisioning.
+        host as unknown as WorktreeTerminalProvisioningHost,
+        {
+          worktreeSelector: 'id:wt-1',
+          worktreeId: 'wt-1',
+          worktreePath: '/worktrees/wt-1',
+          setup: { runnerScriptPath: '/tmp/setup.sh', envVars: {} },
+          hasStartupTerminal: true,
+          primaryTerminalHandle: 'term_agent',
+          setupCommandPlatform: 'posix'
+        }
+      )
+      expect(result).toEqual({ setupSpawned: true, setupTerminalHandle: 'term_split' })
+      expect(host.createTerminal).not.toHaveBeenCalled()
+      expect(host.splitTerminal).toHaveBeenCalledWith('term_agent', {
+        direction: setupLaunchMode === 'split-horizontal' ? 'horizontal' : 'vertical',
+        command: expect.any(String),
+        env: {},
+        activate: false
+      })
+    }
+  )
 })

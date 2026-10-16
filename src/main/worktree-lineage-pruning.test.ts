@@ -3,6 +3,7 @@ import type { Repo } from '../shared/repo-types'
 import type { WorkspaceLineage, WorktreeLineage } from '../shared/worktree/lineage-types'
 import type { WorktreeMeta } from '../shared/worktree/meta-types'
 import { worktreeWorkspaceKey } from '../shared/workspace-scope'
+import { mergeWorktreeMetaForWrite } from './persistence/loading-store/worktree-meta-write-normalization'
 import { pruneLineageForMissingRepoWorktrees } from './worktree-lineage-pruning'
 
 const repo: Repo = {
@@ -228,5 +229,37 @@ describe('pruneLineageForMissingRepoWorktrees', () => {
 
     expect(store.setWorktreeMeta).not.toHaveBeenCalled()
     expect(worktreeLineageById[liveChildId]).toBe(edge)
+  })
+})
+
+describe('in-place workspace lineage', () => {
+  it('keeps lineage and instance metadata while the shared checkout is live', () => {
+    const parentId = 'repo-1::/repo'
+    const childId = `${parentId}::workspace:11111111-2222-3333-4444-555555555555`
+    const edge = lineage(childId, parentId)
+    const workspaceEdge = workspaceLineage(childId, parentId)
+    const worktreeLineageById = { [childId]: edge }
+    const workspaceLineageByChildKey = { [worktreeWorkspaceKey(childId)]: workspaceEdge }
+    const childMeta = mergeWorktreeMetaForWrite(undefined, { instanceId: edge.worktreeInstanceId })
+    const parentMeta = mergeWorktreeMetaForWrite(undefined, {
+      instanceId: edge.parentWorktreeInstanceId
+    })
+    const metaById = { [childId]: childMeta, [parentId]: parentMeta }
+    const store = createStore(worktreeLineageById, workspaceLineageByChildKey, metaById)
+
+    pruneLineageForMissingRepoWorktrees(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: pruning reads only the lineage and metadata methods implemented by this fixture.
+      store as never,
+      repo,
+      [{ path: '/repo', head: 'a', branch: 'main', isBare: false, isMainWorktree: true }]
+    )
+
+    expect(store.removeWorktreeLineage).not.toHaveBeenCalled()
+    expect(store.removeWorkspaceLineage).not.toHaveBeenCalled()
+    expect(store.setWorktreeMeta).not.toHaveBeenCalled()
+    expect(metaById[childId]).toBe(childMeta)
+    expect(metaById[parentId]).toBe(parentMeta)
+    expect(worktreeLineageById[childId]).toBe(edge)
+    expect(workspaceLineageByChildKey[worktreeWorkspaceKey(childId)]).toBe(workspaceEdge)
   })
 })

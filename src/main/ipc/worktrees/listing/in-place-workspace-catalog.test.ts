@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { appendInPlaceGitWorkspaces } from './in-place-workspace-catalog'
+import { toDetectedWorktree } from '../../../../shared/worktree/ownership'
+import type { Store } from '../../../persistence'
+import {
+  appendInPlaceGitWorkspaces,
+  appendInPlaceDetectedGitWorkspaces
+} from './in-place-workspace-catalog'
 
 const repo: Repo = {
   id: 'repo-1',
@@ -95,5 +100,57 @@ describe('appendInPlaceGitWorkspaces', () => {
         [instanceId]: meta({ displayName: 'x' })
       })
     ).toEqual([root])
+  })
+})
+
+describe('in-place catalog edge cases', () => {
+  it('returns the original scan when it contains no main worktree', () => {
+    const rows = [worktree({ isMainWorktree: false })]
+    expect(appendInPlaceGitWorkspaces(repo, rows, { [instanceId]: meta({}) })).toBe(rows)
+  })
+
+  it.each(['ssh:instance' as const, undefined])(
+    'uses instance host %s or falls back to the root host',
+    (hostId) => {
+      const rows = [worktree({ hostId: 'ssh:root' })]
+      const result = appendInPlaceGitWorkspaces(repo, rows, { [instanceId]: meta({ hostId }) })
+      expect(result[1]?.hostId).toBe(hostId ?? 'ssh:root')
+    }
+  )
+})
+
+describe('appendInPlaceDetectedGitWorkspaces', () => {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: detection reads only these two settings.
+  const settings = { workspaceDir: '/ws', nestWorkspaces: true } as ReturnType<Store['getSettings']>
+  const store = { getSettings: () => settings }
+  const root = toDetectedWorktree({
+    repo,
+    worktree: worktree({}),
+    meta: undefined,
+    settings,
+    knownOrcaLayouts: [],
+    isLegacyRepoForVisibility: true
+  })
+
+  it('appends visible selected checkout rows after the scanned rows', () => {
+    const result = appendInPlaceDetectedGitWorkspaces(store, repo, [root], {
+      [instanceId]: meta({ displayName: 'fleet api', instanceId: 'instance-1' })
+    })
+    expect(result).toHaveLength(2)
+    expect(result[0]).toBe(root)
+    expect(result[1]).toMatchObject({
+      id: instanceId,
+      path: repo.path,
+      visible: true,
+      selectedCheckout: true,
+      displayName: 'fleet api',
+      instanceId: 'instance-1',
+      branch: root.branch
+    })
+  })
+
+  it('returns the same detected array when there is no instance metadata', () => {
+    const rows = [root]
+    expect(appendInPlaceDetectedGitWorkspaces(store, repo, rows, {})).toBe(rows)
   })
 })

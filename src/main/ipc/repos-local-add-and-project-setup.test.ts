@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import type * as GitRunner from '../git/runner'
 import type * as RepoModule from '../git/repo'
 
@@ -472,4 +475,111 @@ describe('repos:add + repos:clone', () => {
     expect(result).toEqual({ repo: existing })
     expect(mockStore.addRepo).not.toHaveBeenCalled()
   })
+  it('keeps the root name and no start folder when adding the git root itself', async () => {
+    vi.mocked(getGitRepoRoot).mockReturnValue('/tmp/from-add')
+    const result = await handlers.get('repos:add')!(null, { path: '/tmp/from-add', kind: 'git' })
+    expect(result).toHaveProperty('repo.displayName', 'from-add')
+    expect(result).not.toHaveProperty('repo.workspaceStartPath')
+    expect(mockStore.addRepo).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        workspaceStartPath: expect.anything()
+      })
+    )
+  })
+
+  it('resolves a symlinked selected subfolder against the real git root', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'orca-start-symlink-'))
+    try {
+      const root = join(realpathSync(directory), 'repo')
+      mkdirSync(join(root, 'packages', 'web'), { recursive: true })
+      const alias = join(directory, 'alias')
+      symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir')
+      vi.mocked(getGitRepoRoot).mockReturnValue(root)
+      const result = await handlers.get('repos:add')!(null, {
+        path: join(alias, 'packages', 'web'),
+        kind: 'git'
+      })
+      expect(result).toHaveProperty('repo.workspaceStartPath', 'packages/web')
+      expect(mockStore.addRepo).toHaveBeenCalledWith(
+        expect.objectContaining({ path: root, workspaceStartPath: 'packages/web' })
+      )
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it.each(['/tmp/outside', '/orca-nonexistent-start-folder/selected'])(
+    'ignores a selection outside the reported root: %s',
+    async (path) => {
+      vi.mocked(getGitRepoRoot).mockReturnValue('/tmp/from-add')
+      const result = await handlers.get('repos:add')!(null, { path, kind: 'git' })
+      expect(result).toHaveProperty('repo.path', '/tmp/from-add')
+      expect(result).not.toHaveProperty('repo.workspaceStartPath')
+    }
+  )
+
+  it('preserves an explicit display name for a subfolder project', async () => {
+    vi.mocked(getGitRepoRoot).mockReturnValue('/tmp/from-add')
+    const result = await handlers.get('repos:add')!(null, {
+      path: '/tmp/from-add/packages/web',
+      kind: 'git',
+      displayName: '  Custom project  '
+    })
+    expect(result).toHaveProperty('repo.displayName', 'Custom project')
+    expect(result).toHaveProperty('repo.workspaceStartPath', 'packages/web')
+  })
+
+  it.each([true, false])(
+    'persists inPlaceWorkspaces=%s and the normalized start folder through repos:update',
+    (inPlaceWorkspaces) => {
+      const updated = { id: 'repo-update', inPlaceWorkspaces, workspaceStartPath: 'packages/web' }
+      mockStore.updateRepo.mockReturnValue(updated)
+      expect(
+        handlers.get('repos:update')!(null, {
+          repoId: updated.id,
+          updates: {
+            inPlaceWorkspaces,
+            workspaceStartPath: ' packages//./web/ '
+          }
+        })
+      ).toBe(updated)
+      expect(mockStore.updateRepo).toHaveBeenCalledWith(updated.id, {
+        inPlaceWorkspaces,
+        workspaceStartPath: 'packages/web'
+      })
+    }
+  )
+
+  it.each(['true', 1, null])('drops non-boolean inPlaceWorkspaces=%s', (inPlaceWorkspaces) => {
+    handlers.get('repos:update')!(null, { repoId: 'repo-update', updates: { inPlaceWorkspaces } })
+    expect(mockStore.updateRepo).toHaveBeenCalledWith('repo-update', {})
+  })
+
+  it.each(['/absolute', 'C:\\absolute', '../x', 'packages/../../x'])(
+    'drops an invalid start folder %s through repos:update',
+    (workspaceStartPath) => {
+      handlers.get('repos:update')!(null, {
+        repoId: 'repo-update',
+        updates: { workspaceStartPath }
+      })
+      expect(mockStore.updateRepo).toHaveBeenCalledWith('repo-update', {})
+    }
+  )
+
+  it.each(['', undefined])(
+    'forwards undefined to clear start folder %s through repos:update',
+    (workspaceStartPath) => {
+      handlers.get('repos:update')!(null, {
+        repoId: 'repo-update',
+        updates: { workspaceStartPath }
+      })
+      expect(mockStore.updateRepo).toHaveBeenCalledWith('repo-update', {
+        workspaceStartPath: undefined
+      })
+      expect(mockStore.updateRepo.mock.calls[0]?.[1]).toHaveProperty(
+        'workspaceStartPath',
+        undefined
+      )
+    }
+  )
 })

@@ -3,6 +3,7 @@ import {
   OrcaRuntimeService,
   addWorktree,
   addWorktreeMock,
+  removeWorktreeMock,
   computeWorktreePathMock,
   deleteWorktreeHistoryDirMock,
   ensurePathWithinWorkspaceMock,
@@ -694,5 +695,57 @@ describe('OrcaRuntimeService', () => {
     } finally {
       gitSpy.mockRestore()
     }
+  })
+})
+
+describe('runtime in-place git workspace', () => {
+  it('registers another workspace without git add and forgets it after the mode is disabled', async () => {
+    const repo = {
+      id: 'git-repo',
+      path: '/workspace/git',
+      displayName: 'Git',
+      badgeColor: 'blue',
+      addedAt: 1,
+      kind: 'git' as const,
+      inPlaceWorkspaces: true,
+      executionHostId: 'runtime:env-1' as const
+    }
+    const metaById: Record<string, WorktreeMeta> = {}
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [repo],
+      getRepo: () => repo,
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (id: string) => metaById[id],
+      setWorktreeMeta: (id: string, meta: Partial<WorktreeMeta>) => {
+        metaById[id] = { ...(metaById[id] ?? makeWorktreeMeta()), ...meta }
+        return metaById[id]
+      },
+      removeWorktreeMeta: (id: string) => {
+        delete metaById[id]
+      }
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fixture extends the established runtime store and overrides only repository and metadata access.
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    const result = await runtime.createManagedWorktree({ repoSelector: 'id:git-repo', name: 'api' })
+
+    expect(addWorktreeMock).not.toHaveBeenCalled()
+    expect(result.worktree).toMatchObject({
+      id: expect.stringMatching(/^git-repo::\/workspace\/git::workspace:[0-9a-f-]{36}$/),
+      path: repo.path,
+      repoId: repo.id,
+      displayName: 'api',
+      isMainWorktree: false
+    })
+    expect(metaById[result.worktree.id]).toMatchObject({
+      displayName: 'api',
+      instanceId: result.worktree.instanceId,
+      orcaCreationSource: 'runtime'
+    })
+
+    repo.inPlaceWorkspaces = false
+    await expect(runtime.removeManagedWorktree(`id:${result.worktree.id}`)).resolves.toEqual({})
+    expect(removeWorktreeMock).not.toHaveBeenCalled()
+    expect(metaById[result.worktree.id]).toBeUndefined()
   })
 })

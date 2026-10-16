@@ -391,3 +391,35 @@ describe('folder-to-Git checkout identity', () => {
     }
   )
 })
+
+describe('in-place git workspace rows', () => {
+  it('appends instance metadata after scanned rows with root git state and no lineage', async () => {
+    const gitRepo = repo('repo', '/path', { kind: 'git' })
+    const deps = createDeps([gitRepo])
+    const instanceId = 'repo::/path::workspace:11111111-2222-3333-4444-555555555555'
+    deps.metaById[instanceId] = mergeWorktreeMetaForWrite(undefined, {
+      displayName: 'api',
+      instanceId: 'api-instance',
+      hostId: 'local'
+    })
+    const root = { ...gitWorktree('/path'), isMainWorktree: true }
+    deps.scanRepo.mockResolvedValue({ ok: true, worktrees: [root] })
+
+    const rows = await resolveRepoWorktreeRows(deps, gitRepo, deps.metaById, new Map())
+
+    expect(rows.map((row) => row.id)).toEqual(['repo::/path', instanceId])
+    expect(rows[1]).toMatchObject({
+      id: instanceId,
+      path: '/path',
+      hostId: 'local',
+      displayName: 'api',
+      instanceId: 'api-instance',
+      parentWorktreeId: null,
+      childWorktreeIds: [],
+      lineage: null,
+      git: { ...root, isMainWorktree: false }
+    })
+    expect(rows[1]?.git?.branch).toBe(rows[0]?.git?.branch)
+    expect(rows[1]?.git?.head).toBe(rows[0]?.git?.head)
+  })
+})

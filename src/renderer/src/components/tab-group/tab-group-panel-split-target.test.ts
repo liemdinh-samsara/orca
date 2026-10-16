@@ -368,6 +368,47 @@ describe('resolveActivePaneColumnSplitTarget', () => {
     vi.unstubAllGlobals()
   })
 
+  it.each([
+    { stripOrientation: 'vertical', expected: null },
+    { stripOrientation: undefined, expected: { groupId: 'group-1', zone: 'left' } }
+  ] as const)(
+    'guards vertical row hovers at a pane edge: $stripOrientation',
+    ({ stripOrientation, expected }) => {
+      mockTabGroupGeometry([{ groupId: 'group-1', panelRect, bodyRect }])
+      const pointer = { x: 520, y: 200 }
+      const result = resolveActivePaneColumnSplitTarget({
+        event: makeEvent({
+          activeData: makeDragData(),
+          overData: makeDragData({
+            groupId: 'group-1',
+            unifiedTabId: 'tab-2',
+            visibleTabId: 'tab-2',
+            stripOrientation
+          }),
+          pointer
+        }),
+        groupsByWorktree: {
+          'wt-1': [
+            {
+              id: 'group-1',
+              worktreeId: 'wt-1',
+              activeTabId: 'tab-1',
+              tabOrder: ['tab-1', 'tab-2']
+            }
+          ]
+        },
+        layoutByWorktree: { 'wt-1': { type: 'leaf', groupId: 'group-1' } },
+        worktreeId: 'wt-1',
+        getDragPointer: () => pointer
+      })
+      if (expected === null) {
+        expect(result).toBeNull()
+      } else {
+        expect(result).toEqual(expect.objectContaining(expected))
+      }
+    }
+  )
+
   it('resolves cross-group panel-edge splits without an dnd-kit over target', () => {
     expect(findTabGroupPanelUnderPointer('wt-1', { x: 880, y: 300 })?.groupId).toBe('group-2')
     expect(

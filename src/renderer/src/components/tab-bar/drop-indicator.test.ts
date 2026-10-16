@@ -44,6 +44,7 @@ describe('getDropIndicatorClasses', () => {
 
 describe('ACTIVE_TAB_INDICATOR_CLASSES', () => {
   it('renders a full-foreground 2px bottom-edge marker without shifting layout', () => {
+    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('tab-active-indicator')
     expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('absolute')
     expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('bottom-0')
     expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('h-[2px]')

@@ -35,14 +35,19 @@ function makeDragEvent({
 }: {
   activeData: TabDragItemData | null
   overData: TabDragItemData | null
-  overRect?: { left: number; width: number }
+  overRect?: { left: number; width: number; top?: number; height?: number }
 }) {
   return {
     active: { data: { current: activeData } },
     over: overData
       ? {
           data: { current: overData },
-          rect: { left: overRect?.left ?? 0, width: overRect?.width ?? 100 }
+          rect: {
+            left: overRect?.left ?? 0,
+            width: overRect?.width ?? 100,
+            top: overRect?.top ?? 0,
+            height: overRect?.height ?? 32
+          }
         }
       : null,
     delta: { x: 0, y: 0 }
@@ -54,6 +59,42 @@ function makeDragEvent({
 // ---------------------------------------------------------------------------
 
 describe('resolveTabInsertion', () => {
+  it.each([
+    { x: 290, y: 107, side: 'left' },
+    { x: 110, y: 125, side: 'right' }
+  ] as const)('uses y midpoint for vertical insertion $side, ignoring x', ({ x, y, side }) => {
+    const event = makeDragEvent({
+      activeData: makeDragData(),
+      overData: makeDragData({
+        unifiedTabId: 'tab-over',
+        visibleTabId: 'tab-over',
+        stripOrientation: 'vertical'
+      }),
+      overRect: { left: 100, width: 200, top: 100, height: 32 }
+    })
+    expect(resolveTabInsertion(event, isTabDragData, () => ({ x, y }))).toEqual({
+      groupId: 'group-1',
+      visibleTabId: 'tab-over',
+      side
+    })
+  })
+
+  it.each([
+    { x: 190, y: 125, side: 'left' },
+    { x: 210, y: 107, side: 'right' }
+  ] as const)('uses x midpoint without orientation for insertion $side', ({ x, y, side }) => {
+    const event = makeDragEvent({
+      activeData: makeDragData(),
+      overData: makeDragData({ unifiedTabId: 'tab-over', visibleTabId: 'tab-over' }),
+      overRect: { left: 100, width: 200, top: 100, height: 32 }
+    })
+    expect(resolveTabInsertion(event, isTabDragData, () => ({ x, y }))).toEqual({
+      groupId: 'group-1',
+      visibleTabId: 'tab-over',
+      side
+    })
+  })
+
   it('returns null when there is no "over" element', () => {
     const event = makeDragEvent({ activeData: makeDragData(), overData: null })
     expect(resolveTabInsertion(event, isTabDragData, () => ({ x: 50, y: 10 }))).toBeNull()

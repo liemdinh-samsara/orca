@@ -13,6 +13,31 @@ function makeBaseSession(): WorkspaceSessionState {
 }
 
 describe('buildHydratedTabState group validation', () => {
+  it('keeps the persisted vertical strip orientation on a hydrated group', () => {
+    const result = buildHydratedTabState(
+      {
+        ...makeBaseSession(),
+        unifiedTabs: {},
+        tabGroups: {
+          w1: [
+            {
+              id: 'g1',
+              worktreeId: 'w1',
+              activeTabId: null,
+              tabOrder: [],
+              tabStripOrientation: 'vertical'
+            }
+          ]
+        }
+      },
+      new Set(['w1'])
+    )
+    expect(result.groupsByWorktree.w1[0]).toMatchObject({
+      id: 'g1',
+      tabStripOrientation: 'vertical'
+    })
+  })
+
   it('filters out invalid worktree IDs', () => {
     const session: WorkspaceSessionState = {
       ...makeBaseSession(),

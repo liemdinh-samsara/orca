@@ -47,6 +47,59 @@ describe('TabsSlice', () => {
     })
   })
 
+  describe('setTabGroupStripOrientation', () => {
+    function createGroup(): string {
+      store.getState().createUnifiedTab(WT, 'terminal')
+      return store.getState().groupsByWorktree[WT][0].id
+    }
+
+    it('sets vertical then explicit horizontal on the target group', () => {
+      const groupId = createGroup()
+      store.getState().setTabGroupStripOrientation(WT, groupId, 'vertical')
+      expect(store.getState().groupsByWorktree[WT][0].tabStripOrientation).toBe('vertical')
+
+      store.getState().setTabGroupStripOrientation(WT, groupId, 'horizontal')
+      expect(store.getState().groupsByWorktree[WT][0].tabStripOrientation).toBe('horizontal')
+    })
+
+    it.each(['horizontal', 'vertical'] as const)(
+      'keeps state identity when already %s',
+      (orientation) => {
+        const groupId = createGroup()
+        store.getState().setTabGroupStripOrientation(WT, groupId, orientation)
+        const before = store.getState()
+        store.getState().setTabGroupStripOrientation(WT, groupId, orientation)
+        expect(store.getState()).toBe(before)
+        expect(store.getState().groupsByWorktree).toBe(before.groupsByWorktree)
+      }
+    )
+
+    it('keeps state identity for an unknown group', () => {
+      createGroup()
+      const before = store.getState()
+      store.getState().setTabGroupStripOrientation(WT, 'missing-group', 'vertical')
+      expect(store.getState()).toBe(before)
+      expect(store.getState().groupsByWorktree).toBe(before.groupsByWorktree)
+    })
+
+    it('leaves a sibling split group untouched', () => {
+      const groupId = createGroup()
+      const siblingId = store.getState().createEmptySplitGroup(WT, groupId, 'right')
+      if (!siblingId) {
+        throw new Error('Expected sibling split')
+      }
+      store.getState().setTabGroupStripOrientation(WT, siblingId, 'vertical')
+      const sibling = store.getState().groupsByWorktree[WT].find((group) => group.id === siblingId)
+
+      store.getState().setTabGroupStripOrientation(WT, groupId, 'vertical')
+      store.getState().setTabGroupStripOrientation(WT, groupId, 'horizontal')
+      expect(store.getState().groupsByWorktree[WT].find((group) => group.id === siblingId)).toBe(
+        sibling
+      )
+      expect(sibling?.tabStripOrientation).toBe('vertical')
+    })
+  })
+
   describe('setTabGroupSplitRatio', () => {
     it('updates the persisted ratio for the targeted split node', () => {
       store.setState({

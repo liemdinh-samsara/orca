@@ -1,8 +1,10 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { MobileNativeChatOverlay } from './MobileNativeChatOverlay'
+import { useMobileNativeChatHostSkills } from './use-mobile-native-chat-skills'
 import type { MobileNativeChatController } from './use-mobile-native-chat-controller'
 
 vi.mock('react-native', () => ({
@@ -17,6 +19,13 @@ vi.mock('./MobileNativeChatBackgroundTasks', () => ({
 }))
 vi.mock('./MobileNativeChatVisual', () => ({ useMobileNativeChatVisualRenderer: () => null }))
 
+const hostSkills = vi.hoisted(() => [{ name: 'host-skill', kind: 'skill' as const }])
+vi.mock('./use-mobile-native-chat-skills', () => ({
+  useMobileNativeChatHostSkills: vi.fn(() => hostSkills)
+}))
+
+const client = { sendRequest: vi.fn() }
+
 function assistantTurn(id: string, text: string): NativeChatMessage {
   return { id, role: 'assistant', blocks: [{ type: 'text', text }], timestamp: 0, source: 'hook' }
 }
@@ -24,6 +33,10 @@ function assistantTurn(id: string, text: string): NativeChatMessage {
 /** One render of the route: chat visible or not, the transcript it currently
  *  holds, and the agent-status stream behind it. */
 type Tick = {
+  nativeChatStructured?: boolean
+  nativeChatSessionCommands?: readonly AgentSessionSlashCommand[]
+  composerText?: string
+  worktreeId?: string
   show?: boolean
   messages?: NativeChatMessage[]
   streamingText?: string
@@ -39,6 +52,10 @@ function overlayElement(tick: Tick): ReturnType<typeof createElement> {
     showNativeChat: tick.show ?? true,
     nativeChatSession: { messages: tick.messages ?? [], status: 'ready' },
     nativeChatAgent: 'claude',
+    nativeChatStructured: tick.nativeChatStructured ?? false,
+    nativeChatSessionCommands: tick.nativeChatSessionCommands,
+    client,
+    worktreeId: tick.worktreeId ?? 'wt-1',
     nativeChatAgentWorking: tick.streamLive ?? false,
     nativeChatTurnIndicator: {
       thinking: false,
@@ -50,7 +67,7 @@ function overlayElement(tick: Tick): ReturnType<typeof createElement> {
     nativeChatStreamScopeKey: tick.identity ?? 'tab-a',
     chatPending: [],
     chatImagePreviewsByMessageId: {},
-    chatComposerText: '',
+    chatComposerText: tick.composerText ?? '',
     setChatComposerText: vi.fn(),
     nativeChatQueued: {
       cards: [],
@@ -220,5 +237,63 @@ describe("MobileNativeChatOverlay while a person's Stop ends the turn", () => {
 
   it('leaves Steer to the cards otherwise', async () => {
     expect(await steerHeld({ streamLive: true, stopping: false })).toBe(false)
+  })
+})
+
+describe('MobileNativeChatOverlay skill catalog', () => {
+  let renderer: ReactTestRenderer | null = null
+
+  afterEach(() => {
+    act(() => renderer?.unmount())
+    renderer = null
+    vi.clearAllMocks()
+  })
+
+  it.each([false, true])(
+    'requests host skills only for terminal chats (structured=%s)',
+    async (nativeChatStructured) => {
+      await act(async () => {
+        renderer = create(
+          overlayElement({
+            nativeChatStructured,
+            worktreeId: 'wt-skills',
+            composerText: '/liem'
+          })
+        )
+      })
+
+      expect(useMobileNativeChatHostSkills).toHaveBeenLastCalledWith({
+        agent: nativeChatStructured ? null : 'claude',
+        client,
+        worktreeId: 'wt-skills',
+        composerText: '/liem'
+      })
+      const view = renderer!.root.findAll((node) => node.type === 'ChatView')[0]
+      expect(view.props.sessionCommands).toBe(hostSkills)
+    }
+  )
+
+  it('passes host skills until the structured session reports its own commands', async () => {
+    const sessionCommands: AgentSessionSlashCommand[] = [{ name: 'session-skill', kind: 'skill' }]
+    await act(async () => {
+      renderer = create(overlayElement({}))
+    })
+    const commands = () =>
+      renderer!.root.findAll((node) => node.type === 'ChatView')[0].props.sessionCommands
+    expect(commands()).toBe(hostSkills)
+
+    await act(async () => {
+      renderer!.update(
+        overlayElement({ nativeChatStructured: true, nativeChatSessionCommands: sessionCommands })
+      )
+    })
+    expect(commands()).toBe(sessionCommands)
+
+    await act(async () => {
+      renderer!.update(
+        overlayElement({ nativeChatStructured: true, nativeChatSessionCommands: [] })
+      )
+    })
+    expect(commands()).toEqual([])
   })
 })

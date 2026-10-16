@@ -1,10 +1,27 @@
-import { createElement } from 'react'
+import { createElement, type SetStateAction } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { MobileNativeChatSkill } from './mobile-native-chat-skill-read'
 
 const read = vi.hoisted(() => ({ fn: vi.fn() }))
+const stateWrite = vi.hoisted(() => vi.fn())
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>()
+  return {
+    ...actual,
+    useState<T>(initial: T | (() => T)) {
+      const [value, setValue] = actual.useState(initial)
+      return [
+        value,
+        (next: SetStateAction<T>) => {
+          stateWrite(next)
+          setValue(next)
+        }
+      ] as const
+    }
+  }
+})
 vi.mock('./mobile-native-chat-skill-read', () => ({ readMobileNativeChatSkills: read.fn }))
 
 import {
@@ -32,6 +49,7 @@ describe('useMobileNativeChatSkills', () => {
 
   beforeEach(() => {
     read.fn.mockReset()
+    stateWrite.mockClear()
   })
   afterEach(() => {
     act(() => renderer?.unmount())
@@ -95,6 +113,53 @@ describe('useMobileNativeChatSkills', () => {
     expect(skills).toEqual([])
   })
 
+  it.each([
+    ['workspace changed', { ...base, worktreeId: 'wt-2' }],
+    ['agent changed', { ...base, agent: 'codex' }],
+    ['slash dropped', { ...base, wanted: false }]
+  ])('ignores a reply after the %s', async (_label, next) => {
+    let resolve!: (value: readonly MobileNativeChatSkill[]) => void
+    const pending = new Promise<readonly MobileNativeChatSkill[]>((done) => {
+      resolve = done
+    })
+    read.fn.mockReturnValueOnce(pending).mockResolvedValue(null)
+    await render(base)
+    await render(next)
+
+    await act(async () => {
+      resolve([REPORT])
+    })
+
+    expect(stateWrite).not.toHaveBeenCalled()
+    expect(skills).toEqual([])
+    await render(base)
+    expect(skills).toEqual([])
+  })
+
+  it('ignores a reply after unmount without writing state or logging an error', async () => {
+    let resolve!: (value: readonly MobileNativeChatSkill[]) => void
+    read.fn.mockReturnValueOnce(
+      new Promise<readonly MobileNativeChatSkill[]>((done) => {
+        resolve = done
+      })
+    )
+    await render(base)
+    act(() => renderer?.unmount())
+    renderer = null
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await act(async () => {
+        resolve([REPORT])
+      })
+
+      expect(stateWrite).not.toHaveBeenCalled()
+      expect(skills).toEqual([])
+      expect(consoleError).not.toHaveBeenCalled()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
   it('stays quiet without a connection, workspace or agent', async () => {
     await render({ ...base, client: null })
     await render({ ...base, client: CLIENT, worktreeId: null })
@@ -147,5 +212,15 @@ describe('useMobileNativeChatHostSkills', () => {
 
     await type('/liem-upload-report some text')
     expect(read.fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits the description key when the host skill has no description', async () => {
+    read.fn.mockReset()
+    read.fn.mockResolvedValue([{ name: 'report', description: null }])
+
+    await type('/report')
+
+    expect(result).toEqual([{ name: 'report', kind: 'skill' }])
+    expect(result?.[0]).not.toHaveProperty('description')
   })
 })

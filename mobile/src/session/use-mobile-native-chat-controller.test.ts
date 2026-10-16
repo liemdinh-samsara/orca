@@ -15,6 +15,7 @@ const holdUnconfirmedSend = vi.fn()
 // and transcript state; defaults keep the send-seam tests unchanged.
 const viewMode = { isTabChatView: (_tabId: string) => true }
 const sessionState = { messages: [] as unknown[], status: 'ready', transcriptLoading: false }
+const sessionCommands = [{ name: 'liem-upload-report', kind: 'skill' as const }]
 const structuredSendWithOutcome = vi.fn()
 const structuredCancel = vi.fn()
 const structuredCancelPrompt = vi.fn(async () => true)
@@ -89,6 +90,7 @@ vi.mock('./use-mobile-native-chat-session', () => ({
 vi.mock('./use-mobile-structured-agent-session', () => ({
   useMobileStructuredAgentSession: () => ({
     session: structuredSessionState,
+    sessionCommands,
     ...structuredActivity,
     queued: { cards: [], send: vi.fn(), delete: vi.fn(), edit: vi.fn() },
     sendWithOutcome: structuredSendWithOutcome,
@@ -182,6 +184,18 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
   // Only the stale-input heal reaches the transport directly (the message send
   // itself is mocked above).
   const clientStub = { sendRequest: vi.fn() }
+  const structuredProps = {
+    tab: {
+      type: 'agent-session',
+      id: 'agent-tab-1',
+      title: 'Codex Chat',
+      sessionId: 'session-structured',
+      agent: 'codex',
+      isActive: true
+    },
+    activeHandle: null,
+    inputLeaseReady: false
+  }
 
   function Harness({
     connState = 'connected',
@@ -230,6 +244,13 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
     act(() => renderer?.unmount())
     renderer = null
     controller = null
+  })
+
+  it('exposes the client, workspace and structured session slash catalog', () => {
+    act(() => renderer?.update(createElement(Harness, structuredProps)))
+    expect(controller?.client).toBe(clientStub)
+    expect(controller?.worktreeId).toBe('w')
+    expect(controller?.nativeChatSessionCommands).toBe(sessionCommands)
   })
 
   it('leaves structured prompt cancellation unavailable on the legacy bridge lane', () => {
@@ -323,20 +344,7 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
 
   it('routes structured agent-session sends away from terminal/nativeChat transports', async () => {
     await act(async () => {
-      renderer?.update(
-        createElement(Harness, {
-          tab: {
-            type: 'agent-session',
-            id: 'agent-tab-1',
-            title: 'Codex Chat',
-            sessionId: 'session-structured',
-            agent: 'codex',
-            isActive: true
-          },
-          activeHandle: null,
-          inputLeaseReady: false
-        })
-      )
+      renderer?.update(createElement(Harness, structuredProps))
     })
 
     let accepted = false
@@ -383,20 +391,7 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
 
   it('exposes structured prompt cards and session options on structured tabs', async () => {
     await act(async () => {
-      renderer?.update(
-        createElement(Harness, {
-          tab: {
-            type: 'agent-session',
-            id: 'agent-tab-1',
-            title: 'Codex Chat',
-            sessionId: 'session-structured',
-            agent: 'codex',
-            isActive: true
-          },
-          activeHandle: null,
-          inputLeaseReady: false
-        })
-      )
+      renderer?.update(createElement(Harness, structuredProps))
     })
 
     expect(controller!.nativeChatPermission).toEqual(structuredPermission)

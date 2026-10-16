@@ -421,36 +421,95 @@ describe('MobileNativeChatComposer', () => {
     expect(texts).not.toContain('/cost')
   })
 
-  it('offers the skills a structured session reported when the user types a slash', async () => {
+  it.each([true, false])(
+    'offers reported skills when typing a slash (structured=%s)',
+    async (structured) => {
+      await act(async () => {
+        renderer = create(
+          createElement(MobileNativeChatComposer, {
+            value: '/liem',
+            onChangeText: vi.fn(),
+            onSend: vi.fn().mockResolvedValue(true),
+            sendSurfaceId: 'tab-a',
+            getSendCompletionGeneration: getCurrentSendCompletionGeneration,
+            agent: 'claude',
+            structuredCommands: structured ? [] : undefined,
+            sessionCommands: [
+              { name: 'compact', kind: 'command' },
+              { name: 'liem-upload-report', kind: 'skill', description: 'Publish a report' },
+              { name: 'review', kind: 'skill' }
+            ]
+          })
+        )
+      })
+      const input = renderer!.root.find((node) => node.type === 'TextInput')
+      await act(async () =>
+        input.props.onSelectionChange({ nativeEvent: { selection: { end: 5 } } })
+      )
+      const texts = renderer!.root
+        .findAll((node) => node.type === 'Text')
+        .map((node) => node.props.children)
+
+      expect(texts).toContain('/liem-upload-report')
+      expect(texts).toContain('Publish a report')
+      expect(texts).not.toContain('/review')
+    }
+  )
+
+  it('adds host skills arriving after the terminal chat slash menu opened', async () => {
+    const props = {
+      value: '/liem',
+      onChangeText: vi.fn(),
+      onSend: vi.fn().mockResolvedValue(true),
+      sendSurfaceId: 'tab-a',
+      getSendCompletionGeneration: getCurrentSendCompletionGeneration,
+      agent: 'claude'
+    }
+    await act(async () => {
+      renderer = create(createElement(MobileNativeChatComposer, props))
+    })
+    const input = renderer!.root.find((node) => node.type === 'TextInput')
+    await act(async () => input.props.onSelectionChange({ nativeEvent: { selection: { end: 5 } } }))
+    const texts = () =>
+      renderer!.root.findAll((node) => node.type === 'Text').map((node) => node.props.children)
+    expect(texts()).not.toContain('/liem-upload-report')
+
+    await act(async () => {
+      renderer!.update(
+        createElement(MobileNativeChatComposer, {
+          ...props,
+          sessionCommands: [{ name: 'liem-upload-report', kind: 'skill', description: 'Publish' }]
+        })
+      )
+    })
+
+    expect(texts()).toContain('/liem-upload-report')
+    expect(texts()).toContain('Publish')
+  })
+
+  it('keeps a built-in command row over a same-named host skill', async () => {
     await act(async () => {
       renderer = create(
         createElement(MobileNativeChatComposer, {
-          value: '/liem',
+          value: '/clear',
           onChangeText: vi.fn(),
           onSend: vi.fn().mockResolvedValue(true),
           sendSurfaceId: 'tab-a',
           getSendCompletionGeneration: getCurrentSendCompletionGeneration,
           agent: 'claude',
-          structuredCommands: [],
-          sessionCommands: [
-            { name: 'compact', kind: 'command' },
-            { name: 'liem-upload-report', kind: 'skill', description: 'Publish a report' },
-            { name: 'review', kind: 'skill' }
-          ]
+          sessionCommands: [{ name: 'clear', kind: 'skill', description: 'Host impostor' }]
         })
       )
     })
-    const input = renderer!.root.find((node) => node.type === 'TextInput') as {
-      props: { onSelectionChange: (e: { nativeEvent: { selection: { end: number } } }) => void }
-    }
-    await act(async () => input.props.onSelectionChange({ nativeEvent: { selection: { end: 5 } } }))
+    const input = renderer!.root.find((node) => node.type === 'TextInput')
+    await act(async () => input.props.onSelectionChange({ nativeEvent: { selection: { end: 6 } } }))
     const texts = renderer!.root
       .findAll((node) => node.type === 'Text')
-      .map((node) => (node.props as { children?: unknown }).children)
+      .map((node) => node.props.children)
 
-    expect(texts).toContain('/liem-upload-report')
-    expect(texts).toContain('Publish a report')
-    expect(texts).not.toContain('/review')
+    expect(texts.filter((text) => text === '/clear')).toHaveLength(1)
+    expect(texts).toContain('Clear conversation history')
+    expect(texts).not.toContain('Host impostor')
   })
 
   it('wires the mic for hold vs toggle dictation like the terminal composer', async () => {

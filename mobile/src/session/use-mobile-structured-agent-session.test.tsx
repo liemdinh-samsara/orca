@@ -267,6 +267,12 @@ describe('useMobileStructuredAgentSession', () => {
     return null
   }
 
+  function render(): void {
+    act(() => {
+      renderer = create(createElement(Harness))
+    })
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
 
@@ -290,10 +296,38 @@ describe('useMobileStructuredAgentSession', () => {
     hook = null
   })
 
-  it('subscribes and holds structured sessions without nativeChat or terminal RPCs', async () => {
-    act(() => {
+  it('exposes reported slash commands and clears null reports', async () => {
+    await act(async () => {
       renderer = create(createElement(Harness))
     })
+    await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
+    expect(hook?.sessionCommands).toBeUndefined()
+    const commands = [{ name: 'liem', kind: 'skill' as const }]
+
+    await act(async () => listener?.({ ...snapshotEvent(), commands }))
+    expect(hook?.sessionCommands).toEqual(commands)
+
+    await act(async () => listener?.({ ...snapshotEvent(), commands: null }))
+    expect(hook?.sessionCommands).toBeUndefined()
+  })
+
+  // FORK BUG: a snapshot with commands omitted clears the prior catalog despite the wire contract.
+  it.fails('keeps reported slash commands when a later snapshot omits the catalog', async () => {
+    await act(async () => {
+      renderer = create(createElement(Harness))
+    })
+    await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
+    const commands = [{ name: 'liem', kind: 'skill' as const }]
+    await act(async () => listener?.({ ...snapshotEvent(), commands }))
+    expect(hook?.sessionCommands).toEqual(commands)
+
+    await act(async () => listener?.(snapshotEvent()))
+
+    expect(hook?.sessionCommands).toEqual(commands)
+  })
+
+  it('subscribes and holds structured sessions without nativeChat or terminal RPCs', async () => {
+    render()
 
     await vi.waitFor(() =>
       expect(subscribe).toHaveBeenCalledWith(
@@ -358,9 +392,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('sends with the shared structured mutation envelope after the stream fence lands', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() => listener?.(snapshotEvent()))
 
@@ -390,9 +422,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('surfaces structured prompt cards and option snapshots', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() => listener?.(snapshotEvent(3)))
     act(() => listener?.(snapshotEvent(3)))
@@ -489,9 +519,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('sends structured image attachments in the message body', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() => listener?.(snapshotEvent(3)))
 
@@ -526,9 +554,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('rejects preview-only structured image URIs instead of sending them as host paths', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() => listener?.(snapshotEvent(3)))
     sendRequest.mockClear()
@@ -552,9 +578,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('answers the prompt captured by a structured card after a newer prompt lands', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() =>
       listener?.({
@@ -622,9 +646,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('surfaces unknown structured prompt responses as unconfirmed', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() =>
       listener?.({
@@ -663,9 +685,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('uses a fresh operation id when a prompt response delivery is unknown', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() =>
       listener?.({
@@ -701,9 +721,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('keeps structured option changes dispatched after unknown delivery', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() => listener?.(snapshotEvent(3)))
     await vi.waitFor(() => expect(hook!.optionSnapshot.length).toBeGreaterThan(0))
@@ -728,9 +746,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('reports structured Stop as unconfirmed after unknown delivery', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
     act(() =>
       listener?.({
@@ -758,9 +774,7 @@ describe('useMobileStructuredAgentSession', () => {
   })
 
   it('releases a landed hold when the structured tab unmounts', async () => {
-    act(() => {
-      renderer = create(createElement(Harness))
-    })
+    render()
     await vi.waitFor(() =>
       expect(sendRequest).toHaveBeenCalledWith(
         'agentSession.hold',

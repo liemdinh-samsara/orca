@@ -36,7 +36,7 @@ describe('readMobileNativeChatSkills', () => {
     expect(sendRequest).toHaveBeenCalledWith(
       'nativeChat.skills',
       { worktreeId: 'wt-1', agent: 'claude' },
-      expect.objectContaining({ timeoutMs: expect.any(Number) })
+      expect.objectContaining({ timeoutMs: 10_000, budgetSpansConnect: true })
     )
   })
 
@@ -60,5 +60,47 @@ describe('readMobileNativeChatSkills', () => {
     await expect(
       readMobileNativeChatSkills(clientWith(sendRequest), 'wt-1', 'claude')
     ).resolves.toBeNull()
+  })
+
+  it('drops unknown fields from every skill row', async () => {
+    const sendRequest = vi.fn().mockResolvedValue(
+      success({
+        skills: [
+          { name: 'report', description: 'Publish', path: '/private/skill', future: true },
+          { name: 'browser', description: null, providers: ['claude'] }
+        ]
+      })
+    )
+
+    await expect(
+      readMobileNativeChatSkills(clientWith(sendRequest), 'wt-1', 'claude')
+    ).resolves.toEqual([
+      { name: 'report', description: 'Publish' },
+      { name: 'browser', description: null }
+    ])
+  })
+
+  it.each([
+    ['name', { name: 'n'.repeat(201), description: null }],
+    ['description', { name: 'report', description: 'd'.repeat(401) }]
+  ])('treats an over-long %s as an unreadable whole reply', async (_label, row) => {
+    const sendRequest = vi.fn().mockResolvedValue(
+      success({
+        skills: [{ name: 'valid', description: null }, row]
+      })
+    )
+
+    await expect(
+      readMobileNativeChatSkills(clientWith(sendRequest), 'wt-1', 'claude')
+    ).resolves.toBeNull()
+  })
+
+  it('accepts names and descriptions at the reader length limits', async () => {
+    const row = { name: 'n'.repeat(200), description: 'd'.repeat(400) }
+    const sendRequest = vi.fn().mockResolvedValue(success({ skills: [row] }))
+
+    await expect(
+      readMobileNativeChatSkills(clientWith(sendRequest), 'wt-1', 'claude')
+    ).resolves.toEqual([row])
   })
 })

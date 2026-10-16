@@ -6,8 +6,10 @@ const discovery = vi.hoisted((): { result: SkillDiscoveryResult | null } => ({ r
 vi.mock('../../../skills/skill-discovery-target', () => ({
   discoverSkillsOnTarget: vi.fn(async () => discovery.result)
 }))
-vi.mock('./skills', () => ({ resolveDiscoveryTarget: (params: unknown) => params }))
+vi.mock('./skills', () => ({ resolveDiscoveryTarget: vi.fn() }))
 
+import { discoverSkillsOnTarget } from '../../../skills/skill-discovery-target'
+import { resolveDiscoveryTarget } from './skills'
 import { NativeChatSkills } from '../../../../shared/rpc-contract/native-chat-params'
 import { NATIVE_CHAT_SKILL_METHODS } from './native-chat-skills'
 
@@ -46,14 +48,22 @@ function source(path: string, owner: 'claude' | 'codex' | null) {
 
 const method = NATIVE_CHAT_SKILL_METHODS[0]
 
+const repos = [{ id: 'repo-1', path: '/repo' }]
+const providerRootOverrides = { claude: '/custom/claude/skills' }
+const runtime = {
+  listRepos: vi.fn(() => repos),
+  resolveSkillDiscoveryProviderRoots: vi.fn(async () => providerRootOverrides)
+}
+
 function list(params: unknown): Promise<unknown> {
-  const runtime = { listRepos: () => [], resolveSkillDiscoveryProviderRoots: async () => ({}) }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler reads only runtime.listRepos and resolveSkillDiscoveryProviderRoots; the rest of RpcContext is transport it never touches.
   const context = { runtime } as unknown as RpcContext
   return method.handler(NativeChatSkills.parse(params), context)
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(resolveDiscoveryTarget).mockReturnValue({ kind: 'native-host', cwd: '/repo' })
   discovery.result = null
 })
 
@@ -123,6 +133,8 @@ describe('nativeChat.skills', () => {
     }
 
     await expect(list({ worktreeId: 'wt', agent: 'codex' })).resolves.toEqual({ skills: [] })
+    expect(discoverSkillsOnTarget).not.toHaveBeenCalled()
+    expect(resolveDiscoveryTarget).not.toHaveBeenCalled()
   })
 
   it('answers an empty list when the scan finds nothing', async () => {
@@ -130,4 +142,65 @@ describe('nativeChat.skills', () => {
 
     await expect(list({ worktreeId: 'wt', agent: 'claude' })).resolves.toEqual({ skills: [] })
   })
+
+  it.each([
+    [null, 'Publish a report'],
+    ['Publish a report', null]
+  ])(
+    'prefers a described duplicate when descriptions arrive as %s then %s',
+    async (first, second) => {
+      discovery.result = {
+        skills: [skill('dup', HOME_CLAUDE, first), skill('dup', REPO_CLAUDE, second)],
+        sources: [source(HOME_CLAUDE, 'claude'), source(REPO_CLAUDE, 'claude')],
+        scannedAt: 1
+      }
+
+      await expect(list({ worktreeId: 'wt', agent: 'claude' })).resolves.toEqual({
+        skills: [{ name: 'dup', description: 'Publish a report' }]
+      })
+    }
+  )
+
+  it('truncates descriptions to 200 characters', async () => {
+    discovery.result = {
+      skills: [skill('long-description', HOME_CLAUDE, `${'a'.repeat(200)}discarded`)],
+      sources: [source(HOME_CLAUDE, 'claude')],
+      scannedAt: 1
+    }
+
+    await expect(list({ worktreeId: 'wt', agent: 'claude' })).resolves.toEqual({
+      skills: [{ name: 'long-description', description: 'a'.repeat(200) }]
+    })
+  })
+
+  it('offers nothing without scanning for an agent with no native-chat profile', async () => {
+    await expect(list({ worktreeId: 'wt', agent: 'unknown-agent' })).resolves.toEqual({
+      skills: []
+    })
+    expect(discoverSkillsOnTarget).not.toHaveBeenCalled()
+    expect(resolveDiscoveryTarget).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['local worktree', 'wt-1', '/repo/worktree'],
+    ['folder workspace', 'folder:/projects/my folder', '/projects/my folder'],
+    ['SSH worktree', 'ssh:host-1:wt-remote', '/remote/repo']
+  ])(
+    'scans the resolved %s target with provider roots and refresh disabled',
+    async (_label, worktreeId, cwd) => {
+      const target = { kind: 'native-host' as const, cwd }
+      vi.mocked(resolveDiscoveryTarget).mockReturnValueOnce(target)
+      discovery.result = { skills: [], sources: [], scannedAt: 1 }
+
+      await list({ worktreeId, agent: 'claude' })
+
+      expect(resolveDiscoveryTarget).toHaveBeenCalledExactlyOnceWith({ worktreeId }, runtime)
+      expect(runtime.resolveSkillDiscoveryProviderRoots).toHaveBeenCalledExactlyOnceWith(target)
+      expect(runtime.listRepos).toHaveBeenCalledExactlyOnceWith()
+      expect(discoverSkillsOnTarget).toHaveBeenCalledExactlyOnceWith(target, repos, {
+        providerRootOverrides,
+        refresh: false
+      })
+    }
+  )
 })

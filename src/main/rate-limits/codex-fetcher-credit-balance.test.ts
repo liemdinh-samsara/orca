@@ -199,4 +199,30 @@ describe('fetchCodexRateLimits monthly credit limit', () => {
 
     expect(result.monthly ?? null).toBeNull()
   })
+
+  it('reports session, weekly and monthly windows together', async () => {
+    const result = await fetchWithRateLimits({
+      ...businessWorkspaceRateLimits,
+      primary: { usedPercent: 20, windowDurationMins: 300 },
+      secondary: { usedPercent: 5, windowDurationMins: 10080 }
+    })
+
+    expect(result).toMatchObject({
+      status: 'ok',
+      session: { usedPercent: 20, windowMinutes: 300 },
+      weekly: { usedPercent: 5, windowMinutes: 10080 },
+      monthly: { windowMinutes: 43_200, resetsAt: 1793491200000 }
+    })
+    expect(result.monthly?.usedPercent).toBeCloseTo(2.11, 2)
+  })
+
+  it.each([{}, { limit: 'garbage', used: 'garbage', remainingPercent: 'garbage' }])(
+    'stays ok without a monthly window for unusable individualLimit %j',
+    async (individualLimit) => {
+      const result = await fetchWithRateLimits({ ...businessWorkspaceRateLimits, individualLimit })
+
+      expect(result.status).toBe('ok')
+      expect(result.monthly).toBeUndefined()
+    }
+  )
 })

@@ -47,6 +47,23 @@ describe('isProviderConfigured', () => {
     expect(isProviderConfigured(provider('fetching'))).toBe(false)
   })
 
+  it('keeps a fetching credit-only provider configured while an empty provider stays hidden', () => {
+    const creditOnly = provider('fetching', {
+      provider: 'codex',
+      extraUsage: {
+        unit: 'credits',
+        balance: 1234,
+        unlimited: false,
+        enabled: true,
+        disabledReason: null,
+        resetsAt: null
+      }
+    })
+
+    expect(isProviderConfigured(creditOnly)).toBe(true)
+    expect(isProviderConfigured(provider('fetching', { provider: 'codex' }))).toBe(false)
+  })
+
   it('shows configured providers, including ones failing transiently', () => {
     expect(isProviderConfigured(provider('ok'))).toBe(true)
     expect(isProviderConfigured(provider('error'))).toBe(true)

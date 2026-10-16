@@ -33,4 +33,22 @@ describe('formatCurrencyAmount', () => {
     expect(formatCurrencyAmount(19.6, 'USD', { dropWholeCents: true })).toMatch(/19[.,]60/)
     expect(formatCurrencyAmount(1000, 'USD')).toMatch(/[.,]00$/)
   })
+
+  it('drops cents from the zero used for NaN when requested', () => {
+    const formatted = formatCurrencyAmount(Number.NaN, 'USD', { dropWholeCents: true })
+    expect(formatted).toContain('$')
+    expect(formatted.replace(/\D/g, '')).toBe('0')
+    expect(formatted).not.toMatch(/[.,]00$/)
+  })
+
+  it('keeps cents in the malformed-code fallback even when dropping whole cents', () => {
+    expect(formatCurrencyAmount(9, 'ZZ', { dropWholeCents: true })).toBe('ZZ 9.00')
+  })
+
+  it('leaves zero-decimal JPY unchanged when dropping whole cents', () => {
+    const formatted = formatCurrencyAmount(1234, 'JPY', { dropWholeCents: true })
+    expect(formatted).toBe(formatCurrencyAmount(1234, 'JPY'))
+    expect(formatted).toMatch(/1[.,]234/)
+    expect(formatted).not.toMatch(/[.,]00$/)
+  })
 })

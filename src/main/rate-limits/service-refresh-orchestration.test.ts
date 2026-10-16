@@ -10,6 +10,7 @@ import { fetchGrokRateLimits } from './grok-fetcher'
 import { fetchZcodeRateLimits } from './zcode-usage-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
+import { STALE_THRESHOLD_MS } from './service/service-types'
 import {
   deferred,
   errorProvider,
@@ -276,6 +277,53 @@ describe('RateLimitService', () => {
     const state = service.getState()
     expect(state.claude?.status).toBe('error')
     expect(state.claude?.extraUsage).toMatchObject({ spent: 19.6, spendLimit: 1000 })
+  })
+
+  it('drops a credit-only snapshot older than the stale threshold when refresh fails', async () => {
+    vi.useFakeTimers()
+    try {
+      const service = new RateLimitService()
+      const internal = serviceInternals(service)
+      const creditOnly: ProviderRateLimits = {
+        provider: 'claude',
+        session: null,
+        weekly: null,
+        extraUsage: {
+          unit: 'currency',
+          balance: 980.4,
+          currencyCode: 'USD',
+          enabled: true,
+          disabledReason: null,
+          spent: 19.6,
+          spendLimit: 1000,
+          spentPercent: 1.96,
+          resetsAt: null
+        },
+        updatedAt: Date.now(),
+        error: null,
+        status: 'ok'
+      }
+      vi.mocked(fetchClaudeRateLimits)
+        .mockResolvedValueOnce(creditOnly)
+        .mockResolvedValueOnce(errorProvider('claude', 'temporary failure'))
+      vi.mocked(fetchCodexRateLimits).mockResolvedValue(okProvider('codex', 44, Date.now()))
+
+      await internal.fetchAll()
+      expect(service.getState().claude?.extraUsage).toMatchObject({ spent: 19.6, spendLimit: 1000 })
+
+      vi.setSystemTime(Date.now() + STALE_THRESHOLD_MS + 1)
+      await internal.fetchAll()
+
+      expect(service.getState().claude).toMatchObject({
+        status: 'error',
+        error: 'temporary failure',
+        session: null,
+        weekly: null
+      })
+      expect(service.getState().claude?.extraUsage).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('bypasses the debounce for explicit manual refreshes', async () => {

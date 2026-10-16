@@ -2,6 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Repo } from '../../../shared/repo-types'
 import type { Tab, TabGroup } from '../../../shared/tab-types'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import type { TerminalController } from './use-terminal-controller'
@@ -10,11 +11,13 @@ vi.mock('../store', async () => {
   const { create } = await import('zustand')
   const activeGroupIdByWorktree: Record<string, string | undefined> = {}
   const groupsByWorktree: Record<string, TabGroup[]> = {}
+  const repos: Repo[] = []
   const tabsByWorktree: Record<string, TerminalTab[]> = {}
   const unifiedTabsByWorktree: Record<string, Tab[]> = {}
   const useAppStore = create(() => ({
     activeGroupIdByWorktree,
     groupsByWorktree,
+    repos,
     tabsByWorktree,
     unifiedTabsByWorktree,
     consumeSuppressedPtyExit: () => false,

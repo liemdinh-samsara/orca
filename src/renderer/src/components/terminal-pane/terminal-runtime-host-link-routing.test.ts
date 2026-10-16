@@ -250,7 +250,10 @@ describe('terminal HTTP links on a local pane', () => {
   it('still opens an OSC 8 hyperlink in an Orca browser tab', () => {
     expect(handleOscLink(URL, clickEvent(), { ...baseDeps, runtimeEnvironmentId: null })).toBe(true)
 
-    expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', URL, { activate: true })
+    expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', URL, {
+      activate: true,
+      placement: 'side-pane'
+    })
     expect(openUrlMock).not.toHaveBeenCalled()
   })
 
@@ -262,7 +265,10 @@ describe('terminal HTTP links on a local pane', () => {
       ([name, _listener, options]) => name === 'mouseup' && options === undefined
     )?.[1](clickEvent())
 
-    expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', URL, { activate: true })
+    expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', URL, {
+      activate: true,
+      placement: 'side-pane'
+    })
     expect(openUrlMock).not.toHaveBeenCalled()
     disposable.dispose()
   })

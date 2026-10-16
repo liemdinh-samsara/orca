@@ -217,7 +217,8 @@ describe('terminal link action routing', () => {
 
     request.mock.calls[0][0].alternate.run()
     expect(createBrowserTab).toHaveBeenCalledWith('wt-1', 'https://example.com/path', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
   })
 
@@ -237,7 +238,8 @@ describe('terminal link action routing', () => {
 
     request.mock.calls[0][0].primary.run()
     expect(createBrowserTab).toHaveBeenCalledWith('wt-1', 'https://example.com/path', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
 
     request.mock.calls[0][0].alternate.run()
@@ -312,7 +314,8 @@ describe('terminal link action routing', () => {
     })
 
     expect(createBrowserTab).toHaveBeenCalledWith('wt-1', 'https://example.com/path', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openUrl).not.toHaveBeenCalled()
   })

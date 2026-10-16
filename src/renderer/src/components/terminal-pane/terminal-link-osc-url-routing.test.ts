@@ -81,7 +81,8 @@ describe('handleOscLink', () => {
 
     expect(openUrlMock).not.toHaveBeenCalled()
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(preventDefault).toHaveBeenCalled()
   })
@@ -192,7 +193,8 @@ describe('handleOscLink', () => {
     await flushAsyncWork()
 
     expect(createBrowserTabMock).toHaveBeenCalledWith('wt-1', 'https://example.com/', {
-      activate: true
+      activate: true,
+      placement: 'side-pane'
     })
     expect(openUrlMock).not.toHaveBeenCalled()
   })

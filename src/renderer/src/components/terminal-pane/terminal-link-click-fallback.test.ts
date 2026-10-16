@@ -495,7 +495,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     expect(createBrowserTabMock).toHaveBeenCalledWith(
       'wt-1',
       'https://github.com/stablyai/orca-marketing-website/pull/82',
-      { activate: true }
+      { activate: true, placement: 'side-pane' }
     )
     expect(preventDefault).toHaveBeenCalled()
     expect(terminal.clearSelection).toHaveBeenCalled()

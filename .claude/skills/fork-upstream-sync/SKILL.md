@@ -46,7 +46,7 @@ proof spec `assets/fork-proof.spec.ts`, so BEFORE and AFTER show the same screen
 ## 2. Start the merge
 
 ```bash
-node config/scripts/fork-upstream-sync.mjs start --base origin/main --json | tee "$RUN_DIR/start.json"
+node config/scripts/fork-upstream-sync.mjs start --base origin/main --json > "$RUN_DIR/start.json"; echo "exit=$?"; cat "$RUN_DIR/start.json"
 ```
 
 - Exit 0 + `up-to-date`: write one line to the final message and stop. No PR.
@@ -68,15 +68,21 @@ Run in order. When a step fails because of the merge, fix the fork side and comm
 pnpm install --frozen-lockfile && (cd mobile && pnpm install --frozen-lockfile)   # upstream may change deps
 node config/scripts/fork-contract.mjs check            # every fork change still registered with tests
 pnpm tc
-pnpm exec oxlint $(git diff --name-only HEAD^1 -- '*.ts' '*.tsx' '*.mjs')   # files the merge/fixes touched
-node config/scripts/fork-contract.mjs run --kinds unit,mobile,checks,e2e --json-out "$RUN_DIR/gate.json"
+UPSTREAM_SHA="$(node -p "require('$RUN_DIR/start.json').upstreamSha")"
+pnpm exec oxlint $(git diff --name-only "$UPSTREAM_SHA" HEAD -- '*.ts' '*.tsx' '*.mjs')   # every fork-owned file
+(cd mobile && node scripts/check-tests-typecheck-ratchet.mjs)
+node config/scripts/fork-contract.mjs run --kinds unit,mobile,checks,e2e $(docker info >/dev/null 2>&1 && echo --with docker) --json-out "$RUN_DIR/gate.json"
+pnpm exec vitest run --config config/vitest.config.ts --reporter=json --outputFile="$RUN_DIR/full-unit.json"   # ~35 min
 ```
 
 - `check` fails when upstream moved or renamed a fork-owned file: update the feature's `paths` in
   `config/fork/fork-features.json` and commit (`chore: track <feature> files after upstream move`).
-- A failure in an upstream test you didn't touch: re-run that file on `upstream/main` in a scratch worktree
-  (`git worktree add "$RUN_DIR/upstream" upstream/main`). If it fails there too, it is pre-existing; note it in the
-  PR and move on.
+- The full upstream suite catches upstream tests the fork breaks (an upstream test still asserting behavior a fork
+  feature changed). Re-run every failing file on the upstream tip in a scratch worktree
+  (`git worktree add --detach "$RUN_DIR/upstream" "$UPSTREAM_SHA"`, symlink `node_modules`). Failing there too
+  means pre-existing or this machine's environment (global gitignore, missing Playwright browsers, release tags):
+  list them in the PR and move on. Passing there means the fork broke it: update the test to the fork's intended
+  behavior (never weaken it) and register the file under the owning feature.
 - Give up on a failure after two honest attempts. The PR then opens as a draft that says exactly what fails.
 
 ## 5. Prove the apps
@@ -96,6 +102,7 @@ If something can't be exercised (no Simulator runtime, Xcode broke), say so plai
    a sync summary section, one before/after section per desktop screen, mobile screenshots as `extra`, the gate
    table (from `gate.json`), conflict resolutions and anything for the owner to check by hand.
 2. `python3 .claude/skills/orca-test-and-verify/scripts/build-report.py "$RUN_DIR/manifest.json" "$RUN_DIR/report.html"`
+   and, if there were no conflicts, `test -f "$RUN_DIR/resolutions.md" || echo "No conflicts." > "$RUN_DIR/resolutions.md"`.
 3. Publish it with the `liem-upload-report` skill (slug `orca-upstream-sync-<date>`); keep the URL.
 4. ```bash
    node config/scripts/fork-upstream-sync.mjs pr-body --gate "$RUN_DIR/gate.json" \

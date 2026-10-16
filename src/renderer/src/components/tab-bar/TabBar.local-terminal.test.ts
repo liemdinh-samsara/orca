@@ -118,6 +118,14 @@ describe('TabBar local terminal entry', () => {
     expect(openLocalTerminal).toHaveBeenCalledWith('wt-ssh')
   })
 
+  it('omits the local entry for an SSH workspace in the web client', async () => {
+    vi.stubGlobal('window', { api: {}, __ORCA_WEB_CLIENT__: true })
+    const tree = await renderTabBar('wt-ssh')
+    expect(findDropdownMenuItemByText(tree, 'New Local Terminal')).toBeNull()
+    expect(findDropdownMenuItemByText(tree, 'New Terminal')).not.toBeNull()
+    expect(openLocalTerminal).not.toHaveBeenCalled()
+  })
+
   it('leaves the entry out where terminals already run locally', async () => {
     const tree = await renderTabBar('wt-local')
     expect(findDropdownMenuItemByText(tree, 'New Local Terminal')).toBeNull()

@@ -156,3 +156,46 @@ describe('resolveChildWorkspacesToggleGroupKey', () => {
     expect(resolve(state, hoveredDocument(remoteParent), new Set([remoteKey]))).toBe(remoteKey)
   })
 })
+
+describe('cross-host child workspace toggles', () => {
+  const localParent = worktree('local-parent', { hostId: 'local', projectId: 'project-1' })
+  const sshChild = worktree('ssh-child', {
+    hostId: 'ssh:box',
+    repoId: 'ssh-repo',
+    projectId: 'project-1'
+  })
+  const parentKey = `lineage:${getWorktreeHostIdentity(localParent)}`
+  const chips = new Set([parentKey])
+
+  it('folds the local same-project parent when the SSH child has no own chip', () => {
+    const state = toggleState({
+      worktrees: [localParent, sshChild],
+      lineageById: { [sshChild.id]: lineage(sshChild, localParent) },
+      active: sshChild
+    })
+
+    expect(resolveChildWorkspacesToggleGroupKey(state, chips, hoveredDocument(sshChild))).toBe(
+      parentKey
+    )
+    expect(resolveChildWorkspacesToggleGroupKey(state, chips, hoveredDocument())).toBe(parentKey)
+  })
+
+  it('does not fold a local parent from a different project', () => {
+    const unrelated = { ...localParent, projectId: 'project-2' }
+    const state = toggleState({
+      worktrees: [unrelated, sshChild],
+      lineageById: { [sshChild.id]: lineage(sshChild, unrelated) }
+    })
+
+    expect(resolveChildWorkspacesToggleGroupKey(state, chips, hoveredDocument(sshChild))).toBeNull()
+  })
+
+  it('does not fold a recreated local parent through a stale instance', () => {
+    const state = toggleState({
+      worktrees: [{ ...localParent, instanceId: 'recreated' }, sshChild],
+      lineageById: { [sshChild.id]: lineage(sshChild, localParent) }
+    })
+
+    expect(resolveChildWorkspacesToggleGroupKey(state, chips, hoveredDocument(sshChild))).toBeNull()
+  })
+})

@@ -93,6 +93,30 @@ describe('resolveLocalProjectFolder', () => {
     )
   })
 
+  it('uses the remote registration when local and remote repos share an id', () => {
+    const state = devboxState()
+    state.repos.unshift(repo({ id: 'devbox', path: '/local/unrelated' }))
+    state.projectHostSetups.unshift(
+      setup({
+        id: 'unrelated',
+        repoId: 'devbox',
+        projectId: 'github:acme/unrelated',
+        path: '/local/unrelated'
+      })
+    )
+    expect(resolveLocalProjectFolder(state, 'devbox::/home/ubuntu/co/mono')).toBe(
+      '/Users/me/co/mono/projects/ray'
+    )
+  })
+
+  it('uses the local setup path when its repository is no longer registered', () => {
+    const state = devboxState()
+    state.repos = state.repos.filter((entry) => entry.id !== 'mac')
+    expect(resolveLocalProjectFolder(state, 'devbox::/home/ubuntu/co/mono')).toBe(
+      '/Users/me/co/mono'
+    )
+  })
+
   it('has no folder when the project is not set up on this computer', () => {
     const notReady = devboxState({
       setups: [
@@ -112,7 +136,8 @@ describe('openLocalTerminalForRemoteWorkspace', () => {
     mocks.store.state = devboxState()
     mocks.reveal.mockReset()
     mocks.createFloatingTab.mockClear()
-    getFloatingTerminalCwd.mockClear()
+    getFloatingTerminalCwd.mockReset()
+    getFloatingTerminalCwd.mockImplementation(async ({ path }) => path)
     vi.stubGlobal('window', { api: { app: { getFloatingTerminalCwd } } })
   })
 
@@ -129,6 +154,37 @@ describe('openLocalTerminalForRemoteWorkspace', () => {
       undefined,
       '/Users/me/co/mono/projects/ray'
     )
+  })
+
+  it('uses the floating terminal default when main returns an empty cwd', async () => {
+    getFloatingTerminalCwd.mockResolvedValueOnce('')
+    await openLocalTerminalForRemoteWorkspace('devbox::/home/ubuntu/co/mono')
+    expect(getFloatingTerminalCwd).toHaveBeenCalledWith({ path: '/Users/me/co/mono/projects/ray' })
+    expect(mocks.createFloatingTab).toHaveBeenCalledWith(
+      mocks.store.state,
+      undefined,
+      undefined,
+      undefined
+    )
+  })
+
+  it('reveals the floating workspace before creating its terminal', async () => {
+    await openLocalTerminalForRemoteWorkspace('devbox::/home/ubuntu/co/mono')
+    expect(mocks.reveal).toHaveBeenCalledTimes(1)
+    expect(mocks.createFloatingTab).toHaveBeenCalledTimes(1)
+    expect(mocks.reveal.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createFloatingTab.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('propagates cwd resolution failure without revealing or creating a terminal', async () => {
+    const error = new Error('Local checkout cannot be resolved')
+    getFloatingTerminalCwd.mockRejectedValueOnce(error)
+    await expect(openLocalTerminalForRemoteWorkspace('devbox::/home/ubuntu/co/mono')).rejects.toBe(
+      error
+    )
+    expect(mocks.reveal).not.toHaveBeenCalled()
+    expect(mocks.createFloatingTab).not.toHaveBeenCalled()
   })
 
   it("falls back to the floating terminal's own folder without a local checkout", async () => {

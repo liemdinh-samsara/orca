@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 import type { Worktree } from '../../shared/worktree/types'
 import { toSshExecutionHostId } from '../../shared/execution-host'
+import { worktreeWorkspaceKey } from '../../shared/workspace-scope'
 import { LINEAGE_HYDRATION_TIMEOUT_MS } from './worktrees/metadata/host-lineage-listing'
 import { getSshProviderAuthority, rotateSshProviderAuthority } from '../ssh/ssh-provider-authority'
 import { listWorktreesMock, getSshGitProviderMock } from './worktrees-test-module-mocks'
@@ -359,6 +360,52 @@ describe('registerWorktreeHandlers', () => {
     await expect(
       handlers['worktrees:listLineageForHost'](ipcEvent, { executionHostId: 'local' })
     ).resolves.toMatchObject({ authoritative: true, worktreeLineageById: {} })
+  })
+
+  it('lists a cross-host workspace-keyed edge only with its child host and keeps both hosts authoritative', async () => {
+    const devboxChild = 'devbox::/home/ubuntu/mono'
+    const macParent = 'mac::/Users/me/mono::workspace:peek'
+    const childKey = worktreeWorkspaceKey(devboxChild)
+    const lineage = {
+      [childKey]: {
+        childWorkspaceKey: childKey,
+        childInstanceId: 'devbox-child',
+        parentWorkspaceKey: worktreeWorkspaceKey(macParent),
+        parentInstanceId: 'mac-parent',
+        origin: 'manual',
+        capture: { source: 'manual-action', confidence: 'explicit' },
+        createdAt: 1
+      }
+    }
+    store.getRepos.mockReturnValue([
+      { id: 'mac', path: '/Users/me/mono', displayName: 'mac', badgeColor: '#000', addedAt: 0 },
+      {
+        id: 'devbox',
+        path: '/home/ubuntu/mono',
+        displayName: 'devbox',
+        badgeColor: '#000',
+        addedAt: 0,
+        connectionId: 'target-a'
+      }
+    ])
+    store.getWorktreeMeta.mockImplementation((id: string) => ({
+      hostId: id.startsWith('devbox::') ? 'ssh:target-a' : 'local'
+    }))
+    store.getAllWorkspaceLineage.mockReturnValue(lineage)
+    const provider = { listWorktrees: vi.fn() }
+    getSshGitProviderMock.mockImplementation((targetId: string) =>
+      targetId === 'target-a' ? provider : undefined
+    )
+
+    await expect(
+      handlers['worktrees:listLineageForHost'](ipcEvent, {
+        executionHostId: toSshExecutionHostId('target-a'),
+        expectedAuthority: getSshProviderAuthority('target-a')
+      })
+    ).resolves.toMatchObject({ authoritative: true, workspaceLineageByChildKey: lineage })
+    await expect(
+      handlers['worktrees:listLineageForHost'](ipcEvent, { executionHostId: 'local' })
+    ).resolves.toMatchObject({ authoritative: true, workspaceLineageByChildKey: {} })
   })
 
   it('rejects runtime lineage reads and stale SSH authority after hydration', async () => {

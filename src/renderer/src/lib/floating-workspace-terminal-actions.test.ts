@@ -489,6 +489,7 @@ describe('createFloatingWorkspaceTerminalTab', () => {
       'floating-group',
       undefined,
       {
+        id: expect.any(String),
         startupCwd: '/Users/me/co/mono'
       }
     )

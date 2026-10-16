@@ -24,12 +24,6 @@ vi.mock('../registered-worktree-roots-cache', () =>
 vi.mock('../../worktree-root-preparation', () =>
   moduleMocks.worktreeRootPreparationModuleMock(reposMocks)
 )
-vi.mock('../../providers/ssh-git-dispatch', () => moduleMocks.sshGitDispatchModuleMock(reposMocks))
-vi.mock('../../providers/ssh-filesystem-dispatch', () =>
-  moduleMocks.sshFilesystemDispatchModuleMock(reposMocks)
-)
-vi.mock('../ssh', () => moduleMocks.sshModuleMock(reposMocks))
-vi.mock('../../ssh/ssh-target-registry', () => moduleMocks.sshModuleMock(reposMocks))
 
 const { setupProjectAtMappedPath, emitRepoAdded } = vi.hoisted(() => ({
   setupProjectAtMappedPath: vi.fn(),

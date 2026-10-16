@@ -53,7 +53,8 @@ describe('resolveRemoteDirectory', () => {
     channel.emit('close')
 
     await expect(result).resolves.toBe('/home/me/project')
-    expect(exec).toHaveBeenCalledWith('cd "$HOME"/\'project\' && pwd && command ls -1Ap')
+    // Why containing: upstream fences the POSIX browse command's stdout with capture markers.
+    expect(exec).toHaveBeenCalledWith(expect.stringContaining('cd "$HOME"/\'project\' && pwd && '))
   })
 
   it('returns null when a command ran but the directory check failed', async () => {
@@ -92,7 +93,8 @@ describe('resolveRemoteDirectory', () => {
 
     await expect(result).resolves.toBeNull()
     expect(exec).toHaveBeenCalledTimes(1)
-    expect(exec.mock.calls[0][0]).toMatch(/^cd /)
+    expect(exec.mock.calls[0][0]).toContain("cd 'C:/Users/me/project' && pwd && ")
+    expect(exec.mock.calls[0][0]).not.toContain('powershell')
   })
 })
 

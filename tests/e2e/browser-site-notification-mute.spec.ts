@@ -3,7 +3,10 @@ import { expect, test } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
 const SLACK_URL = 'https://app.slack.com/client'
+const ENTERPRISE_SLACK_URL = 'https://acme.enterprise.slack.com/'
 const CONTROL_URL = 'https://notify.example.test/'
+// Why: a suffix-only match would mute a look-alike host that merely starts with slack.com.
+const LOOKALIKE_URL = 'https://slack.com.evil.test/'
 
 async function readNotificationPermission(
   page: Page,
@@ -53,7 +56,15 @@ test('withholds notification permission from Slack pages only', async ({
       current: 'denied',
       requested: 'denied'
     })
+    expect(await readNotificationPermission(orcaPage, worktreeId, ENTERPRISE_SLACK_URL)).toEqual({
+      current: 'denied',
+      requested: 'denied'
+    })
     expect(await readNotificationPermission(orcaPage, worktreeId, CONTROL_URL)).toEqual({
+      current: 'granted',
+      requested: 'granted'
+    })
+    expect(await readNotificationPermission(orcaPage, worktreeId, LOOKALIKE_URL)).toEqual({
       current: 'granted',
       requested: 'granted'
     })

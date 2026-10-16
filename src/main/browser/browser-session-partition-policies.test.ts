@@ -4,6 +4,7 @@ import type { BrowserSessionProfile } from '../../shared/browser-workspace-types
 const mocks = vi.hoisted(() => ({
   handleGuestWillDownload: vi.fn(),
   noticeDocPreviewDownloadBlocked: vi.fn(),
+  notifyPermissionDenied: vi.fn(),
   clearBrowserWebAuthnAccessHandlers: vi.fn(),
   installBrowserWebAuthnAccessHandlers: vi.fn()
 }))
@@ -71,7 +72,7 @@ vi.mock('./browser-manager', () => ({
     handleGuestWillDownload: mocks.handleGuestWillDownload,
     installCertificateRequestGuard: vi.fn(),
     removeCertificateRequestGuard: vi.fn(),
-    notifyPermissionDenied: vi.fn()
+    notifyPermissionDenied: mocks.notifyPermissionDenied
   }
 }))
 vi.mock('./doc-preview-download-block-notice', () => ({
@@ -185,6 +186,90 @@ describe('partition download policy', () => {
 })
 
 describe('partition permission policy', () => {
+  it('grants local network access and only Okta launches on an isolated browser partition', async () => {
+    const install = await loadInstaller()
+    install(profileFor('persist:browsing-1'))
+    const sess = sessionsByPartition.get('persist:browsing-1')
+    if (!sess) {
+      throw new Error('Expected the isolated browser session')
+    }
+    const requestHandler = sess.setPermissionRequestHandler.mock.calls[0][0]
+    const checkHandler = sess.setPermissionCheckHandler.mock.calls[0][0]
+    const webContents = { id: 7, getURL: () => 'https://example.com/' }
+    const callback = vi.fn()
+
+    for (const permission of ['local-network-access', 'local-network', 'loopback-network']) {
+      callback.mockClear()
+      requestHandler(webContents, permission, callback)
+      expect(callback).toHaveBeenCalledExactlyOnceWith(true)
+      expect(checkHandler(webContents, permission, '')).toBe(true)
+    }
+    callback.mockClear()
+    requestHandler(webContents, 'openExternal', callback, {
+      externalURL: 'com-okta-authenticator:/deviceChallenge?x=1'
+    })
+    expect(callback).toHaveBeenCalledExactlyOnceWith(true)
+    expect(mocks.notifyPermissionDenied).not.toHaveBeenCalled()
+
+    callback.mockClear()
+    requestHandler(webContents, 'openExternal', callback, { externalURL: 'slack://open' })
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false)
+    expect(mocks.notifyPermissionDenied).toHaveBeenCalledExactlyOnceWith({
+      guestWebContentsId: 7,
+      permission: 'openExternal',
+      rawUrl: 'https://example.com/'
+    })
+  })
+
+  it('silently mutes Slack notifications while granting other sites on an isolated partition', async () => {
+    const install = await loadInstaller()
+    install(profileFor('persist:browsing-1'))
+    const sess = sessionsByPartition.get('persist:browsing-1')
+    if (!sess) {
+      throw new Error('Expected the isolated browser session')
+    }
+    const requestHandler = sess.setPermissionRequestHandler.mock.calls[0][0]
+    const checkHandler = sess.setPermissionCheckHandler.mock.calls[0][0]
+    const webContents = { id: 7, getURL: () => 'https://app.slack.com/' }
+    const callback = vi.fn()
+
+    requestHandler(webContents, 'notifications', callback)
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false)
+    expect(checkHandler(webContents, 'notifications', 'https://app.slack.com/')).toBe(false)
+    for (const requestingUrl of ['https://slack.com/', 'https://example.com/']) {
+      callback.mockClear()
+      const allowed = requestingUrl === 'https://example.com/'
+      requestHandler(webContents, 'notifications', callback, { requestingUrl })
+      expect(callback).toHaveBeenCalledExactlyOnceWith(allowed)
+      expect(checkHandler(webContents, 'notifications', requestingUrl)).toBe(allowed)
+    }
+    expect(mocks.notifyPermissionDenied).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['local-network-access', {}],
+    ['local-network', {}],
+    ['loopback-network', {}],
+    ['openExternal', { externalURL: 'com-okta-authenticator:/deviceChallenge?x=1' }],
+    ['notifications', { requestingUrl: 'https://app.slack.com/' }],
+    ['notifications', { requestingUrl: 'https://example.com/' }]
+  ])('denies %s with %j on a strict partition', async (permission, details) => {
+    const install = await loadInstaller()
+    install(profileFor('orca-doc-preview'), { permissions: 'deny' })
+    const sess = sessionsByPartition.get('orca-doc-preview')
+    if (!sess) {
+      throw new Error('Expected the preview session')
+    }
+    const requestHandler = sess.setPermissionRequestHandler.mock.calls[0][0]
+    const checkHandler = sess.setPermissionCheckHandler.mock.calls[0][0]
+    const webContents = { id: 7, getURL: () => 'https://app.slack.com/' }
+    const callback = vi.fn()
+
+    requestHandler(webContents, permission, callback, details)
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false)
+    expect(checkHandler(webContents, permission, '', details)).toBe(false)
+  })
+
   it('keeps ordinary browser partitions on the browser permission policy', async () => {
     const install = await loadInstaller()
     install(profileFor('persist:browsing-1'))

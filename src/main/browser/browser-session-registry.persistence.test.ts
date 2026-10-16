@@ -351,6 +351,8 @@ describe('BrowserSessionRegistry persistence', () => {
     requestHandler(guestWc, 'local-network-access', permissionCallback)
     expect(permissionCallback).toHaveBeenLastCalledWith(true)
     expect(checkHandler(null, 'loopback-network', '')).toBe(true)
+    expect(checkHandler(null, 'local-network-access', '')).toBe(true)
+    expect(checkHandler(null, 'local-network', '')).toBe(true)
     requestHandler(guestWc, 'local-network', permissionCallback)
     expect(permissionCallback).toHaveBeenLastCalledWith(true)
 
@@ -374,6 +376,21 @@ describe('BrowserSessionRegistry persistence', () => {
     expect(permissionCallback).toHaveBeenLastCalledWith(false)
     expect(checkHandler(null, 'notifications', 'https://app.slack.com/')).toBe(false)
     expect(checkHandler(null, 'notifications', 'https://example.com/')).toBe(true)
+    expect(
+      checkHandler(null, 'notifications', '', { requestingUrl: 'https://acme.slack.com/' })
+    ).toBe(false)
+    expect(
+      checkHandler(null, 'notifications', '', { requestingUrl: 'https://widget.example.net/' })
+    ).toBe(true)
+    requestHandler(slackWc, 'notifications', permissionCallback, {
+      requestingUrl: 'https://widget.example.net/'
+    })
+    expect(permissionCallback).toHaveBeenLastCalledWith(true)
+    for (const permission of ['clipboard-read', 'fullscreen']) {
+      requestHandler(slackWc, permission, permissionCallback)
+      expect(permissionCallback).toHaveBeenLastCalledWith(true)
+      expect(checkHandler(null, permission, 'https://app.slack.com/')).toBe(true)
+    }
 
     // Why: the reported symptom was a user-visible denial notice, so pin the notified list here —
     // storage-access must no longer raise one, while the deliberate top-level denial still does.

@@ -66,6 +66,18 @@ describe('updater', () => {
     expect(setLastUpdateCheckAt).not.toHaveBeenCalled()
   })
 
+  it('registers resume and focus wake listeners on an official build', async () => {
+    const mainWindow = { webContents: { send: vi.fn() } }
+
+    const { setupAutoUpdater } = await loadUpdaterModule()
+
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+
+    // Control for the local-build case below: only the version differs.
+    expect(powerMonitorOnMock).toHaveBeenCalledWith('resume', expect.any(Function))
+    expect(appMock.on).toHaveBeenCalledWith('browser-window-focus', expect.any(Function))
+  })
+
   it('skips background checks and nudges on a hand-packaged local build', async () => {
     appMock.getVersion.mockReturnValue('1.4.214-local.1791504809000.81fd59dab3e4')
     const mainWindow = { webContents: { send: vi.fn() } }
@@ -83,6 +95,23 @@ describe('updater', () => {
     expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
     expect(fetchNudgeMock).not.toHaveBeenCalled()
     expect(powerMonitorOnMock).not.toHaveBeenCalled()
+    expect(appMock.on).not.toHaveBeenCalledWith('browser-window-focus', expect.any(Function))
+  })
+
+  it('still runs an explicit menu check on a hand-packaged local build', async () => {
+    appMock.getVersion.mockReturnValue('1.4.214-local.1791504809000.81fd59dab3e4')
+    const mainWindow = { webContents: { send: vi.fn() } }
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
+
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+
+    checkForUpdatesFromMenu()
+
+    await vi.waitFor(() => {
+      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('starts nudge polling only after updater initialization is complete', async () => {

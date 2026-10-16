@@ -15,6 +15,9 @@ import {
 } from './helpers/terminal'
 import { waitForPtyShellEcho } from './terminal-pty-readiness'
 
+// Why: every test toggles the shared seeded project's in-place setting, so parallel workers collide.
+test.describe.configure({ mode: 'serial' })
+
 function listGitWorktreePaths(repoPath: string): string[] {
   return execFileSync('git', ['worktree', 'list', '--porcelain'], {
     cwd: repoPath,
@@ -109,7 +112,7 @@ test('creates a workspace on the project checkout and starts terminals in the st
 
 async function openComposerDialog(page: Page): Promise<Locator> {
   await openSidebarWorkspaceComposer(page)
-  const dialog = page.getByRole('dialog', { name: /Create Workspace/i })
+  const dialog = page.getByRole('dialog', { name: /Create (Workspace|Worktree)/i })
   await expect(dialog).toBeVisible()
   return dialog
 }

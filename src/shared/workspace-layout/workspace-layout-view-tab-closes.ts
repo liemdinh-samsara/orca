@@ -41,7 +41,13 @@ export function followTabClosesInView(
         ...groups,
         [key]: {
           ...groups[key],
-          [groupId]: { activeTabId, ...(recentTabIds ? { recentTabIds } : {}) }
+          [groupId]: {
+            activeTabId,
+            ...(recentTabIds ? { recentTabIds } : {}),
+            ...(selection.tabStripOrientation
+              ? { tabStripOrientation: selection.tabStripOrientation }
+              : {})
+          }
         }
       }
     }

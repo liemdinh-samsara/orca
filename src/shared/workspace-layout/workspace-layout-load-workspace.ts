@@ -151,7 +151,7 @@ export function loadWorkspace(args: WorkspaceLoadArgs): WorkspaceLayout {
   for (const group of storedGroups) {
     childRecord(view.groups, key)[group.id] ??= {
       activeTabId: group.activeTabId,
-      ...pickStoredFields(group, ['recentTabIds'])
+      ...pickStoredFields(group, ['recentTabIds', 'tabStripOrientation'])
     }
   }
   const groups = resolveGroupOrder({

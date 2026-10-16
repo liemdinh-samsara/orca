@@ -34,6 +34,9 @@ vi.mock('@/components/editor/editor-labels', () => stubEditorLabels())
 vi.mock('./SortableTab', () => ({
   default: (props: Record<string, unknown>) => ({ type: 'TerminalRow', props })
 }))
+vi.mock('./TerminalSortableTab', () => ({
+  default: (props: Record<string, unknown>) => ({ type: 'TerminalRow', props })
+}))
 vi.mock('./EditorFileTab', () => stubEditorFileTab())
 vi.mock('./BrowserTab', () => stubBrowserTab())
 vi.mock('./QuickLaunchButton', () => stubQuickLaunchButton())

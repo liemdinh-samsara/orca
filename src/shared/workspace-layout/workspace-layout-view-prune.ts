@@ -76,12 +76,13 @@ export function pruneViewRecord(
     for (const group of workspaces[key]?.groups ?? []) {
       const selection = byGroup[group.id]
       if (selection) {
-        const { activeTabId, recentTabIds } = selection
+        const { activeTabId, recentTabIds, tabStripOrientation } = selection
         byGroup[group.id] = {
           activeTabId: activeTabId && group.tabOrder.includes(activeTabId) ? activeTabId : null,
           ...(recentTabIds
             ? { recentTabIds: recentTabIds.filter((id) => group.tabOrder.includes(id)) }
-            : {})
+            : {}),
+          ...(tabStripOrientation ? { tabStripOrientation } : {})
         }
       }
     }

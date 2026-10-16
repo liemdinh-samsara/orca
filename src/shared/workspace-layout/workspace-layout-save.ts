@@ -84,6 +84,9 @@ function saveWorkspace(
           ? {
               recentTabIds: selection.recentTabIds.filter((tabId) => group.tabOrder.includes(tabId))
             }
+          : {}),
+        ...(selection?.tabStripOrientation
+          ? { tabStripOrientation: selection.tabStripOrientation }
           : {})
       }
     })

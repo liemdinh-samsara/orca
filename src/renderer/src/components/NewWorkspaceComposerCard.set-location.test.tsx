@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderCard } from './NewWorkspaceComposerCard.test-fixture'
 
 const storeMocks = vi.hoisted(() => ({
+  setupProjectMappedFolder: vi.fn(),
   closeModal: vi.fn(),
   openModal: vi.fn(),
   openSettingsPage: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock('@/store', () => ({
   useAppStore: Object.assign(
     (selector: (state: unknown) => unknown) =>
       selector({
+        setupProjectMappedFolder: storeMocks.setupProjectMappedFolder,
         closeModal: storeMocks.closeModal,
         openModal: storeMocks.openModal,
         openSettingsPage: storeMocks.openSettingsPage,
@@ -72,11 +74,13 @@ vi.mock('@/components/new-workspace/SetProjectLocationDialog', () => ({
   SetProjectLocationDialog: ({
     option,
     projectName,
+    suggestedPath,
     onClose,
     onReady
   }: {
     option: { label: string } | null
     projectName: string
+    suggestedPath?: string | null
     onClose: () => void
     onReady: (setupId: string) => void
   }) =>
@@ -85,6 +89,7 @@ vi.mock('@/components/new-workspace/SetProjectLocationDialog', () => ({
         data-testid="set-project-location-dialog"
         data-host={option.label}
         data-project={projectName}
+        data-suggested-path={suggestedPath ?? undefined}
       >
         <button type="button" onClick={onClose}>
           Close location
@@ -100,6 +105,11 @@ describe('NewWorkspaceComposerCard set location', () => {
   let container: HTMLDivElement | null = null
 
   beforeEach(() => {
+    storeMocks.setupProjectMappedFolder.mockReset()
+    storeMocks.setupProjectMappedFolder.mockResolvedValue({
+      status: 'unavailable',
+      reason: 'no-mappable-setup'
+    })
     storeMocks.closeModal.mockReset()
     storeMocks.openModal.mockReset()
     storeMocks.openSettingsPage.mockReset()
@@ -163,4 +173,66 @@ describe('NewWorkspaceComposerCard set location', () => {
     expect(setupChanges).toEqual(['setup-remote'])
     expect(document.body.querySelector('[data-testid="set-project-location-dialog"]')).toBeNull()
   })
+
+  it('selects a ready mapped setup without opening a nested dialog', async () => {
+    storeMocks.setupProjectMappedFolder.mockResolvedValue({
+      status: 'ready',
+      result: { setup: { id: 'setup-mapped' } }
+    })
+    const onProjectHostSetupChange = vi.fn()
+    const onNestedDialogOpenChange = vi.fn()
+    container = await renderCard({ onProjectHostSetupChange, onNestedDialogOpenChange })
+
+    await selectSetLocation()
+
+    expect(storeMocks.setupProjectMappedFolder).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'project-group:platform',
+      hostId: 'ssh:devbox'
+    })
+    expect(onProjectHostSetupChange).toHaveBeenCalledExactlyOnceWith('setup-mapped')
+    expect(onNestedDialogOpenChange).not.toHaveBeenCalled()
+    expect(document.body.querySelector('[data-testid="set-project-location-dialog"]')).toBeNull()
+  })
+
+  it('prefills the fallback dialog with a mapped path that was not found', async () => {
+    storeMocks.setupProjectMappedFolder.mockResolvedValue({
+      status: 'unavailable',
+      reason: 'not-found',
+      suggestedPath: '/home/dev/co/platform'
+    })
+    const onProjectHostSetupChange = vi.fn()
+    const onNestedDialogOpenChange = vi.fn()
+    container = await renderCard({ onProjectHostSetupChange, onNestedDialogOpenChange })
+
+    await selectSetLocation()
+
+    const dialog = document.body.querySelector('[data-testid="set-project-location-dialog"]')
+    expect(dialog?.getAttribute('data-suggested-path')).toBe('/home/dev/co/platform')
+    expect(onNestedDialogOpenChange).toHaveBeenCalledExactlyOnceWith(true)
+    expect(onProjectHostSetupChange).not.toHaveBeenCalled()
+  })
+
+  it('opens the fallback dialog without a suggested path when mapped setup returns null', async () => {
+    storeMocks.setupProjectMappedFolder.mockResolvedValue(null)
+    const onNestedDialogOpenChange = vi.fn()
+    container = await renderCard({ onNestedDialogOpenChange })
+
+    await selectSetLocation()
+
+    const dialog = document.body.querySelector('[data-testid="set-project-location-dialog"]')
+    expect(dialog).toBeTruthy()
+    expect(dialog?.hasAttribute('data-suggested-path')).toBe(false)
+    expect(onNestedDialogOpenChange).toHaveBeenCalledExactlyOnceWith(true)
+  })
+
+  async function selectSetLocation(): Promise<void> {
+    act(() => {
+      container?.querySelector<HTMLElement>('div[data-run-target-combobox-root="true"]')?.click()
+    })
+    const setLocation = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent?.includes('Set project location')
+    )
+    expect(setLocation).toBeTruthy()
+    await act(async () => setLocation?.click())
+  }
 })

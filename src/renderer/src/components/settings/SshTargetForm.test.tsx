@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EMPTY_FORM, SshTargetForm, type EditingTarget } from './SshTargetForm'
@@ -224,6 +225,72 @@ describe('SshTargetForm', () => {
     })
     expect(button('Advanced').getAttribute('data-state')).toBe('open')
     expect(document.body.textContent).toContain('Jump Host')
+    act(() => root.unmount())
+  })
+
+  it('opens Advanced for a target whose only advanced value is its project prefix', async () => {
+    const root = await renderForm({
+      editingId: 'devbox',
+      form: { ...EMPTY_FORM, host: 'devbox', projectPathPrefix: '/data/src' }
+    })
+
+    expect(button('Advanced').getAttribute('data-state')).toBe('open')
+    expect(
+      document.querySelector<HTMLLabelElement>('label[for="ssh-project-path-prefix"]')?.textContent
+    ).toBe('Project path prefix')
+    expect(document.querySelector<HTMLInputElement>('#ssh-project-path-prefix')?.value).toBe(
+      '/data/src'
+    )
+    act(() => root.unmount())
+  })
+
+  it('reveals the project prefix field when Advanced is expanded for a new target', async () => {
+    const root = await renderForm({})
+
+    expect(button('Advanced').getAttribute('data-state')).toBe('closed')
+    expect(document.querySelector('#ssh-project-path-prefix')).toBeNull()
+    await act(async () => button('Advanced').click())
+
+    const input = document.querySelector<HTMLInputElement>('#ssh-project-path-prefix')
+    expect(input).not.toBeNull()
+    expect(input?.value).toBe('')
+    expect(input?.placeholder).toBe('~ (home folder)')
+    expect(input?.disabled).toBe(false)
+    act(() => root.unmount())
+  })
+
+  it('publishes project prefix edits and protects the changed draft from backdrop dismissal', async () => {
+    const baseline = { ...EMPTY_FORM, host: 'devbox', projectPathPrefix: '/data/src' }
+    let form: EditingTarget = baseline
+    const onFormChange = vi.fn((updater: (prev: EditingTarget) => EditingTarget) => {
+      form = updater(form)
+    })
+    const onOpenChange = vi.fn()
+    const root = await renderForm({ editingId: 'devbox', form, onFormChange, onOpenChange })
+    const input = document.querySelector<HTMLInputElement>('#ssh-project-path-prefix')
+    if (!input) {
+      throw new Error('missing project prefix input')
+    }
+
+    act(() => fireEvent.change(input, { target: { value: '~/code' } }))
+
+    expect(onFormChange).toHaveBeenCalledOnce()
+    expect(form).toEqual({ ...baseline, projectPathPrefix: '~/code' })
+    await renderForm({ editingId: 'devbox', form, onFormChange, onOpenChange }, root)
+    expect(document.querySelector<HTMLInputElement>('#ssh-project-path-prefix')?.value).toBe(
+      '~/code'
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await act(async () => {
+      document.body.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, cancelable: true })
+      )
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+
+    expect(onOpenChange).not.toHaveBeenCalled()
     act(() => root.unmount())
   })
 })

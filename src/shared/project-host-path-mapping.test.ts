@@ -28,4 +28,18 @@ describe('mapPathBetweenHostPrefixes', () => {
       mapPathBetweenHostPrefixes('c:\\users\\Me\\co\\app', 'C:\\Users\\me', '/home/ubuntu')
     ).toBe('/home/ubuntu/co/app')
   })
+
+  it('joins the suffix with backslashes for a Windows target prefix', () => {
+    expect(mapPathBetweenHostPrefixes('/Users/me/co/app', '/Users/me', 'C:\\Users\\me')).toBe(
+      'C:\\Users\\me\\co\\app'
+    )
+  })
+
+  it('maps the prefix itself onto the filesystem root', () => {
+    expect(mapPathBetweenHostPrefixes('/Users/me', '/Users/me', '/')).toBe('/')
+  })
+
+  it('keeps POSIX source prefixes case-sensitive', () => {
+    expect(mapPathBetweenHostPrefixes('/Users/Me/app', '/Users/me', '/home/ubuntu')).toBeNull()
+  })
 })

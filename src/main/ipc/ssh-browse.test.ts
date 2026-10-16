@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { registerSshBrowseHandler } from './ssh-browse'
+import { registerSshBrowseHandler, resolveRemoteDirectory } from './ssh-browse'
+import { SshConnection } from '../ssh/ssh-connection'
 
 const { handleMock, removeHandlerMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
@@ -24,6 +25,76 @@ function createMockChannel(): EventEmitter & { stderr: EventEmitter } {
     stderr: new EventEmitter()
   })
 }
+
+function browseConnection(exec: SshConnection['exec']): SshConnection {
+  return Object.assign(
+    new SshConnection(
+      {
+        id: 'ssh-1',
+        label: 'Devbox',
+        host: 'example.invalid',
+        port: 22,
+        username: 'me'
+      },
+      { onStateChange: vi.fn() }
+    ),
+    { exec }
+  )
+}
+
+describe('resolveRemoteDirectory', () => {
+  it('returns the resolved spelling of an existing directory', async () => {
+    const channel = createMockChannel()
+    const exec = vi.fn().mockResolvedValue(channel)
+    const result = resolveRemoteDirectory(browseConnection(exec), '~/project')
+    await Promise.resolve()
+    channel.emit('data', Buffer.from('/home/me/project\nsrc/\n'))
+    channel.emit('exit', 0)
+    channel.emit('close')
+
+    await expect(result).resolves.toBe('/home/me/project')
+    expect(exec).toHaveBeenCalledWith('cd "$HOME"/\'project\' && pwd && command ls -1Ap')
+  })
+
+  it('returns null when a command ran but the directory check failed', async () => {
+    const channel = createMockChannel()
+    const exec = vi.fn().mockResolvedValue(channel)
+    const result = resolveRemoteDirectory(browseConnection(exec), '/missing')
+    await Promise.resolve()
+    channel.stderr.emit('data', Buffer.from('cd: /missing: No such file or directory'))
+    channel.emit('exit', 1)
+    channel.emit('close')
+
+    await expect(result).resolves.toBeNull()
+    expect(exec).toHaveBeenCalledTimes(1)
+  })
+
+  it('rethrows transport errors instead of treating the directory as missing', async () => {
+    const channel = createMockChannel()
+    const exec = vi.fn().mockResolvedValue(channel)
+    const result = resolveRemoteDirectory(browseConnection(exec), '/project')
+    const error = new Error('SSH channel disconnected')
+    await Promise.resolve()
+    channel.emit('error', error)
+
+    await expect(result).rejects.toBe(error)
+    expect(exec).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null on a Windows shell rejection without attempting PowerShell', async () => {
+    const channel = createMockChannel()
+    const exec = vi.fn().mockResolvedValue(channel)
+    const result = resolveRemoteDirectory(browseConnection(exec), 'C:/Users/me/project')
+    await Promise.resolve()
+    channel.stderr.emit('data', Buffer.from('"exec" is not recognized'))
+    channel.emit('exit', 1)
+    channel.emit('close')
+
+    await expect(result).resolves.toBeNull()
+    expect(exec).toHaveBeenCalledTimes(1)
+    expect(exec.mock.calls[0][0]).toMatch(/^cd /)
+  })
+})
 
 // Recover the PowerShell script from a `powershell.exe ... -EncodedCommand <b64>`
 // command so tests can assert on the actual (UTF-16LE) payload sent to the host.

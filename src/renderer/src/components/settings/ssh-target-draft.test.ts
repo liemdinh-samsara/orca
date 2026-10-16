@@ -318,6 +318,18 @@ describe('getEditingTargetFromSshConfigHost', () => {
   })
 })
 
+describe('hasAdvancedConnectionValues', () => {
+  it('includes a project prefix as the only advanced setting', () => {
+    expect(hasAdvancedConnectionValues({ ...EMPTY_FORM, projectPathPrefix: '/data/src' })).toBe(
+      true
+    )
+  })
+
+  it('ignores a whitespace-only project prefix', () => {
+    expect(hasAdvancedConnectionValues({ ...EMPTY_FORM, projectPathPrefix: '   ' })).toBe(false)
+  })
+})
+
 describe('isSshTargetFormDirty', () => {
   it('is clean when the draft matches the baseline', () => {
     expect(isSshTargetFormDirty(EMPTY_FORM, EMPTY_FORM)).toBe(false)

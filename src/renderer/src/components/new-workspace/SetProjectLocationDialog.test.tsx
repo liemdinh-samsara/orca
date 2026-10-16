@@ -84,6 +84,60 @@ afterEach(() => {
 })
 
 describe('SetProjectLocationDialog', () => {
+  it('opens the existing-folder form at the suggested path with the missing-path notice', () => {
+    renderDialog({ suggestedPath: '/home/dev/co/orca' })
+
+    expect(screen.getByPlaceholderText('/path/to/project/on/host').getAttribute('value')).toBe(
+      '/home/dev/co/orca'
+    )
+    expect(screen.getByRole('button', { name: 'Set location' })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Nothing was found at the matching path on openclaw. Check the path or browse for the project.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Clone from URL/ })).toBeNull()
+  })
+
+  it('starts with the location choices and no missing-path notice without a suggestion', async () => {
+    const user = renderDialog()
+
+    expect(screen.getByRole('button', { name: /Browse folder/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Clone from URL/ })).toBeTruthy()
+    expect(screen.queryByPlaceholderText('/path/to/project/on/host')).toBeNull()
+    expect(screen.queryByText(/Nothing was found at the matching path/)).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /Browse folder/ }))
+
+    expect(screen.getByPlaceholderText('/path/to/project/on/host').getAttribute('value')).toBe('')
+    expect(screen.queryByText(/Nothing was found at the matching path/)).toBeNull()
+  })
+
+  it('resets an edited path when the suggestion changes for the same host option', async () => {
+    const props = {
+      option,
+      projectName: 'orca',
+      projectKind: 'git' as const,
+      defaultCloneUrl: '',
+      onClose: vi.fn(),
+      onReady: vi.fn()
+    }
+    const { rerender } = render(
+      <SetProjectLocationDialog {...props} suggestedPath="/home/dev/co/orca" />
+    )
+    const user = userEvent.setup()
+    const input = screen.getByPlaceholderText('/path/to/project/on/host')
+    await user.clear(input)
+    await user.type(input, '/my/custom/path')
+    expect(input.getAttribute('value')).toBe('/my/custom/path')
+
+    rerender(<SetProjectLocationDialog {...props} suggestedPath="/data/co/orca" />)
+
+    expect(screen.getByPlaceholderText('/path/to/project/on/host').getAttribute('value')).toBe(
+      '/data/co/orca'
+    )
+  })
+
   it('keeps the parent caller in charge of close and saves an existing folder', async () => {
     const onClose = vi.fn()
     const onReady = vi.fn()

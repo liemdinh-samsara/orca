@@ -33,7 +33,6 @@ src/notifications/notification-consent-ownership.test.ts
 src/notifications/push-dismissal-native-races.test.ts
 src/notifications/push-receive.test.ts
 src/notifications/push-registration.test.ts
-src/notifications/push-token.test.ts
 src/onboarding/MobileOnboardingPage.test.ts
 src/onboarding/NotificationOnboardingPreview.test.ts
 src/onboarding/legacy-notification-opt-in-route.test.ts

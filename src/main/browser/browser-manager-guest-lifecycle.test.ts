@@ -40,6 +40,7 @@ vi.mock('./popup-origin-bar-window', () => ({
 }))
 
 import { browserManager } from './browser-manager'
+import { DestroyedGuestTestContents } from './browser-manager-destroyed-guest-test-fixture'
 import {
   rendererWebContentsId,
   resetBrowserManagerMocks,
@@ -633,6 +634,98 @@ describe('browserManager', () => {
     expect(
       guestOffMock.mock.calls.filter(([eventName]) => eventName === 'before-input-event')
     ).toHaveLength(2)
+  })
+
+  function registerSideButtonGuest(
+    guest: DestroyedGuestTestContents,
+    rendererSendMock: ReturnType<typeof vi.fn>
+  ) {
+    webContentsFromIdMock.mockImplementation((id: number) => {
+      if (id === guest.id) {
+        return guest.asWebContents()
+      }
+      if (id === rendererWebContentsId) {
+        return { isDestroyed: () => false, send: rendererSendMock }
+      }
+      return null
+    })
+    browserManager.attachGuestPolicies(guest.asWebContents())
+    expect(
+      browserManager.registerGuest({
+        browserPageId: 'side-button-page',
+        webContentsId: guest.id,
+        rendererWebContentsId
+      })
+    ).toBe(true)
+  }
+
+  it('registers side-button navigation for a guest and removes it on unregister', () => {
+    const guest = new DestroyedGuestTestContents(810)
+    const onMock = vi.spyOn(guest, 'on')
+    const offMock = vi.spyOn(guest, 'off')
+    const rendererSendMock = vi.fn()
+    registerSideButtonGuest(guest, rendererSendMock)
+    const preventDefault = vi.fn()
+    const navigators = onMock.mock.calls.filter(([event, listener]) => {
+      if (event !== 'before-mouse-event') {
+        return false
+      }
+      const callsBefore = rendererSendMock.mock.calls.length
+      listener({ preventDefault }, { type: 'mouseUp', button: 'back' })
+      return rendererSendMock.mock.calls.length > callsBefore
+    })
+
+    expect(navigators).toHaveLength(1)
+    expect(preventDefault).toHaveBeenCalledTimes(1)
+    expect(rendererSendMock).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
+      browserPageId: 'side-button-page',
+      direction: 'back'
+    })
+
+    browserManager.unregisterGuest('side-button-page')
+
+    expect(offMock).toHaveBeenCalledWith('before-mouse-event', navigators[0]?.[1])
+    expect(offMock).toHaveBeenCalledWith('before-input-event', expect.any(Function))
+    rendererSendMock.mockClear()
+    guest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
+    expect(rendererSendMock).not.toHaveBeenCalled()
+  })
+
+  it('removes the old guest side-button listener when a page registers a replacement guest', () => {
+    const oldGuest = new DestroyedGuestTestContents(811)
+    const oldOffMock = vi.spyOn(oldGuest, 'off')
+    const rendererSendMock = vi.fn()
+    registerSideButtonGuest(oldGuest, rendererSendMock)
+    const preventDefault = vi.fn()
+    const navigators = oldGuest.listeners('before-mouse-event').filter((listener) => {
+      const callsBefore = rendererSendMock.mock.calls.length
+      listener({ preventDefault }, { type: 'mouseUp', button: 'back' })
+      return rendererSendMock.mock.calls.length > callsBefore
+    })
+    expect(navigators).toHaveLength(1)
+    expect(rendererSendMock).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
+      browserPageId: 'side-button-page',
+      direction: 'back'
+    })
+    const newGuest = new DestroyedGuestTestContents(812)
+    const newOffMock = vi.spyOn(newGuest, 'off')
+    registerSideButtonGuest(newGuest, rendererSendMock)
+
+    expect(oldOffMock).toHaveBeenCalledWith('before-mouse-event', navigators[0])
+    rendererSendMock.mockClear()
+    oldGuest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
+    expect(rendererSendMock).not.toHaveBeenCalled()
+    newGuest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
+    expect(rendererSendMock).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
+      browserPageId: 'side-button-page',
+      direction: 'back'
+    })
+
+    browserManager.unregisterGuest('side-button-page')
+    expect(newOffMock).toHaveBeenCalledWith('before-mouse-event', expect.any(Function))
+    rendererSendMock.mockClear()
+    newGuest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
+    expect(rendererSendMock).not.toHaveBeenCalled()
   })
 
   // Why: a plain browsing tab must never attach a debugger (Cloudflare treats CDP as a bot signal);

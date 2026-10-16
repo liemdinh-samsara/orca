@@ -405,6 +405,26 @@ describe('PortsPanel runtime routing', () => {
     expect(createBrowserTab).not.toHaveBeenCalled()
   })
 
+  it('opens local workspace ports in an active browser side pane by default', async () => {
+    const createBrowserTab = vi.fn()
+
+    await expect(
+      openWorkspacePortInBrowser({
+        port: workspacePort,
+        runtimeTarget: { kind: 'local' },
+        createBrowserTab,
+        setRemoteBrowserPageHandle: vi.fn()
+      })
+    ).resolves.toEqual({ ok: true })
+
+    expect(createBrowserTab).toHaveBeenCalledExactlyOnceWith(
+      'repo::/workspace/app',
+      'http://127.0.0.1:63468',
+      { activate: true, placement: 'side-pane' }
+    )
+    expect(openUrl).not.toHaveBeenCalled()
+  })
+
   it('opens workspace ports in the system browser when link routing is off', async () => {
     const createBrowserTab = vi.fn()
     const setRemoteBrowserPageHandle = vi.fn()

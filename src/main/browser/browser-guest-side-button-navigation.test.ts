@@ -13,7 +13,10 @@ function rendererMock(): Renderer {
   return { send: vi.fn<Send>() }
 }
 
-function setup(renderer: Renderer | null = rendererMock()) {
+function setup(
+  renderer: Renderer | null = rendererMock(),
+  resolveRenderer: SetupArgs['resolveRenderer'] = () => renderer
+) {
   const listeners: Listener[] = []
   const guest = {
     on: vi.fn((_event: 'before-mouse-event', listener: Listener) => listeners.push(listener)),
@@ -22,7 +25,7 @@ function setup(renderer: Renderer | null = rendererMock()) {
   const cleanup = setupGuestSideButtonNavigation({
     browserTabId: 'page-1',
     guest,
-    resolveRenderer: () => renderer
+    resolveRenderer
   })
   const press = (type: string, button: string): ReturnType<typeof vi.fn> => {
     const preventDefault = vi.fn()
@@ -92,5 +95,43 @@ describe('setupGuestSideButtonNavigation', () => {
     cleanup()
 
     expect(guest.off).toHaveBeenCalledWith('before-mouse-event', listeners[0])
+  })
+
+  it('resolves the current renderer on every side-button release', () => {
+    const firstRenderer = rendererMock()
+    const secondRenderer = rendererMock()
+    const resolveRenderer = vi
+      .fn<SetupArgs['resolveRenderer']>()
+      .mockReturnValueOnce(firstRenderer)
+      .mockReturnValue(secondRenderer)
+    const { press } = setup(null, resolveRenderer)
+
+    expect(resolveRenderer).not.toHaveBeenCalled()
+    press('mouseUp', 'back')
+    expect(firstRenderer.send).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
+      browserPageId: 'page-1',
+      direction: 'back'
+    })
+    expect(secondRenderer.send).not.toHaveBeenCalled()
+
+    press('mouseUp', 'forward')
+    expect(resolveRenderer).toHaveBeenCalledTimes(2)
+    expect(resolveRenderer).toHaveBeenNthCalledWith(1, 'page-1')
+    expect(resolveRenderer).toHaveBeenNthCalledWith(2, 'page-1')
+    expect(firstRenderer.send).toHaveBeenCalledTimes(1)
+    expect(secondRenderer.send).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
+      browserPageId: 'page-1',
+      direction: 'forward'
+    })
+  })
+
+  it('does not throw during cleanup when a destroyed guest rejects listener removal', () => {
+    const { guest, cleanup, listeners } = setup()
+    guest.off.mockImplementation(() => {
+      throw new Error('destroyed')
+    })
+
+    expect(cleanup).not.toThrow()
+    expect(guest.off).toHaveBeenCalledExactlyOnceWith('before-mouse-event', listeners[0])
   })
 })

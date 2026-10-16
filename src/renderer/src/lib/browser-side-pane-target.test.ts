@@ -80,4 +80,24 @@ describe('resolveBrowserSidePaneTarget', () => {
       })
     ).toEqual({ kind: 'group', groupId: 'empty', isSidePane: false })
   })
+
+  it.each([
+    split('horizontal', leaf('empty'), leaf('right')),
+    split('vertical', leaf('top'), split('horizontal', leaf('empty'), leaf('right')))
+  ])('reuses an existing right pane before filling an empty left pane (%#)', (layout) => {
+    expect(
+      resolveBrowserSidePaneTarget({
+        ...base,
+        layout,
+        sourceGroupId: 'empty',
+        sourceIsEmpty: true
+      })
+    ).toEqual({ kind: 'group', groupId: 'right', isSidePane: true })
+  })
+
+  it('splits right when the layout is undefined and the source is non-empty', () => {
+    expect(
+      resolveBrowserSidePaneTarget({ ...base, layout: undefined, sourceGroupId: 'terminal' })
+    ).toEqual({ kind: 'split-right', sourceGroupId: 'terminal' })
+  })
 })

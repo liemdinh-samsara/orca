@@ -442,6 +442,58 @@ describe('openHttpLink', () => {
     expect(openUrlMock).toHaveBeenCalledWith('http://analytics.orca.localhost:60016/episodes')
   })
 
+  it('opens a labeled localhost URL in an active browser side pane after registration', async () => {
+    storeState.settings = { openLinksInApp: true, localhostWorktreeLabelsEnabled: true }
+    storeState.repos = [{ id: 'repo-1', displayName: 'snapstudio' }]
+    storeState.worktreesByRepo = {
+      'repo-1': [{ id: 'wt-analytics', projectId: 'repo-1', displayName: 'analytics' }]
+    }
+    storeState.workspacePortScan = {
+      result: {
+        platform: 'darwin',
+        scannedAt: 1,
+        ports: [
+          {
+            id: 'tcp:5180',
+            kind: 'workspace',
+            port: 5180,
+            protocol: 'http',
+            bindHost: '127.0.0.1',
+            connectHost: 'localhost',
+            owner: {
+              repoId: 'repo-1',
+              worktreeId: 'wt-analytics',
+              displayName: 'analytics',
+              path: '/repo/analytics',
+              confidence: 'cwd'
+            }
+          }
+        ]
+      }
+    }
+    registerLocalhostLabelMock.mockResolvedValue({
+      url: 'http://analytics.orca.localhost:60016/episodes'
+    })
+
+    openHttpLink('http://localhost:5180/episodes', { worktreeId: 'wt-analytics' })
+
+    expect(createBrowserTabMock).not.toHaveBeenCalled()
+    await Promise.resolve()
+
+    expect(registerLocalhostLabelMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        targetUrl: 'http://localhost:5180/episodes',
+        worktreeId: 'wt-analytics'
+      })
+    )
+    expect(createBrowserTabMock).toHaveBeenCalledExactlyOnceWith(
+      'wt-analytics',
+      'http://analytics.orca.localhost:60016/episodes',
+      { activate: true, placement: 'side-pane' }
+    )
+    expect(openUrlMock).not.toHaveBeenCalled()
+  })
+
   it('resolves display URLs for labeled localhost links without opening them', async () => {
     storeState.settings = { localhostWorktreeLabelsEnabled: true }
     storeState.repos = [

@@ -91,6 +91,20 @@ describe('useTerminalCreateActions creation gates', () => {
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
   })
 
+  it('requests side-pane placement for a new browser tab when no pane group exists', () => {
+    mocks.state.activeGroupIdByWorktree = {}
+    mocks.state.groupsByWorktree = {}
+
+    renderActions().handleNewBrowserTab()
+
+    expect(mocks.createBrowserTab).toHaveBeenCalledExactlyOnceWith(
+      WORKTREE_ID,
+      'about:blank',
+      expect.objectContaining({ placement: 'side-pane' })
+    )
+    expect(mocks.openNewBrowserTabInActiveWorkspace).not.toHaveBeenCalled()
+  })
+
   it('toasts instead of duplicating a browser tab when the provider forbids it', () => {
     mocks.browserAvailability = { state: 'hidden', reason: 'no browser here' }
     renderActions().handleDuplicateBrowserTab('browser-1', 'unified-browser-1')

@@ -1,4 +1,5 @@
 import { UnsealedCredentialNotice } from './UnsealedCredentialNotice'
+import { KeychainCredentialNotice } from './keychain-credential-notice'
 import { useState } from 'react'
 import { AlertCircle, CheckCircle2, LoaderCircle, Unlink } from 'lucide-react'
 import { JiraConnectDialog } from '@/components/jira-connect-dialog'
@@ -84,9 +85,11 @@ export function JiraIntegrationCard(): React.JSX.Element {
       description={
         connected
           ? translate(
-              'auto.components.settings.task.tracker.integration.cards.9fa04a032e',
-              '{{value0}} site{{value1}} connected',
-              { value0: siteCount, value1: siteCount === 1 ? '' : 's' }
+              siteCount === 1
+                ? 'auto.components.settings.task.tracker.integration.cards.connectedSiteSingular'
+                : 'auto.components.settings.task.tracker.integration.cards.connectedSitePlural',
+              siteCount === 1 ? '{{count}} site connected' : '{{count}} sites connected',
+              { count: siteCount }
             )
           : checking
             ? translate(
@@ -135,6 +138,11 @@ export function JiraIntegrationCard(): React.JSX.Element {
             'auto.components.settings.jira.integration.card.jiraTokenName',
             'Your Jira API token'
           )}
+        />
+        <KeychainCredentialNotice
+          service="Jira"
+          status={contextMatches ? jiraStatus : {}}
+          statusContextKey={jiraStatusContextKey}
         />
         <ProviderHostScopeControl
           labelPrefix={translate(

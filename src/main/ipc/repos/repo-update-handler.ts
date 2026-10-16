@@ -17,6 +17,10 @@ import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { notifyReposChanged } from './repos-changed-notification'
 import { normalizeWorkspaceStartPath } from '../../../shared/workspace-start-path'
+import {
+  assertWslMoveProjectWritable,
+  isWslMoveSourceHost
+} from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle(
@@ -61,6 +65,9 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
         }
       }
     ) => {
+      if (isWslMoveSourceHost(args.hostId)) {
+        assertWslMoveProjectWritable(store, { repoId: args.repoId })
+      }
       // Why: TS is erased at runtime, so a garbage preference would silently collapse to 'auto' in resolveIssueSource; strip it, keeping other fields.
       const updates = { ...args.updates }
       if (

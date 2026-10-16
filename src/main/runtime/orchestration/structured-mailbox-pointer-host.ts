@@ -47,7 +47,12 @@ export async function readStructuredSessionGateFacts(
   sessionId: string
 ): Promise<StructuredSessionGateFacts | null> {
   const snapshot = await readSessionJournal(sessionId)
-  return snapshot ? structuredSessionGateFacts(snapshot.items) : null
+  if (!snapshot) {
+    return null
+  }
+  // The host's projection of current work: an agent that ended is idle, whatever its rows say.
+  const work = getStructuredAgentSessionHost()?.currentWork(sessionId)
+  return structuredSessionGateFacts(snapshot.items, work?.scope)
 }
 
 /** What each recorded send settled as. */
@@ -55,7 +60,16 @@ async function readPointerSessionFacts(
   sessionId: string
 ): Promise<StructuredPointerSessionFacts | null> {
   const snapshot = await readSessionJournal(sessionId)
-  return snapshot ? { submissions: snapshot.submissions } : null
+  if (!snapshot) {
+    return null
+  }
+  const boundary =
+    getStructuredAgentSessionHost()?.deps.store.getRecord(sessionId)?.providerContextBoundary
+  return {
+    submissions: boundary
+      ? snapshot.submissions.filter((submission) => submission.fence > boundary.afterFence)
+      : snapshot.submissions
+  }
 }
 
 async function readSessionJournal(sessionId: string): Promise<AgentJournalSnapshot | null> {
@@ -85,6 +99,11 @@ export function createStructuredMailboxPointerHost(): StructuredMailboxPointerHo
       return (
         getStructuredAgentSessionHost()?.deps.store.getRecord(sessionId)?.lease.runtimeFence ?? null
       )
+    },
+
+    currentContextClearOperationId(sessionId) {
+      return getStructuredAgentSessionHost()?.deps.store.getRecord(sessionId)
+        ?.providerContextBoundary?.operationId
     },
 
     async send(input) {

@@ -65,8 +65,8 @@ export function isEligibleWorktreeParent({
     parentHostId !== null &&
     // Why: the same rule the backend enforces, so a same-project parent on another host is offered.
     sharesWorktreeLineageBoundary(
-      { repoId: child.repoId, hostId: childHostId, projectId: child.projectId },
-      { repoId: candidateParent.repoId, hostId: parentHostId, projectId: candidateParent.projectId }
+      { hostId: childHostId, projectId: child.projectId },
+      { hostId: parentHostId, projectId: candidateParent.projectId }
     ) &&
     !candidateParent.isArchived &&
     canAssignWorktreeParent({

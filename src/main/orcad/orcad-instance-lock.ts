@@ -19,8 +19,12 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { z } from 'zod'
 import {
-  orcadProcessStartTimeMatches,
-  readOrcadProcessStartedAtMs
+  compareOrcadProcessIdentity,
+  readOrcadProcessIncarnation,
+  readOrcadProcessName,
+  readOrcadProcessStartedAtMs,
+  type OrcadProcessIdentityVerdict,
+  type OrcadProcessIncarnation
 } from './orcad-process-start-time'
 import {
   assertOrcadDataRootIsPrivate,
@@ -35,12 +39,16 @@ const MAX_ORCAD_LOCK_BYTES = 64 * 1024
 // A writer finishes in milliseconds; a garbled record older than this has no live writer.
 const GARBLED_LOCK_GRACE_MS = 10_000
 
-export { OrcadInstanceLockError, type OrcadInstanceLockCode } from './orcad-data-root-privacy'
-
 const OrcadLockRecordSchema = z.object({
   pid: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   /** Null where the platform cannot read it; PID alone is then the (weaker) fence. */
   startedAtMs: z.number().finite().nonnegative().nullable(),
+  /**
+   * Linux only, absent from older writers: drift-free identity preferred over `startedAtMs`.
+   * Salvaged rather than refused, so a future encoding never makes the whole lock unreadable.
+   */
+  linuxStartTicks: z.string().regex(/^\d+$/).max(32).optional().catch(undefined),
+  bootId: z.string().min(1).max(255).optional().catch(undefined),
   /** POSIX uid, or the Windows username. Compared as an opaque string. */
   identity: z.string().min(1).max(1_024),
   version: z.string().min(1).max(255),
@@ -71,7 +79,11 @@ export type OrcadInstanceLockHooks = OrcadDataRootPrivacyHooks & {
   /** Whether a PID is running. EPERM counts as alive: it proves the process exists. */
   processIsAlive?: (pid: number) => boolean
   startedAtMs?: (pid: number) => number | null
-  startTimeMatches?: (pid: number, expected: number | null) => boolean
+  incarnation?: (pid: number) => OrcadProcessIncarnation | null
+  ownerUid?: (pid: number) => number | null
+  processName?: (pid: number) => string | null
+  /** Only `differs` frees a live holder's PID; anything less proves nothing. */
+  holderIdentity?: (record: OrcadLockRecord) => OrcadProcessIdentityVerdict
   /**
    * Who takes the profile. The desktop app takes it too, so the two refuse each other; it must
    * hold Electron's single-instance lock first, which is what lets it reclaim a desktop record.
@@ -110,7 +122,16 @@ export function acquireOrcadInstanceLock(
   const identity = (hooks.identity ?? defaultIdentity)()
   const isAlive = hooks.processIsAlive ?? isProcessAlive
   const readStartedAt = hooks.startedAtMs ?? readOrcadProcessStartedAtMs
-  const matchesStartTime = hooks.startTimeMatches ?? orcadProcessStartTimeMatches
+  const readIncarnation = hooks.incarnation ?? readOrcadProcessIncarnation
+  const holderIdentity =
+    hooks.holderIdentity ??
+    ((holder: OrcadLockRecord) =>
+      compareOrcadProcessIdentity(holder.pid, holder, {
+        startedAtMs: readStartedAt,
+        incarnation: readIncarnation,
+        ownerUid: hooks.ownerUid,
+        platform: hooks.platform
+      }))
 
   try {
     mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
@@ -129,6 +150,7 @@ export function acquireOrcadInstanceLock(
   const record: OrcadLockRecord = {
     pid: process.pid,
     startedAtMs: readStartedAt(process.pid),
+    ...readIncarnation(process.pid),
     identity,
     version: (hooks.version ?? (() => process.env.ORCA_VERSION ?? 'unknown'))(),
     acquiredAt: (hooks.now ?? (() => new Date()))().toISOString(),
@@ -194,11 +216,11 @@ export function acquireOrcadInstanceLock(
   // The desktop takes this lock only after Electron's single-instance lock, which already proves
   // no other desktop runs; a desktop record is then stale even when its PID was reused.
   const staleDesktopRecord = hooks.role === 'desktop' && existing.role === 'desktop'
-  if (
-    !staleDesktopRecord &&
-    isAlive(existing.pid) &&
-    matchesStartTime(existing.pid, existing.startedAtMs)
-  ) {
+  const verdict = staleDesktopRecord || !isAlive(existing.pid) ? null : holderIdentity(existing)
+  if (verdict === 'unproven' && !existing.bootId) {
+    throw possiblyReusedPidError(lockPath, existing, hooks.processName ?? readOrcadProcessName)
+  }
+  if (verdict !== null && verdict !== 'differs') {
     throw new OrcadInstanceLockError(
       'orcad_instance_lock_held',
       `${describeLockHolder(existing)} (pid ${existing.pid}, started ` +
@@ -207,6 +229,25 @@ export function acquireOrcadInstanceLock(
     )
   }
   return reclaimAndPublish(lockPath, dataRoot, existingContents, publish, record)
+}
+
+/** A record without a boot id cannot tell its holder from a reused PID; say so. */
+function possiblyReusedPidError(
+  lockPath: string,
+  existing: OrcadLockRecord,
+  processName: (pid: number) => string | null
+): OrcadInstanceLockError {
+  const name = processName(existing.pid)
+  const holder = existing.role === 'desktop' ? 'the Orca desktop app' : 'orcad'
+  return new OrcadInstanceLockError(
+    'orcad_instance_lock_held',
+    `The orcad instance lock at ${lockPath} names pid ${existing.pid}, which is still running ` +
+      `(as ${name ? `"${name}"` : 'an unknown program'}). This lock, written by ${holder} at ` +
+      `${existing.acquiredAt}, does not record which boot it came from, so Orca cannot tell ` +
+      `whether that process is still ${holder} or an unrelated program that reused the PID. ` +
+      `If you are sure ${holder} is not running for this data root, delete ${lockPath} and ` +
+      'try again, or use a different ORCA_USER_DATA.'
+  )
 }
 
 /**

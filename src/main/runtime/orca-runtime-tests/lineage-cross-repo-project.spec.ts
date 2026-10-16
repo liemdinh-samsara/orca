@@ -114,7 +114,7 @@ describe('OrcaRuntimeService manual lineage across repos of one project', () => 
         lineage: { parentWorktree: `id:${parentId}` }
       })
     ).rejects.toThrow(
-      'Parent worktree must belong to the same project, or the same repository and execution host.'
+      'Parent worktree must be on the same execution host, or belong to the same project.'
     )
     expect(setWorktreeLineage).not.toHaveBeenCalled()
     expect(setWorkspaceLineage).not.toHaveBeenCalled()

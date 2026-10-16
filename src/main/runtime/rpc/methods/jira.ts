@@ -2,9 +2,14 @@ import {
   JIRA_PAYLOAD_CHUNK_CHARS,
   JIRA_PAYLOAD_MAX_CHARS
 } from '../../../../shared/jira-payload-stream'
-import { defineMethod, defineStreamingMethod } from '../core'
+import { defineMethod, defineStreamingMethod, type RpcContext } from '../core'
+import { recoverIntegrationCredentialKey } from '../../../integration-credential-keychain'
+import { JIRA_ATTACHMENT_IMAGE_METHODS } from './jira-attachment-image'
+import { JiraFavouriteFilterParams } from '../../../../shared/rpc-contract/jira-favourite-filter-params'
 import {
   AssignableUsers,
+  GenerateIssueSummary,
+  CancelGenerateIssueSummary,
   Connect,
   CreateIssue,
   IssueComment,
@@ -34,7 +39,36 @@ function emitJiraPayload(value: unknown, emit: (result: unknown) => void): void 
   emit({ type: 'end' })
 }
 
+function generationOwner(context: Pick<RpcContext, 'pairedDeviceId' | 'caller'>): string {
+  // One-shot RPCs use different sockets for Generate and Stop.
+  if (context.pairedDeviceId) {
+    return `device:${context.pairedDeviceId}`
+  }
+  if (context.caller?.kind === 'paired-device') {
+    return `device:${context.caller.deviceId}`
+  }
+  if (context.caller?.kind === 'local-cli') {
+    return 'local-cli'
+  }
+  throw new Error('A title generation request needs an authenticated connection.')
+}
+
 export const JIRA_METHODS = [
+  ...JIRA_ATTACHMENT_IMAGE_METHODS,
+  defineMethod({
+    name: 'jira.generateIssueSummary',
+    permission: 'workspace',
+    params: GenerateIssueSummary,
+    handler: (params, context) =>
+      context.runtime.jiraGenerateIssueSummary(params, generationOwner(context), context.signal)
+  }),
+  defineMethod({
+    name: 'jira.cancelGenerateIssueSummary',
+    permission: 'workspace',
+    params: CancelGenerateIssueSummary,
+    handler: (params, context) =>
+      context.runtime.jiraCancelGenerateIssueSummary(params, generationOwner(context))
+  }),
   defineMethod({
     name: 'jira.connect',
     permission: 'accounts-admin',
@@ -63,13 +97,19 @@ export const JIRA_METHODS = [
     name: 'jira.status',
     permission: 'workspace',
     params: null,
-    handler: async (_params, { runtime }) => runtime.jiraStatus()
+    handler: async (_params, { runtime }) => {
+      await recoverIntegrationCredentialKey()
+      return runtime.jiraStatus()
+    }
   }),
   defineMethod({
     name: 'jira.readStatus',
     permission: 'workspace',
     params: null,
-    handler: async (_params, { runtime }) => runtime.jiraReadStatus()
+    handler: async (_params, { runtime }) => {
+      await recoverIntegrationCredentialKey()
+      return runtime.jiraReadStatus()
+    }
   }),
   defineMethod({
     name: 'jira.testConnection',
@@ -82,20 +122,27 @@ export const JIRA_METHODS = [
     permission: 'workspace',
     params: SearchIssues,
     handler: async (params, { runtime, signal }) =>
-      runtime.jiraSearchIssues(params.jql, params.limit, params.siteId, signal)
+      runtime.jiraSearchIssues(params.jql, params.limit, params.siteId, signal, params.strict)
   }),
   defineMethod({
     name: 'jira.listIssues',
     permission: 'workspace',
     params: ListIssues,
     handler: async (params, { runtime }) =>
-      runtime.jiraListIssues(params?.filter, params?.limit, params?.siteId)
+      runtime.jiraListIssues(
+        params?.filter,
+        params?.limit,
+        params?.siteId,
+        params?.strict,
+        params?.filters
+      )
   }),
   defineMethod({
     name: 'jira.getIssue',
     permission: 'workspace',
     params: IssueKey,
-    handler: async (params, { runtime }) => runtime.jiraGetIssue(params.key.trim(), params.siteId)
+    handler: async (params, { runtime }) =>
+      runtime.jiraGetIssue(params.key.trim(), params.siteId, params.strict, params.mediaFormat)
   }),
   defineMethod({
     name: 'jira.lookupIssueSummary',
@@ -113,7 +160,15 @@ export const JIRA_METHODS = [
     permission: 'workspace',
     params: IssueKey,
     handler: async (params, { runtime }, emit) => {
-      emitJiraPayload(await runtime.jiraGetIssue(params.key.trim(), params.siteId), emit)
+      emitJiraPayload(
+        await runtime.jiraGetIssue(
+          params.key.trim(),
+          params.siteId,
+          params.strict,
+          params.mediaFormat
+        ),
+        emit
+      )
     }
   }),
   defineMethod({
@@ -150,28 +205,43 @@ export const JIRA_METHODS = [
     permission: 'workspace',
     params: IssueKey,
     handler: async (params, { runtime }) =>
-      runtime.jiraIssueComments(params.key.trim(), params.siteId)
+      runtime.jiraIssueComments(params.key.trim(), params.siteId, params.strict, params.mediaFormat)
   }),
   defineStreamingMethod({
     name: 'jira.issueCommentsStream',
     permission: 'workspace',
     params: IssueKey,
     handler: async (params, { runtime }, emit) => {
-      emitJiraPayload(await runtime.jiraIssueComments(params.key.trim(), params.siteId), emit)
+      emitJiraPayload(
+        await runtime.jiraIssueComments(
+          params.key.trim(),
+          params.siteId,
+          params.strict,
+          params.mediaFormat
+        ),
+        emit
+      )
     }
+  }),
+  defineMethod({
+    name: 'jira.listFavouriteFilters',
+    permission: 'workspace',
+    params: JiraFavouriteFilterParams,
+    handler: async (params, { runtime, signal }) =>
+      runtime.jiraListFavouriteFilters(params.siteId, signal)
   }),
   defineMethod({
     name: 'jira.listProjects',
     permission: 'workspace',
     params: SiteSelection,
-    handler: async (params, { runtime }) => runtime.jiraListProjects(params?.siteId)
+    handler: async (params, { runtime }) => runtime.jiraListProjects(params?.siteId, params?.strict)
   }),
   defineMethod({
     name: 'jira.listIssueTypes',
     permission: 'workspace',
     params: ProjectIssueTypes,
     handler: async (params, { runtime }) =>
-      runtime.jiraListIssueTypes(params.projectIdOrKey.trim(), params.siteId)
+      runtime.jiraListIssueTypes(params.projectIdOrKey.trim(), params.siteId, params.strict)
   }),
   defineMethod({
     name: 'jira.listCreateFields',
@@ -181,21 +251,23 @@ export const JIRA_METHODS = [
       runtime.jiraListCreateFields(
         params.projectIdOrKey.trim(),
         params.issueTypeId.trim(),
-        params.siteId
+        params.siteId,
+        params.strict
       )
   }),
   defineMethod({
     name: 'jira.listPriorities',
     permission: 'workspace',
     params: SiteSelection,
-    handler: async (params, { runtime }) => runtime.jiraListPriorities(params?.siteId)
+    handler: async (params, { runtime }) =>
+      runtime.jiraListPriorities(params?.siteId, params?.strict)
   }),
   defineMethod({
     name: 'jira.listAssignableUsers',
     permission: 'workspace',
     params: AssignableUsers,
     handler: async (params, { runtime }) =>
-      runtime.jiraListAssignableUsers(params.key.trim(), params.query, params.siteId)
+      runtime.jiraListAssignableUsers(params.key.trim(), params.query, params.siteId, params.strict)
   }),
   defineMethod({
     name: 'jira.searchUsers',
@@ -208,7 +280,7 @@ export const JIRA_METHODS = [
     permission: 'workspace',
     params: IssueKey,
     handler: async (params, { runtime }) =>
-      runtime.jiraListTransitions(params.key.trim(), params.siteId)
+      runtime.jiraListTransitions(params.key.trim(), params.siteId, params.strict)
   }),
   defineMethod({
     name: 'jira.getProjectStatusOrder',

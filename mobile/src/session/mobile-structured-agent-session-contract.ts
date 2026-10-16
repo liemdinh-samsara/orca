@@ -5,6 +5,7 @@ import type { MobileChatPermission } from './mobile-native-chat-permission'
 import type { MobileChatQuestion } from './mobile-native-chat-question'
 import type { MobileNativeChatSession } from './use-mobile-native-chat-session'
 import type { NativeChatLiveTurnIndicator } from '../../../src/shared/native-chat-turn-status'
+import type { NativeChatResolvedPrompt } from '../../../src/shared/native-chat-resolution-receipt'
 import type { useMobileStructuredAgentOptions } from './use-mobile-structured-agent-options'
 import type { useMobileStructuredAgentTurnTiming } from './use-mobile-structured-agent-turn-timing'
 import type { StructuredMobileSendAttachment } from './use-mobile-structured-send-with-outcome'
@@ -26,6 +27,9 @@ export type StructuredMobileSession = ReturnType<typeof useMobileStructuredAgent
       attachments?: readonly StructuredMobileSendAttachment[]
     ) => Promise<MobileNativeChatSendOutcome>
     cancel: () => void
+    receipts: ReadonlyMap<string, NativeChatResolvedPrompt>
+    /** Undefined from a host too old to say. */
+    actionablePromptIds: readonly string[] | undefined
     permission: MobileChatPermission | null
     question: MobileChatQuestion | null
     respondPermission: (optionId: string) => Promise<boolean>
@@ -40,4 +44,6 @@ export type StructuredMobileSession = ReturnType<typeof useMobileStructuredAgent
     visualSource: MobileNativeChatVisualSource | null
     /** The `/` menu the session's agent reports; undefined until the host reports one. */
     sessionCommands: readonly AgentSessionSlashCommand[] | undefined
+    /** This phone's photos, by the row id their send is drawn under. */
+    imagePreviewsByMessageId: Record<string, string[]>
   }

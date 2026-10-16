@@ -27,6 +27,10 @@ import {
 } from './repo-ipc-arg-schemas'
 import { setupExistingFolderOnHost } from './project-host-existing-folder-setup'
 import { setupProjectAtMappedPath } from './project-host-mapped-setup'
+import {
+  assertWslMoveHostSetupIdWritable,
+  assertWslMoveHostSetupWritable
+} from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 async function finishFolderSetup(
   mainWindow: BrowserWindow,
@@ -51,6 +55,7 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
         rawArgs,
         'project_host_setup_create_invalid_args'
       )
+      assertWslMoveHostSetupWritable(store, args)
       const result = store.createProjectHostSetup(args)
       if (!result) {
         throw new Error(`Project not found: ${args.projectId}`)
@@ -68,6 +73,7 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
         rawArgs,
         'project_host_setup_update_invalid_args'
       )
+      assertWslMoveHostSetupIdWritable(store, args.setupId)
       const result = store.updateProjectHostSetup(args)
       if (!result) {
         throw new Error(`Project host setup not found: ${args.setupId}`)
@@ -89,6 +95,7 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
         rawArgs,
         'project_host_setup_delete_invalid_args'
       )
+      assertWslMoveHostSetupIdWritable(store, args.setupId)
       const result = store.deleteProjectHostSetup(args)
       if (!result) {
         throw new Error(`Project host setup not found: ${args.setupId}`)

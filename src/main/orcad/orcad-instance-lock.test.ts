@@ -13,13 +13,15 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import {
   acquireOrcadInstanceLock,
   ORCAD_LOCK_FILE_NAME,
-  OrcadInstanceLockError,
+  readOrcadInstanceLockRecord,
   type OrcadInstanceLockHooks,
   type OrcadLockRecord
 } from './orcad-instance-lock'
+import { OrcadInstanceLockError } from './orcad-data-root-privacy'
 
 const roots: string[] = []
 
@@ -35,7 +37,8 @@ function hooks(overrides: OrcadInstanceLockHooks = {}): OrcadInstanceLockHooks {
     identity: () => 'uid-1000',
     version: () => '1.0.0-test',
     startedAtMs: () => 1_000,
-    startTimeMatches: () => true,
+    incarnation: () => null,
+    holderIdentity: () => 'matches',
     processIsAlive: () => false,
     ...overrides
   }
@@ -94,9 +97,152 @@ describe('acquireOrcadInstanceLock', () => {
     writeFileSync(join(root, ORCAD_LOCK_FILE_NAME), JSON.stringify(persistedRecord()))
     const lock = acquireOrcadInstanceLock(
       root,
-      hooks({ processIsAlive: () => true, startTimeMatches: () => false })
+      hooks({ processIsAlive: () => true, holderIdentity: () => 'differs' })
     )
     expect(JSON.parse(readFileSync(lock.path, 'utf8')).pid).toBe(process.pid)
+  })
+
+  it('keeps a live holder whose ticks match though its btime-derived start time drifted', () => {
+    const root = makeRoot()
+    const incarnation = { linuxStartTicks: '1234', bootId: 'boot-a' }
+    writeFileSync(
+      join(root, ORCAD_LOCK_FILE_NAME),
+      JSON.stringify(persistedRecord({ startedAtMs: 1_000, ...incarnation }))
+    )
+    const drifted = {
+      processIsAlive: () => true,
+      holderIdentity: undefined,
+      startedAtMs: () => 158_000,
+      incarnation: () => incarnation
+    }
+    expect(() => acquireOrcadInstanceLock(root, hooks(drifted))).toThrow(
+      expect.objectContaining({ code: 'orcad_instance_lock_held' })
+    )
+    const reused = { ...drifted, incarnation: () => ({ ...incarnation, linuxStartTicks: '9' }) }
+    expect(acquireOrcadInstanceLock(root, hooks(reused)).record.nonce).not.toBe('stale')
+  })
+
+  // The platform hook also drives data-root privacy, whose POSIX mode check a Windows temp dir fails.
+  describe.runIf(process.platform !== 'win32')(
+    'an older Linux record whose wall-clock start time disagrees',
+    () => {
+      const olderRecord = persistedRecord({
+        identity: '1000',
+        acquiredAt: '2026-01-01T00:00:00.000Z'
+      })
+      const liveMismatch = (ownerUid: number | null): OrcadInstanceLockHooks =>
+        hooks({
+          identity: () => '1000',
+          processIsAlive: () => true,
+          holderIdentity: undefined,
+          startedAtMs: () => 9e9,
+          ownerUid: () => ownerUid,
+          processName: () => 'postgres',
+          platform: 'linux'
+        })
+
+      // Same boot or not, btime drift alone can produce this mismatch, so it proves nothing.
+      it.each([
+        ['the same uid', 1000],
+        ['root, which a non-dumpable process also shows as', 0],
+        ['an unreadable owner', null]
+      ])('stays held when the live PID is owned by %s', (_owner, ownerUid) => {
+        const root = makeRoot()
+        const lockPath = join(root, ORCAD_LOCK_FILE_NAME)
+        writeFileSync(lockPath, JSON.stringify(olderRecord))
+        let error: unknown
+        try {
+          acquireOrcadInstanceLock(root, liveMismatch(ownerUid))
+        } catch (caught) {
+          error = caught
+        }
+        expect(error).toEqual(expect.objectContaining({ code: 'orcad_instance_lock_held' }))
+        const message = error instanceof Error ? error.message : ''
+        expect(message).toContain('pid 424242')
+        expect(message).toContain('"postgres"')
+        expect(message).toContain('reused the PID')
+        expect(message).toContain(`delete ${lockPath}`)
+        expect(readOrcadInstanceLockRecord(lockPath)?.nonce).toBe('stale')
+      })
+
+      it('is reclaimed when another non-root uid now owns the PID', () => {
+        const root = makeRoot()
+        writeFileSync(join(root, ORCAD_LOCK_FILE_NAME), JSON.stringify(olderRecord))
+        expect(acquireOrcadInstanceLock(root, liveMismatch(1001)).record.nonce).not.toBe('stale')
+      })
+
+      it('says "an unknown program" when the live process name cannot be read', () => {
+        const root = makeRoot()
+        writeFileSync(join(root, ORCAD_LOCK_FILE_NAME), JSON.stringify(olderRecord))
+        expect(() =>
+          acquireOrcadInstanceLock(root, { ...liveMismatch(1000), processName: () => null })
+        ).toThrow(
+          expect.objectContaining({ message: expect.stringContaining('an unknown program') })
+        )
+      })
+
+      it('keeps the plain refusal for a record that carries a boot id', () => {
+        const root = makeRoot()
+        writeFileSync(
+          join(root, ORCAD_LOCK_FILE_NAME),
+          JSON.stringify({ ...olderRecord, bootId: 'boot-a' })
+        )
+        expect(() => acquireOrcadInstanceLock(root, liveMismatch(1000))).toThrow(
+          expect.objectContaining({
+            code: 'orcad_instance_lock_held',
+            message: expect.stringContaining('already owns the data root')
+          })
+        )
+      })
+    }
+  )
+
+  it('records the incarnation in a lock an older reader still parses', () => {
+    const root = makeRoot()
+    const incarnation = { linuxStartTicks: '1234', bootId: 'boot-a' }
+    const lock = acquireOrcadInstanceLock(root, hooks({ incarnation: () => incarnation }))
+    const written: unknown = JSON.parse(readFileSync(lock.path, 'utf8'))
+    expect(written).toMatchObject({ startedAtMs: 1_000, ...incarnation })
+    // The shape desktops before this change parse with: unknown keys are dropped, not refused.
+    const olderReader = z.object({
+      pid: z.number().int().positive(),
+      startedAtMs: z.number().finite().nonnegative().nullable(),
+      identity: z.string().min(1),
+      version: z.string().min(1),
+      acquiredAt: z.iso.datetime({ offset: true }),
+      nonce: z.string().min(1),
+      role: z.enum(['orcad', 'desktop']).optional()
+    })
+    expect(olderReader.parse(written)).toEqual({
+      pid: process.pid,
+      startedAtMs: 1_000,
+      identity: 'uid-1000',
+      version: '1.0.0-test',
+      acquiredAt: lock.record.acquiredAt,
+      nonce: lock.record.nonce,
+      role: 'orcad'
+    })
+    lock.release()
+  })
+
+  it('reads an older lock without an incarnation, and salvages a malformed one', () => {
+    const root = makeRoot()
+    writeFileSync(
+      join(root, ORCAD_LOCK_FILE_NAME),
+      JSON.stringify(persistedRecord({ linuxStartTicks: undefined }))
+    )
+    expect(readOrcadInstanceLockRecord(join(root, ORCAD_LOCK_FILE_NAME))).not.toHaveProperty(
+      'linuxStartTicks'
+    )
+    writeFileSync(
+      join(root, ORCAD_LOCK_FILE_NAME),
+      JSON.stringify({ ...persistedRecord(), linuxStartTicks: 12, bootId: '' })
+    )
+    expect(readOrcadInstanceLockRecord(join(root, ORCAD_LOCK_FILE_NAME))).toMatchObject({
+      nonce: 'stale',
+      linuxStartTicks: undefined,
+      bootId: undefined
+    })
   })
 
   it('does not displace a successor published between stale inspection and reclaim', () => {

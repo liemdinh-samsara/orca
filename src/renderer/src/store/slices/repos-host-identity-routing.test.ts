@@ -476,7 +476,11 @@ describe('repo slice host identity routing', () => {
       params: { repo: 'same-repo' },
       timeoutMs: 15_000
     })
-    expect(reposRemoveForHost).not.toHaveBeenCalled()
+    // Host-scoped residue cleanup for the runtime row only; the local row is never addressed.
+    expect(reposRemoveForHost).toHaveBeenCalledWith({
+      repoId: 'same-repo',
+      hostId: 'runtime:env-1'
+    })
     expect(reposRemove).not.toHaveBeenCalled()
     expect(store.getState().repos).toEqual([localDuplicate])
     expect(store.getState().worktreesByRepo['same-repo']).toEqual([localWorktree])
@@ -484,7 +488,7 @@ describe('repo slice host identity routing', () => {
 
   it('removeProject of an SSH host row routes local even when a runtime is focused', async () => {
     // Regression: removing an SSH host's repo (explicit ssh hostId) must NOT route
-    // repo.rm to the focused runtime env. settingsForRepoOwner clears the focused
+    // repo.rm to the focused runtime env. Owner routing clears the focused
     // runtime for SSH owners, so removal stays on the host-scoped local path.
     const sshDuplicate: Repo = {
       id: 'same-repo',

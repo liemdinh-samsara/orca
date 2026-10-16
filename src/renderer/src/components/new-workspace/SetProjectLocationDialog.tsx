@@ -10,7 +10,10 @@ import {
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { CreateProjectParentBrowser } from '@/components/sidebar/CreateProjectLocationField'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import {
+  getProjectHostSetupSelectionKey,
+  type NeedsSetupProjectHostOption
+} from '@/lib/project-host-setup-options'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type { RepoKind } from '../../../../shared/repo-types'
 import { pickLocalProjectLocationFolder } from './pick-local-project-folder'
@@ -174,7 +177,7 @@ function SetProjectLocationDialogBody({
         displayName: projectName
       })
       if (result && !abandoned.current) {
-        onReady(result.setup.id)
+        onReady(getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }))
       }
     } finally {
       setIsSubmitting(false)
@@ -195,7 +198,7 @@ function SetProjectLocationDialogBody({
         displayName: projectName
       })
       if (result && !abandoned.current) {
-        onReady(result.setup.id)
+        onReady(getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }))
       }
     } finally {
       setIsSubmitting(false)

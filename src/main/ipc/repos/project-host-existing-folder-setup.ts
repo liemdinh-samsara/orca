@@ -9,7 +9,8 @@ import { getProjectHostSetupForRepo } from '../../../shared/project-host-setup-l
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../shared/execution-host'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { addLocalRepoFromPath } from './local-repo-registration'
-import { addRemoteRepoFromPath } from './remote-repo-registration'
+import { sshTargetNotConnectedMessage } from '../../providers/ssh-host-not-served-error'
+import { assertWslMoveHostSetupWritable } from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 export function buildProjectHostSetupResult(store: Store, repo: Repo): ProjectHostSetupResult {
   const setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
@@ -27,6 +28,11 @@ function alignRepoWithRequestedProject(
   setupMethod: ProjectHostSetupExistingFolderArgs['setupMethod'] = 'imported-existing-folder',
   requestedProviderIdentity?: ProjectHostSetupExistingFolderArgs['projectProviderIdentity']
 ): ProjectHostSetupResult {
+  assertWslMoveHostSetupWritable(store, {
+    projectId,
+    hostId: getRepoExecutionHostId(repo),
+    repoId: repo.id
+  })
   let setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
   if (setup.projectId !== projectId) {
     const project = store.getProjects().find((entry) => entry.id === projectId)
@@ -59,7 +65,7 @@ function alignRepoWithRequestedProject(
   return buildProjectHostSetupResult(store, repo)
 }
 
-/** Registers an existing folder on a local or SSH host and links it to the requested project. */
+/** Registers an existing folder on the local host and links it to the requested project. */
 export async function setupExistingFolderOnHost(
   store: Store,
   // Why a plain string host: IPC args arrive unbranded and are parsed here.
@@ -73,12 +79,7 @@ export async function setupExistingFolderOnHost(
     parsedHost.kind === 'local'
       ? await addLocalRepoFromPath(store, args.path, args.kind)
       : parsedHost.kind === 'ssh'
-        ? await addRemoteRepoFromPath(store, {
-            connectionId: parsedHost.targetId,
-            remotePath: args.path,
-            displayName: args.displayName,
-            kind: args.kind
-          })
+        ? { error: sshTargetNotConnectedMessage(parsedHost.targetId) }
         : {
             error:
               'Runtime hosts must be set up through the runtime projectHostSetup.setupExistingFolder RPC.'

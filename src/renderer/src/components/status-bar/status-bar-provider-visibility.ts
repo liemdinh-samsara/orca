@@ -42,7 +42,7 @@ type UsageProviderSnapshots = {
 
 type UsageProviderId = ProviderRateLimits['provider']
 
-function hasUsageData(provider: ProviderRateLimits): boolean {
+export function hasUsageData(provider: ProviderRateLimits): boolean {
   return hasUsageWindowData(provider) || getCreditOnlyUsageSummary(provider) !== null
 }
 
@@ -130,7 +130,7 @@ export function hasUsageProviderSettingsForProvider(
   return false
 }
 
-function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRateLimits {
+export function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRateLimits {
   return {
     provider: providerId,
     session: null,

@@ -22,6 +22,7 @@ import {
   waitForPendingWorktreeRemoval
 } from '../../../worktree-background-removal'
 import { runSerializedWorktreeRemovalAcceptance } from '../../../worktree-removal-acceptance-queue'
+import { assertWslMoveRepoWritable } from '../../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 export function registerWorktreeRemovalHandlers(context: WorktreeIpcContext): void {
   const { store, options, worktreeRemovalsInFlight } = context
@@ -45,6 +46,7 @@ export function registerWorktreeRemovalHandlers(context: WorktreeIpcContext): vo
     if (!repo) {
       throw new Error(`Repo not found: ${repoId}`)
     }
+    assertWslMoveRepoWritable(store, repo)
     // The resolved repo supplies host ownership when legacy callers omit args.hostId.
     const removalHostId = getRepoExecutionHostId(repo)
     // Why: a retry or a second window asking while Git still deletes joins that removal.

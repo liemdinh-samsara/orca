@@ -12,6 +12,8 @@ import { discoverSkillsOnTarget } from '../../../skills/skill-discovery-target'
 import { resolveDiscoveryTarget } from './skills'
 import { NativeChatSkills } from '../../../../shared/rpc-contract/native-chat-params'
 import { NATIVE_CHAT_SKILL_METHODS } from './native-chat-skills'
+import { MOBILE_RPC_METHOD_ALLOWLIST } from '../../runtime-rpc/runtime-rpc-mobile-method-allowlist'
+import { MOBILE_RPC_METHOD_ROUTES } from '../../runtime-rpc/runtime-rpc-mobile-method-routing'
 
 const HOME_CLAUDE = '/home/u/.claude/skills'
 const HOME_AGENTS = '/home/u/.agents/skills'
@@ -203,4 +205,11 @@ describe('nativeChat.skills', () => {
       })
     }
   )
+})
+
+describe('nativeChat.skills mobile routing', () => {
+  it('lets a paired phone call it on the host that owns the workspace', () => {
+    expect(MOBILE_RPC_METHOD_ALLOWLIST.has('nativeChat.skills')).toBe(true)
+    expect(MOBILE_RPC_METHOD_ROUTES.get('nativeChat.skills')).toBe('execution-host')
+  })
 })

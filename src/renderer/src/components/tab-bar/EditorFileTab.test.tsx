@@ -164,6 +164,9 @@ vi.mock('@/components/ui/input', () => ({
 }))
 
 vi.mock('@/components/ui/tooltip', () => ({
+  TooltipProvider: function TooltipProvider(props: { children?: unknown }) {
+    return props.children
+  },
   Tooltip: function Tooltip(props: { children?: unknown }) {
     return { type: 'Tooltip', props }
   },
@@ -171,6 +174,12 @@ vi.mock('@/components/ui/tooltip', () => ({
     return { type: 'TooltipContent', props }
   },
   TooltipTrigger: function TooltipTrigger(props: { children?: unknown }) {
+    return props.children
+  }
+}))
+
+vi.mock('./TabHoverCard', () => ({
+  TabHoverCard: function TabHoverCard(props: { children?: unknown }) {
     return props.children
   }
 }))

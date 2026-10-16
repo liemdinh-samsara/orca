@@ -24,6 +24,8 @@ import {
   loadPairedBrowserTabCreator
 } from './paired-browser-tab-creator'
 import { findGroupAndWorktree } from '../tab-group-state'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/layout-owner-switch'
+import { recordBrowserTabOpen } from './browser-layout-owner-commands'
 import { placeInBrowserSidePane } from './browser-side-pane-placement'
 
 export function createBrowserTabActions(
@@ -162,10 +164,12 @@ export function createBrowserTabActions(
         const created = state.createUnifiedTab(worktreeId, 'browser', {
           entityId: workspaceId,
           label: browserTab.title,
+          // Why: an explicit split already names where the tab goes; side-pane placement only picks a group.
           targetGroupId:
-            options?.placement === 'side-pane'
+            options?.placement === 'side-pane' && !options.split
               ? placeInBrowserSidePane(get, worktreeId, options.targetGroupId)
               : options?.targetGroupId,
+          ...(options?.split ? { split: options.split } : {}),
           ...(options?.afterTabId ? { afterTabId: options.afterTabId } : {}),
           // Why no routing-host default: a substituted host would disown the wrapper from its worktree.
           ...(options?.executionHostId ? { executionHostId: options.executionHostId } : {}),
@@ -175,6 +179,10 @@ export function createBrowserTabActions(
         if (shouldActivate && created) {
           get().focusGroup(worktreeId, created.groupId)
         }
+      }
+      // Switch point: main records the tab under these ids before any later command names it.
+      if (ORCA_LAYOUT_OWNER_IS_MAIN) {
+        recordBrowserTabOpen(get(), browserTab)
       }
       return browserTab
     },
@@ -229,7 +237,7 @@ export function createBrowserTabActions(
       get().createBrowserTab(worktreeId, defaultUrl, {
         title: translate('auto.store.slices.browser.d175274b6d', 'New Browser Tab'),
         focusAddressBar: true,
-        ...(runtimeEnvironmentId ? { browserRuntimeEnvironmentId: null } : {}),
+        browserRuntimeEnvironmentId: null,
         targetGroupId: groupId,
         placement: 'side-pane'
       })
@@ -273,7 +281,7 @@ export function createBrowserTabActions(
       get().createBrowserTab(worktreeId, url, {
         activate: true,
         sessionProfileId: profileId,
-        ...(runtimeEnvironmentId ? { browserRuntimeEnvironmentId: null } : {})
+        browserRuntimeEnvironmentId: null
       })
       return true
     }

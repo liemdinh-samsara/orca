@@ -1,3 +1,4 @@
+import { isIntegrationCredentialErrorReason } from '../../../shared/integration-credential-errors'
 import type {
   JiraAuthType,
   JiraConnectionStatus,
@@ -62,7 +63,8 @@ function parseJiraSite(value: unknown): JiraSite | null {
     email: typeof value.email === 'string' ? value.email : '',
     displayName: value.displayName,
     accountId: value.accountId,
-    authType: isJiraAuthType(value.authType) ? value.authType : undefined
+    authType: isJiraAuthType(value.authType) ? value.authType : undefined,
+    apiBaseUrl: typeof value.apiBaseUrl === 'string' ? value.apiBaseUrl : undefined
   }
   return site
 }
@@ -92,10 +94,19 @@ export function parseJiraConnectionStatus(value: unknown): JiraConnectionStatus 
     activeSiteId: parseOptionalSiteId(value.activeSiteId),
     selectedSiteId: parseOptionalSiteId(value.selectedSiteId),
     credentialError: typeof value.credentialError === 'string' ? value.credentialError : undefined,
+    credentialErrorReason: isIntegrationCredentialErrorReason(value.credentialErrorReason)
+      ? value.credentialErrorReason
+      : undefined,
+    canMoveCredentialKeyToFile:
+      typeof value.canMoveCredentialKeyToFile === 'boolean'
+        ? value.canMoveCredentialKeyToFile
+        : undefined,
     credentialProtection:
       value.credentialProtection === null || isSecretAtRestProtection(value.credentialProtection)
         ? value.credentialProtection
-        : undefined
+        : undefined,
+    supportsScopedTokens:
+      typeof value.supportsScopedTokens === 'boolean' ? value.supportsScopedTokens : undefined
   }
   return status
 }

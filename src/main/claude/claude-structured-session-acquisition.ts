@@ -1,13 +1,11 @@
-import {
-  AgentSessionPreSpawnError,
-  type AgentSessionAcquisition,
-  type StructuredAgentSessionAcquireInput
+import type {
+  AgentSessionAcquisition,
+  StructuredAgentSessionAcquireInput
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
-import { CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE } from '../claude-accounts/environment'
-import { isClaudeAuthSwitchInProgress } from '../claude-accounts/live-pty-gate'
 import { openClaudeStreamJsonConnection } from './claude-stream-json-connection'
 import { buildClaudePermissionCallbacks } from './claude-structured-inbound-control'
 import { resolveClaudeReplayTurn } from './claude-replay-turn-resolution'
+import { claudeStartedUnechoedSend } from './claude-command-lifecycle'
 import { claudeSessionStateEndsTurn } from './claude-session-state-turn-over'
 import { settleClaudeTurnEndWaiters } from './claude-request-end-wait'
 import {
@@ -17,7 +15,7 @@ import {
   readClaudeInit
 } from './claude-structured-init-proof'
 import { claudeConfigDirEnvPatch } from './claude-config-dir-pin'
-import { CLAUDE_SPAWN_TOKEN_ENV, claudeProcessIdentity } from './claude-structured-owner-identity'
+import { claudeProcessIdentity } from './claude-structured-owner-identity'
 import { ClaudePromptRegistry } from './claude-structured-prompt-replies'
 import { adoptClaudeStructuredSpawnOptions } from './claude-structured-spawn-options'
 import { observeClaudeFastModeFacts } from './claude-structured-session-options'
@@ -41,7 +39,6 @@ import { readClaudeTranscriptEntryUuid } from './claude-transcript-entry-uuid'
 import { persistClaudeTurnResumePoint } from './claude-structured-resume-point'
 import { withAgentSessionCreatePhase } from '../observability/agent-session-instrumentation'
 import { resolveClaudeAcquisitionLaunch } from './claude-structured-acquisition-launch'
-import { claudeAcquireCatalogAccess } from './claude-structured-acquire-catalog'
 import {
   bindClaudeConnectionJournalControls,
   createClaudeSessionJournalTranslator
@@ -62,13 +59,6 @@ export async function acquireClaudeSession({
   exits: Map<string, ClaudeSessionExit>
   callbacks: ClaudeAcquireCallbacks
 }): Promise<AgentSessionAcquisition> {
-  // A managed-account switch is mid-swap of the pinned credential home; refuse here,
-  // before this acquisition cancels the previous attempt and closes the live session.
-  if (isClaudeAuthSwitchInProgress()) {
-    throw new AgentSessionPreSpawnError(new Error(CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE), {
-      reason: 'accountSwitchInProgress'
-    })
-  }
   const sessionId = input.identity.sessionId
   const prompts = new ClaudePromptRegistry()
   const { previous, attempt } = acquisitions.start(sessionId, prompts)
@@ -81,12 +71,20 @@ export async function acquireClaudeSession({
   // Frames are admitted only after launch resolution proves the provider session
   // this acquisition owns. Keep the check ahead of every stateful consumer.
   const initProof = createClaudeInitProof()
-  const translator = createClaudeSessionJournalTranslator(input.events, String(input.fence), {
-    attempt,
-    initProof,
-    callbacks,
-    sessionId
-  })
+  const translator = createClaudeSessionJournalTranslator(
+    input.events,
+    String(input.fence),
+    {
+      attempt,
+      initProof,
+      callbacks,
+      sessionId
+    },
+    () =>
+      liveSession && sessions.get(sessionId) === liveSession
+        ? liveSession.backgroundTasks.goalBackgroundWork
+        : 'unverifiable'
+  )
 
   const onMessage = (message: Record<string, unknown>): void => {
     const init = readClaudeInit(message)
@@ -138,6 +136,7 @@ export async function acquireClaudeSession({
     const observedAt =
       startsTurn || message.type === 'result' ? { observedAt: deps.now?.() ?? Date.now() } : {}
     const requestedAt = turnOrigin?.requestedAt
+    const startedSend = !startsTurn && liveSession ? claudeStartedUnechoedSend(liveSession) : null
     callbacks.deliver(attempt, sessionId, () =>
       callbacks.emit(liveSession, input.events, {
         type: 'message',
@@ -146,6 +145,7 @@ export async function acquireClaudeSession({
         ...(startsTurn ? { startsTurn: true } : {}),
         ...(requestedAt === null || requestedAt === undefined ? {} : { requestedAt }),
         ...(turnOrigin?.clientMessageId ? { clientMessageId: turnOrigin.clientMessageId } : {}),
+        ...(startedSend ? { startedSend } : {}),
         ...observedAt
       })
     )
@@ -180,7 +180,6 @@ export async function acquireClaudeSession({
           cwd: launch.cwd,
           env: {
             ...launch.env,
-            [CLAUDE_SPAWN_TOKEN_ENV]: input.spawnToken,
             // Compared against what the child would otherwise inherit, so the record's
             // account home still wins over a diverging overlay without a needless pin.
             // (`process` is shadowed by a local later in this function, so it is not named here.)
@@ -188,7 +187,8 @@ export async function acquireClaudeSession({
               launch.claudeConfigDir,
               launch.env ? { env: launch.env } : {}
             )
-          }
+          },
+          ...(launch.envToDelete ? { envToDelete: launch.envToDelete } : {})
         },
         {
           onMessage,
@@ -260,10 +260,6 @@ export async function acquireClaudeSession({
     const session = publication.session
     liveSession = session
     adoptClaudeStructuredSpawnOptions(session, launch.savedOptions)
-    const catalogAccess = claudeAcquireCatalogAccess(deps.modelCatalog, launch.claudeConfigDir)
-    if (catalogAccess) {
-      session.catalogAccess = catalogAccess
-    }
     acquisitions.deleteIfCurrent(sessionId, attempt)
     await withAgentSessionCreatePhase('publish', input.recordPhase, async () => {
       sessions.set(sessionId, session)

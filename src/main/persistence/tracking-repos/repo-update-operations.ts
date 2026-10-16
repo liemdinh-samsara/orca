@@ -93,6 +93,7 @@ export class RepoUpdatePersistenceOperations {
         | 'inPlaceWorkspaces'
         | 'workspaceStartPath'
         | 'issueSourcePreference'
+        | 'defaultJiraProject'
         | 'forkSyncMode'
         | 'externalWorktreeVisibilityPromptDismissedAt'
         | 'externalWorktreeInboxBaselinePaths'

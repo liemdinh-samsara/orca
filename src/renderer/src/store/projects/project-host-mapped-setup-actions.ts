@@ -6,8 +6,8 @@ import { parseExecutionHostId } from '../../../../shared/execution-host'
 import { normalizeProjectRow } from '../../../../shared/project-catalog-row-normalization'
 import { resolveWorkspaceStartCwd } from '../../../../shared/workspace-start-path'
 import type { RepoSlice } from '../repos/repo-state'
-import { repoWithFetchedOwner } from '../repos/owner-routing'
-import { getProjectSetupRuntimeTarget, setupWithFetchedOwner } from './project-host-routing'
+import { adoptFromEndpoint } from '../adopt-from-endpoint'
+import { getProjectSetupRuntimeTarget } from './project-host-routing'
 import { mergeProjectHostSetupResult } from './project-host-setup-result-merge'
 
 export function createProjectHostMappedSetupActions(
@@ -26,8 +26,11 @@ export function createProjectHostMappedSetupActions(
           return outcome
         }
         const target = getProjectSetupRuntimeTarget(args.hostId)
-        const repo = repoWithFetchedOwner(outcome.result.repo, target)
-        const setup = setupWithFetchedOwner(outcome.result.setup, target)
+        const repo = adoptFromEndpoint(target, { kind: 'repo', row: outcome.result.repo })
+        const setup = adoptFromEndpoint(target, {
+          kind: 'projectHostSetup',
+          row: outcome.result.setup
+        })
         const project = normalizeProjectRow(outcome.result.project)
         set((s) => mergeProjectHostSetupResult(s, { repo, project, setup }))
         toast.success(

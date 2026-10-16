@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { resolvePnpmCliInvocation } from './pnpm-cli-invocation.mjs'
-import { runProcessSync } from './script-child-process.mjs'
+import { runProcessSync } from '@orca/process-host'
 
 export const RUN_KINDS = ['unit', 'mobile', 'checks', 'e2e']
 

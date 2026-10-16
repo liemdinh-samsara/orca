@@ -22,6 +22,9 @@ Manifest (image paths are relative to the manifest file):
   "notes": "<p>Anything the reader must check by hand.</p>"
 }
 """
+# Keeps `str | None` annotations working on macOS's system Python 3.9.
+from __future__ import annotations
+
 import base64
 import html
 import json

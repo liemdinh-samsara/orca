@@ -18,7 +18,11 @@ const storeMock = vi.hoisted(() => ({
 }))
 
 // Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
-vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
+vi.mock('./ReopenClosedTabMenuItem', () => ({
+  ReopenClosedTabMenuItem: ({ worktreeId }: { worktreeId: string }) => (
+    <span data-testid="reopen" data-worktree={worktreeId} />
+  )
+}))
 
 vi.mock('@/hooks/useShortcutLabel', () => ({
   formatShortcutLabel: () => '⌘D',
@@ -213,6 +217,15 @@ describe('requestActiveTerminalPaneSplit', () => {
 })
 
 describe('SortableTabContextMenu', () => {
+  it('includes Reopen Closed Tab for the terminal worktree', () => {
+    const { container } = renderMenu()
+
+    expect(container.querySelectorAll('[data-testid="reopen"]')).toHaveLength(1)
+    expect(container.querySelector('[data-testid="reopen"]')?.getAttribute('data-worktree')).toBe(
+      'wt-1'
+    )
+  })
+
   it('does not expose a native/terminal view switch', () => {
     const { container } = renderMenu()
 

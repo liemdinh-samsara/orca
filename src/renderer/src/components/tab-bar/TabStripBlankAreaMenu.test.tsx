@@ -4,6 +4,7 @@
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { TabStripBlankAreaMenu } from './TabStripBlankAreaMenu'
 
 const storeMock = vi.hoisted(() => {
@@ -35,7 +36,7 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
     </button>
   ),
   DropdownMenuShortcut: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
-  DropdownMenuTrigger: () => null
+  DropdownMenuTrigger: ({ children }: { children?: ReactNode }) => children
 }))
 
 vi.mock('lucide-react', () => ({ RotateCcw: () => null }))
@@ -71,11 +72,13 @@ function renderStrip(): void {
   })
 }
 
-function rightClick(testId: string): void {
+function rightClick(testId: string, coordinates: MouseEventInit = {}): void {
   act(() => {
     container
       .querySelector(`[data-testid="${testId}"]`)!
-      .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+      .dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ...coordinates })
+      )
   })
 }
 
@@ -102,6 +105,52 @@ afterEach(() => {
 })
 
 describe('TabStripBlankAreaMenu', () => {
+  it('closes when another context menu broadcasts its opening', () => {
+    renderStrip()
+    rightClick('blank')
+    expect(reopenItem()).not.toBeNull()
+
+    act(() => window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT)))
+
+    expect(reopenItem()).toBeNull()
+  })
+
+  it('closes on window blur when a webview takes focus', () => {
+    renderStrip()
+    rightClick('blank')
+    expect(reopenItem()).not.toBeNull()
+
+    act(() => window.dispatchEvent(new Event('blur')))
+
+    expect(reopenItem()).toBeNull()
+  })
+
+  it('broadcasts to close other menus before opening its own', () => {
+    renderStrip()
+    const closeOtherMenus = vi.fn(() => expect(reopenItem()).toBeNull())
+    window.addEventListener(CLOSE_ALL_CONTEXT_MENUS_EVENT, closeOtherMenus)
+    try {
+      rightClick('blank')
+
+      expect(closeOtherMenus).toHaveBeenCalledTimes(1)
+      expect(reopenItem()).not.toBeNull()
+    } finally {
+      window.removeEventListener(CLOSE_ALL_CONTEXT_MENUS_EVENT, closeOtherMenus)
+    }
+  })
+
+  it('anchors a fixed one-pixel trigger at the click coordinates', () => {
+    renderStrip()
+    rightClick('blank', { clientX: 40, clientY: 90 })
+
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-hidden]')
+    expect(trigger).not.toBeNull()
+    expect(trigger?.style.left).toBe('40px')
+    expect(trigger?.style.top).toBe('90px')
+    expect(trigger?.classList.contains('fixed')).toBe(true)
+    expect(trigger?.classList.contains('size-px')).toBe(true)
+  })
+
   it('opens Reopen Closed Tab on blank space and reopens in the strip worktree', () => {
     renderStrip()
     expect(reopenItem()).toBeNull()

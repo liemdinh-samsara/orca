@@ -7,7 +7,11 @@ const reactHookRuntime = vi.hoisted(() => ({
 }))
 
 // Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
-vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
+vi.mock('./ReopenClosedTabMenuItem', () => ({
+  ReopenClosedTabMenuItem: ({ worktreeId }: { worktreeId: string }) => (
+    <span data-testid="reopen" data-worktree={worktreeId} />
+  )
+}))
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react') // eslint-disable-line @typescript-eslint/consistent-type-imports -- vi.importActual requires inline import()
@@ -251,6 +255,17 @@ describe('BrowserTab favicon', { timeout: 30_000 }, () => {
     reactHookRuntime.states = []
     reactHookRuntime.index = 0
     vi.clearAllMocks()
+  })
+
+  it('includes Reopen Closed Tab for the browser worktree in the context menu', async () => {
+    const tree = await renderExpandedBrowserTab(baseBrowserTab({ worktreeId: 'browser-wt' }))
+    const menu = findElementsByType(tree, 'DropdownMenuContent')[0]
+    const reopen = findElementsByType(menu, 'span').filter(
+      (element) => element.props['data-testid'] === 'reopen'
+    )
+
+    expect(reopen).toHaveLength(1)
+    expect(reopen[0].props['data-worktree']).toBe('browser-wt')
   })
 
   it('renders the favicon image when faviconUrl is present', async () => {

@@ -5,7 +5,12 @@ const revealInFileManager = vi.hoisted(() => vi.fn())
 const storeSettings = vi.hoisted((): { activeRuntimeEnvironmentId?: string } => ({}))
 
 // Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
-vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
+vi.mock('./ReopenClosedTabMenuItem', () => ({
+  ReopenClosedTabMenuItem: (props: { worktreeId: string }) => ({
+    type: 'ReopenClosedTabMenuItem',
+    props
+  })
+}))
 
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: function DropdownMenu(props: { children?: unknown }) {
@@ -212,6 +217,7 @@ async function renderMenu(
     runtimeEnvironmentId?: string | null
     externalSshTargetId?: string
     mode?: 'edit' | 'check-details'
+    canShowMarkdownPreview?: boolean
   } = {}
 ): Promise<unknown> {
   const { runtimeEnvironmentId, externalSshTargetId, mode = 'edit', ...props } = overrides
@@ -288,6 +294,24 @@ describe('EditorFileTabContextMenu close-all shortcut', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('places Reopen Closed Tab for the file worktree between the close and markdown groups', async () => {
+    const tree = expandNode(await renderMenu({ canShowMarkdownPreview: true }))
+    const reopen = findElementsByType(tree, 'ReopenClosedTabMenuItem')
+    expect(reopen).toHaveLength(1)
+    expect(reopen[0].props.worktreeId).toBe('wt-1')
+
+    const children = findElementsByType(tree, 'DropdownMenuContent')[0].props.children
+    if (!Array.isArray(children)) {
+      throw new Error('Expected menu content children')
+    }
+    const index = children.indexOf(reopen[0])
+    expect(index).toBeGreaterThan(1)
+    expect(extractText(children[index - 2])).toContain('Close Tabs To The Left')
+    expect(findElementsByType(children[index - 1], 'DropdownMenuSeparator')).toHaveLength(1)
+    expect(findElementsByType(children[index + 1], 'DropdownMenuSeparator')).toHaveLength(1)
+    expect(extractText(children[index + 2])).toContain('Open Markdown Preview')
   })
 
   it('opens rename only after menu close releases focus and consumes the request once', async () => {

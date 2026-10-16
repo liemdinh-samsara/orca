@@ -421,6 +421,53 @@ describe('reopenClosedTab cross-type MRU', () => {
 })
 
 describe('canReopenClosedTab', () => {
+  it('is true for a local terminal snapshot and matches reopenClosedTab', () => {
+    const store = makeSeededStore()
+    store.setState({
+      recentlyClosedTerminalTabsByWorktree: { [WT]: [{ startupCwd: '/path/wt1/api' }] },
+      recentlyClosedTabKindsByWorktree: { [WT]: ['terminal'] }
+    })
+
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(true)
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+    expect(store.getState().tabsByWorktree[WT]?.[0]?.startupCwd).toBe('/path/wt1/api')
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+  })
+
+  it('is true for an editor snapshot and matches reopenClosedTab', () => {
+    const store = makeSeededStore()
+    store.setState({
+      recentlyClosedEditorTabsByWorktree: {
+        [WT]: [makeOpenFile({ filePath: '/path/wt1/a.ts', worktreeId: WT })]
+      },
+      recentlyClosedTabKindsByWorktree: { [WT]: ['editor'] }
+    })
+
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(true)
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+    expect(store.getState().openFiles).toEqual([
+      expect.objectContaining({ filePath: '/path/wt1/a.ts', worktreeId: WT })
+    ])
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+  })
+
+  it('finds a later restorable kind after drained kinds, matching reopenClosedTab', () => {
+    const store = makeSeededStore()
+    store.setState({
+      recentlyClosedTabKindsByWorktree: { [WT]: ['browser', 'editor', 'terminal'] },
+      recentlyClosedBrowserTabsByWorktree: { [WT]: [] },
+      recentlyClosedEditorTabsByWorktree: { [WT]: [] },
+      recentlyClosedTerminalTabsByWorktree: { [WT]: [{ startupCwd: '/path/wt1/api' }] }
+    })
+
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(true)
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+    expect(store.getState().tabsByWorktree[WT]?.[0]?.startupCwd).toBe('/path/wt1/api')
+    expect(store.getState().recentlyClosedTabKindsByWorktree[WT]).toEqual([])
+    expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
+    expect(store.getState().reopenClosedTab(WT)).toBe(false)
+  })
+
   it('follows a browser tab through close and reopen', () => {
     const store = makeSeededStore()
     expect(canReopenClosedTab(store.getState(), WT)).toBe(false)
@@ -482,6 +529,93 @@ describe('reopenClosedBrowserTab placement', () => {
       .filter((tab) => tab.contentType === 'browser')
       .map((tab) => tab.groupId)
   }
+
+  it.each([
+    { name: 'a zero-page snapshot whose pane is gone', hasPosition: true, hasPages: false },
+    { name: 'a zero-page snapshot with no recorded position', hasPosition: false, hasPages: false },
+    { name: 'a snapshot with pages but no recorded position', hasPosition: false, hasPages: true }
+  ])('restores $name into a side pane', ({ hasPosition, hasPages }) => {
+    const store = makeSeededStore()
+    const { terminalGroupId, sideGroupId, browser } = openSidePaneBrowser(store)
+    const pages = store.getState().browserPagesByWorkspace[browser.id]
+    expect(pages).toHaveLength(1)
+    store.getState().closeBrowserTab(browser.id)
+    store.getState().closeEmptyGroup(WT, sideGroupId!)
+    expect(store.getState().groupsByWorktree[WT]?.map((group) => group.id)).toEqual([
+      terminalGroupId
+    ])
+    store.setState({
+      recentlyClosedBrowserTabsByWorktree: {
+        [WT]: [
+          {
+            workspace: browser,
+            pages: hasPages ? pages : [],
+            position: hasPosition ? { groupId: sideGroupId, groupIndex: 0 } : undefined
+          }
+        ]
+      }
+    })
+
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+
+    const restored = store.getState().browserTabsByWorktree[WT]
+    expect(restored).toHaveLength(1)
+    expect(restored[0]).toMatchObject({ url: browser.url, title: browser.title })
+    expect(store.getState().browserPagesByWorkspace[restored[0].id]).toEqual([
+      expect.objectContaining({ url: browser.url, title: browser.title })
+    ])
+    const groups = browserGroupIds(store)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).not.toBe(terminalGroupId)
+    expect(groups[0]).not.toBe(sideGroupId)
+    expect(store.getState().groupsByWorktree[WT]).toHaveLength(2)
+    expect(
+      store.getState().groupsByWorktree[WT]?.find((group) => group.id === groups[0])
+        ?.tabStripOrientation
+    ).toBe('vertical')
+    expect(store.getState().recentlyClosedBrowserTabsByWorktree[WT]).toEqual([])
+  })
+
+  it('restores every page of a multi-page workspace into a new side pane after its pane is removed', () => {
+    const store = makeSeededStore()
+    const { terminalGroupId, sideGroupId, browser } = openSidePaneBrowser(store)
+    const second = store.getState().createBrowserPage(browser.id, 'https://example.com/build', {
+      title: 'Build',
+      activate: true
+    })
+    store.getState().createBrowserPage(browser.id, 'https://example.com/review', {
+      title: 'Review',
+      activate: false
+    })
+    expect(second).not.toBeNull()
+    const pages = store.getState().browserPagesByWorkspace[browser.id]
+    expect(pages).toHaveLength(3)
+    store.getState().closeBrowserTab(browser.id)
+    store.getState().closeEmptyGroup(WT, sideGroupId!)
+    expect(store.getState().groupsByWorktree[WT]?.map((group) => group.id)).toEqual([
+      terminalGroupId
+    ])
+
+    expect(store.getState().reopenClosedTab(WT)).toBe(true)
+
+    const restored = store.getState().browserTabsByWorktree[WT]
+    expect(restored).toHaveLength(1)
+    const restoredPages = store.getState().browserPagesByWorkspace[restored[0].id]
+    expect(restoredPages.map((page) => ({ url: page.url, title: page.title }))).toEqual(
+      pages.map((page) => ({ url: page.url, title: page.title }))
+    )
+    expect(restored[0].pageIds).toEqual(restoredPages.map((page) => page.id))
+    expect(restored[0].activePageId).toBe(restoredPages[1].id)
+    expect(browserGroupIds(store)).toHaveLength(1)
+    const [newGroupId] = browserGroupIds(store)
+    expect(newGroupId).not.toBe(terminalGroupId)
+    expect(newGroupId).not.toBe(sideGroupId)
+    expect(store.getState().groupsByWorktree[WT]).toHaveLength(2)
+    expect(
+      store.getState().groupsByWorktree[WT]?.find((group) => group.id === newGroupId)
+        ?.tabStripOrientation
+    ).toBe('vertical')
+  })
 
   it('returns a tab to the pane it was closed from', () => {
     const store = makeSeededStore()

@@ -2,7 +2,7 @@ import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { expect, it } from 'vitest'
-import { runProcess } from '../../src/shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 
 export const root = realpathSync(join(import.meta.dirname, '../..'))
 export const skill = join(root, '.claude/skills/orca-test-and-verify')

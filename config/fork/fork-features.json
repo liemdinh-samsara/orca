@@ -18,19 +18,20 @@
         "src/main/ipc/worktrees/listing/detected-provider-listing.ts",
         "src/main/ipc/worktrees/listing/in-place-workspace-catalog.ts",
         "src/main/ipc/worktrees/listing/register-worktree-catalog-handlers.ts",
+        "src/main/ipc/worktrees/listing/ssh-worktree-fallback.ts",
         "src/main/ipc/worktrees/removal/execute-worktree-removal.ts",
         "src/main/ipc/worktrees/removal/register-worktree-removal-handlers.ts",
         "src/main/persistence/loading-store/repo-lifecycle-operations.ts",
         "src/main/persistence/tracking-repos/repo-update-operations.ts",
         "src/main/project-start-folder-cwd.ts",
-        "src/main/runtime/orca-runtime-create-managed-worktree.ts",
-        "src/main/runtime/orca-runtime-get-worktree-ps.ts",
-        "src/main/runtime/orca-runtime-remove-orphan-or-folder-worktree.ts",
-        "src/main/runtime/orca-runtime-resolve-browser-network-execution-host-for-worktree.ts",
         "src/main/runtime/repo-worktree-row-resolution.ts",
         "src/main/runtime/runtime-managed-worktree-queries.ts",
         "src/main/runtime/runtime-repository-settings-controller.ts",
         "src/main/runtime/runtime-worktree-terminal-provisioning.ts",
+        "src/main/runtime/terminal/launch/terminal-workspace-scope.ts",
+        "src/main/runtime/workspaces/workspace-creation.ts",
+        "src/main/runtime/workspaces/workspace-process-listing.ts",
+        "src/main/runtime/workspaces/workspace-registration-removal.ts",
         "src/main/worktree-lineage-pruning.ts",
         "src/renderer/src/components/TerminalLegacyTerminalPanes.tsx",
         "src/renderer/src/components/settings/RepositoryPane.tsx",
@@ -42,7 +43,6 @@
         "src/renderer/src/hooks/composer-state/runtime-target-selection.ts",
         "src/renderer/src/i18n/locales/en.json",
         "src/renderer/src/lib/launch-agent-background-session.ts",
-        "src/renderer/src/lib/launch-worktree-background-terminals.ts",
         "src/renderer/src/lib/workspace-start-cwd.ts",
         "src/renderer/src/lib/worktree-creation-ready-toast.tsx",
         "src/renderer/src/lib/worktree-setup-issue-command-queue.ts",
@@ -75,7 +75,6 @@
         "src/renderer/src/components/sidebar/repo-header-create-state.test.ts",
         "src/renderer/src/components/terminal-startup-hold-placeholder.test.tsx",
         "src/renderer/src/lib/launch-agent-background-session.test.ts",
-        "src/renderer/src/lib/launch-worktree-background-terminals.test.ts",
         "src/renderer/src/lib/workspace-start-cwd.test.ts",
         "src/renderer/src/lib/worktree-creation-ready-toast.test.tsx",
         "src/renderer/src/lib/worktree-setup-issue-command-queue.test.ts",
@@ -118,6 +117,12 @@
         "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts",
         "src/renderer/src/store/slices/tabs/tabs-strip-orientation-actions.ts",
         "src/shared/tab-types.ts",
+        "src/shared/workspace-layout/workspace-layout-beside.ts",
+        "src/shared/workspace-layout/workspace-layout-disk-fields.ts",
+        "src/shared/workspace-layout/workspace-layout-load-workspace.ts",
+        "src/shared/workspace-layout/workspace-layout-save.ts",
+        "src/shared/workspace-layout/workspace-layout-view-prune.ts",
+        "src/shared/workspace-layout/workspace-layout-view-tab-closes.ts",
         "src/shared/workspace-session-schema.ts",
         "src/shared/workspace-session-tab-group-schema.ts"
       ],
@@ -131,6 +136,8 @@
         "src/renderer/src/components/tab-group/tab-insertion.test.ts",
         "src/renderer/src/store/slices/tabs-hydration-group-validation.test.ts",
         "src/renderer/src/store/slices/tabs-pane-layout-operations.test.ts",
+        "src/shared/workspace-layout/workspace-layout-fact-locations.test.ts",
+        "src/shared/workspace-layout/workspace-layout-strip-orientation.test.ts",
         "src/shared/workspace-session-schema.test.ts",
         "src/shared/workspace-session-strip-orientation.test.ts",
         "src/shared/workspace-session-tab-group-schema.test.ts"
@@ -245,7 +252,6 @@
       "commits": ["dcc5e6a9b4"],
       "paths": [
         "config/scripts/run-ssh-docker-e2e.mjs",
-        "src/main/ipc/worktrees/metadata/workspace-lineage-filtering.ts",
         "src/main/runtime/runtime-worktree-lineage-controller.ts",
         "src/renderer/src/components/new-workspace/ComposerParentWorktreePicker.tsx",
         "src/renderer/src/components/sidebar/child-workspaces-toggle-target.ts",
@@ -281,27 +287,29 @@
       "checks": [],
       "appProof": {
         "surface": "desktop",
-        "steps": "Needs one project registered on two hosts: a local checkout and an SSH checkout with the same git origin (Docker sshd relay target via tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox). Launch the app hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode (window.__store exposed), attach Playwright over CDP, wait until both main worktrees report the same projectId, call window.__store.getState().setGroupBy(\"repo\"), then drag the card [data-worktree-drag-id=<ssh id>] onto [data-worktree-card-parent-content] of the local card with CDP mouse events. The AFTER screenshot should show the local card with a \"Hide 1 child workspace\" chip and the SSH workspace indented one level beneath it; check worktreeLineageById[sshId].parentWorktreeId equals the local id. BEFORE screenshot is the same view with both cards at depth 0. Then open the delete dialog on the local parent: the \"delete with children\" list must not include the SSH child. Restart the app and confirm the nesting survives (hydration lists the edge under the SSH host snapshot)."
+        "steps": "Needs one project registered on two hosts: a local checkout and an SSH checkout with the same git origin (Docker sshd relay target via tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox). Launch the app hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode (window.__store exposed), attach Playwright over CDP, wait until both main worktrees report the same projectId, call window.__store.getState().setGroupBy(\"repo\"), then drag the card [data-worktree-drag-id=<ssh id>] onto [data-worktree-card-parent-content] of the local card with CDP mouse events. The AFTER screenshot should show the local card with a \"Hide 1 child workspace\" chip and the SSH workspace indented one level beneath it; check worktreeLineageById[sshId].parentWorktreeId equals the local id. BEFORE screenshot is the same view with both cards at depth 0. Then open the delete dialog on the local parent: the \"delete with children\" list must not include the SSH child. Restart the app and confirm the nesting survives (worktrees:listLineage returns the edge after restart)."
       }
     },
     {
       "id": "ssh-okta-verify-ports",
       "title": "Okta Verify ports forwarded to the desktop from SSH tabs",
       "commits": ["a47cabfa5d"],
-      "paths": ["src/main/browser/browser-route-session-policy.ts"],
+      "paths": [
+        "src/main/browser/browser-route-session-policy.ts",
+        "tests/e2e/helpers/okta-verify-desktop-stub.ts"
+      ],
       "unit": [
-        "config/scripts/ssh-browser-e2e-routing.test.mjs",
         "src/main/browser/browser-route-session-policy.electron.test.ts",
         "src/main/browser/browser-route-session-policy.test.ts",
         "src/main/browser/browser-route-session-registry.test.ts"
       ],
       "unitSupport": [],
       "mobile": [],
-      "e2e": ["tests/e2e/local-ssh-browser-routing.spec.ts"],
+      "e2e": ["tests/e2e/ssh-orcad-browser-routing.spec.ts"],
       "checks": [
         {
-          "name": "local SSH browser routing e2e",
-          "cmd": ["node", "config/scripts/run-local-ssh-browser-routing-e2e.mjs"],
+          "name": "SSH docker e2e (orcad browser routing incl. Okta Verify ports)",
+          "cmd": ["node", "config/scripts/run-ssh-docker-e2e.mjs"],
           "requires": ["docker"]
         }
       ],
@@ -320,8 +328,10 @@
         "src/main/ipc/repos/project-host-existing-folder-setup.ts",
         "src/main/ipc/repos/project-host-mapped-setup.ts",
         "src/main/ipc/repos/project-host-setup-handlers.ts",
+        "src/main/ipc/repos/remote-home-path.ts",
         "src/main/ipc/repos/repo-ipc-arg-schemas.ts",
         "src/main/ipc/ssh-browse.ts",
+        "src/main/ssh/ssh-remote-directory-browse.ts",
         "src/preload/api/projects-bridge.ts",
         "src/preload/api/repository-api.ts",
         "src/renderer/src/components/NewWorkspaceComposerCard.tsx",
@@ -344,6 +354,7 @@
         "src/main/ipc/repos-local-add-and-project-setup.test.ts",
         "src/main/ipc/repos/project-host-mapped-local-add.test.ts",
         "src/main/ipc/repos/project-host-mapped-setup.test.ts",
+        "src/main/ipc/repos/remote-home-path.test.ts",
         "src/main/ipc/ssh-browse.test.ts",
         "src/main/ipc/ssh-project-prefix-persistence.test.ts",
         "src/renderer/src/components/NewWorkspaceComposerCard.set-location.test.tsx",
@@ -359,7 +370,7 @@
       "e2e": ["tests/e2e/ssh-project-path-prefix-setup.spec.ts"],
       "checks": [
         {
-          "name": "SSH docker e2e (all Docker-backed SSH specs, incl. the fork's three)",
+          "name": "SSH docker e2e (managed-host orcad Docker specs, incl. the fork specs)",
           "cmd": ["node", "config/scripts/run-ssh-docker-e2e.mjs"],
           "requires": ["docker"]
         }
@@ -497,7 +508,7 @@
         "mobile/src/session/use-mobile-structured-agent-session.ts",
         "src/main/runtime/rpc/methods/index.ts",
         "src/main/runtime/rpc/methods/native-chat-skills.ts",
-        "src/main/runtime/runtime-rpc/runtime-rpc-mobile-method-allowlist.ts",
+        "src/main/runtime/runtime-rpc/runtime-rpc-mobile-method-routing.ts",
         "src/renderer/src/components/native-chat/use-native-chat-skills.ts",
         "src/shared/native-chat-skill-visibility.ts",
         "src/shared/rpc-contract/native-chat-params.ts",
@@ -513,6 +524,7 @@
         "mobile/src/session/MobileNativeChatOverlay.test.ts",
         "mobile/src/session/mobile-native-chat-session-catalog.test.ts",
         "mobile/src/session/mobile-native-chat-skill-read.test.ts",
+        "mobile/src/session/use-mobile-native-chat-controller-skill-catalog.test.ts",
         "mobile/src/session/use-mobile-native-chat-controller.test.ts",
         "mobile/src/session/use-mobile-native-chat-skills.test.ts",
         "mobile/src/session/use-mobile-structured-agent-session.test.tsx"

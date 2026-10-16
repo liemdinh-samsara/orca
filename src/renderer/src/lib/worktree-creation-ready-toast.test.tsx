@@ -7,7 +7,7 @@ type ReadyToast = { title: string; label: ReactNode; onClick: () => void }
 
 const { toasts, store } = vi.hoisted(() => {
   const toasts: ReadyToast[] = []
-  const store: { repos: Pick<Repo, 'id' | 'kind'>[] } = { repos: [] }
+  const store: { repos: Pick<Repo, 'id' | 'kind' | 'inPlaceWorkspaces'>[] } = { repos: [] }
   return { toasts, store }
 })
 
@@ -72,6 +72,26 @@ describe('showWorktreeCreationReadyToast', () => {
     expect(label).toContain('lucide-external-link')
     expect(label).toContain('Go to workspace')
     expect(label).not.toContain('Go to worktree')
+  })
+
+  it('names an in-place git repo workspace a workspace, not a worktree', () => {
+    store.repos = [{ id: 'repo-1', kind: 'git', inPlaceWorkspaces: true }]
+
+    showWorktreeCreationReadyToast(worktree)
+
+    expect(toasts[0]?.title).toBe('Workspace Feature is ready')
+    const label = renderToStaticMarkup(<>{toasts[0]?.label}</>)
+    expect(label).toContain('Go to workspace')
+    expect(label).not.toContain('Go to worktree')
+  })
+
+  it('keeps the worktree wording for a git repo with in-place workspaces switched off', () => {
+    store.repos = [{ id: 'repo-1', kind: 'git', inPlaceWorkspaces: false }]
+
+    showWorktreeCreationReadyToast(worktree)
+
+    expect(toasts[0]?.title).toBe('Worktree Feature is ready')
+    expect(renderToStaticMarkup(<>{toasts[0]?.label}</>)).toContain('Go to worktree')
   })
 
   it('keeps the worktree wording when the repo is unknown', () => {

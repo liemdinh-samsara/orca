@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { removeWorktreeViaStore } from './helpers/dead-terminal'
 import { expect, test } from './helpers/orca-app'
 import { openSidebarWorkspaceComposer } from './helpers/sidebar-project-dialog'
@@ -104,5 +104,99 @@ test('creates a workspace on the project checkout and starts terminals in the st
       workspaceStartPath: undefined
     }).catch(() => undefined)
     rmSync(join(testRepoPath, startFolder), { recursive: true, force: true })
+  }
+})
+
+async function openComposerDialog(page: Page): Promise<Locator> {
+  await openSidebarWorkspaceComposer(page)
+  const dialog = page.getByRole('dialog', { name: /Create Workspace/i })
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
+async function closeComposerDialog(page: Page, dialog: Locator): Promise<void> {
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden({ timeout: 10_000 })
+}
+
+test('composer hides the git-only fields for an in-place project', async ({ orcaPage }) => {
+  test.setTimeout(120_000)
+  await waitForSessionReady(orcaPage)
+  const rootWorktreeId = await waitForActiveWorktree(orcaPage)
+  const repoId = rootWorktreeId.split('::')[0]
+
+  try {
+    // Control: the fixture project is a plain git project, so the git-only fields exist.
+    await updateActiveRepo(orcaPage, repoId, { inPlaceWorkspaces: false })
+    const gitDialog = await openComposerDialog(orcaPage)
+    await expect(gitDialog.getByText(/Create From/i).first()).toBeAttached()
+    await expect(gitDialog.getByLabel('Branch from', { exact: true })).toBeAttached()
+    await expect(gitDialog.getByText('Branch name', { exact: true })).toBeAttached()
+    await expect(gitDialog.getByText('Parent worktree', { exact: true })).toBeAttached()
+    await expect(gitDialog.getByText('Only available for local Git projects.')).toHaveCount(0)
+    await closeComposerDialog(orcaPage, gitDialog)
+
+    await updateActiveRepo(orcaPage, repoId, { inPlaceWorkspaces: true })
+    const inPlaceDialog = await openComposerDialog(orcaPage)
+    await expect(inPlaceDialog.getByText(/Workspace name/i).first()).toBeAttached()
+    await expect(inPlaceDialog.getByText(/Create From/i)).toHaveCount(0)
+    await expect(inPlaceDialog.getByLabel('Branch from', { exact: true })).toHaveCount(0)
+    await expect(inPlaceDialog.getByText('Branch name', { exact: true })).toHaveCount(0)
+    await expect(inPlaceDialog.getByText('Parent worktree', { exact: true })).toHaveCount(0)
+    // Sparse checkout stays listed but is disabled, like a folder project.
+    await expect(inPlaceDialog.getByText('Only available for local Git projects.')).toBeAttached()
+    await closeComposerDialog(orcaPage, inPlaceDialog)
+  } finally {
+    await updateActiveRepo(orcaPage, repoId, { inPlaceWorkspaces: false }).catch(() => undefined)
+  }
+})
+
+test('project settings show the in-place switch and start folder', async ({ orcaPage }) => {
+  test.setTimeout(120_000)
+  await waitForSessionReady(orcaPage)
+  const rootWorktreeId = await waitForActiveWorktree(orcaPage)
+  const repoId = rootWorktreeId.split('::')[0]
+  const startFolder = 'services/api'
+
+  try {
+    await updateActiveRepo(orcaPage, repoId, {
+      inPlaceWorkspaces: true,
+      workspaceStartPath: startFolder
+    })
+    await orcaPage.evaluate((targetRepoId) => {
+      const state = window.__store?.getState()
+      state?.setSettingsSearchQuery('')
+      state?.openSettingsTarget({ pane: 'repo', repoId: targetRepoId })
+      state?.openSettingsPage()
+    }, repoId)
+
+    const repoSettings = orcaPage.locator(`[data-settings-section="repo-${repoId}"]`)
+    await expect(repoSettings).toBeVisible({ timeout: 10_000 })
+    const inPlaceSwitch = repoSettings.getByRole('switch', {
+      name: 'Create workspaces without git worktrees'
+    })
+    await expect(inPlaceSwitch).toBeChecked()
+    await expect(repoSettings.getByPlaceholder('Project root')).toHaveValue(startFolder)
+
+    await inPlaceSwitch.click()
+    await expect(inPlaceSwitch).not.toBeChecked()
+    await expect
+      .poll(() =>
+        orcaPage.evaluate(
+          (targetRepoId) =>
+            window.__store?.getState().repos.find((repo) => repo.id === targetRepoId)
+              ?.inPlaceWorkspaces,
+          repoId
+        )
+      )
+      .toBe(false)
+  } finally {
+    await updateActiveRepo(orcaPage, repoId, {
+      inPlaceWorkspaces: false,
+      workspaceStartPath: undefined
+    }).catch(() => undefined)
+    await orcaPage
+      .evaluate(() => window.__store?.getState().setActiveView('terminal'))
+      .catch(() => undefined)
   }
 })

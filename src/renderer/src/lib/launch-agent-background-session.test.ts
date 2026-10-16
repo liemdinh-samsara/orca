@@ -307,6 +307,43 @@ describe('launchAgentBackgroundSession', () => {
     })
   })
 
+  it.each([
+    ['a git worktree', 'repo-1::/repo/worktree'],
+    [
+      'an in-place workspace instance',
+      'repo-1::/repo/worktree::workspace:123e4567-e89b-12d3-a456-426614174000'
+    ]
+  ])("spawns the agent PTY in the project's start folder for %s", async (_label, worktreeId) => {
+    // A variable skips the excess-property check on the narrow shared test-state repo type.
+    const repoWithStartFolder = {
+      id: 'repo-1',
+      connectionId: null,
+      path: '/repo',
+      workspaceStartPath: 'services/api'
+    }
+    state.repos = [repoWithStartFolder]
+    state.worktreesByRepo['repo-1'] = [
+      {
+        id: worktreeId,
+        repoId: 'repo-1',
+        projectId: 'repo-1',
+        path: '/repo/worktree',
+        displayName: 'main'
+      }
+    ]
+    const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+
+    await launchAgentBackgroundSession({
+      agent: 'claude',
+      worktreeId,
+      prompt: 'run in the start folder'
+    })
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      expect.objectContaining({ cwd: '/repo/worktree/services/api', worktreeId })
+    )
+  })
+
   it('uses WSL launch quoting for Windows-path projects forced to WSL', async () => {
     state.projects = [
       {

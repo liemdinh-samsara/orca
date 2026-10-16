@@ -247,6 +247,69 @@ describe('launchWorktreeBackgroundTerminals', () => {
     })
   })
 
+  describe('with a project start folder', () => {
+    const worktreeId = 'repo-1::/repo/worktree'
+
+    beforeEach(() => {
+      // A variable skips the excess-property check on the narrow test-state repo type.
+      const repoWithStartFolder = { id: 'repo-1', connectionId: null, workspaceStartPath: 'api' }
+      state.repos = [repoWithStartFolder]
+      state.worktreesByRepo['repo-1'] = [
+        { id: worktreeId, repoId: 'repo-1', path: '/repo/worktree', displayName: 'Worktree' }
+      ]
+    })
+
+    it('spawns default tabs in the start folder and the Setup tab at the workspace root', async () => {
+      const { launchWorktreeBackgroundTerminals } =
+        await import('./launch-worktree-background-terminals')
+
+      await launchWorktreeBackgroundTerminals({
+        worktreeId,
+        setup: setupLaunch,
+        defaultTabs: { runCommands: true, tabs: [{ title: 'Dev', command: 'pnpm dev' }] }
+      })
+
+      expect(mockSpawn).toHaveBeenCalledTimes(2)
+      expect(mockSpawn).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ cwd: '/repo/worktree/api', command: 'pnpm dev', worktreeId })
+      )
+      expect(mockSpawn).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          cwd: '/repo/worktree',
+          command: 'bash /tmp/setup.sh',
+          worktreeId
+        })
+      )
+    })
+
+    it('spawns the initial terminal in the start folder and the Setup split at the workspace root', async () => {
+      state.settings = {
+        activeRuntimeEnvironmentId: null,
+        setupScriptLaunchMode: 'split-horizontal'
+      }
+      const { launchWorktreeBackgroundTerminals } =
+        await import('./launch-worktree-background-terminals')
+
+      await launchWorktreeBackgroundTerminals({ worktreeId, setup: setupLaunch })
+
+      expect(mockSpawn).toHaveBeenCalledTimes(2)
+      expect(mockSpawn).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ cwd: '/repo/worktree/api', worktreeId })
+      )
+      expect(mockSpawn).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          cwd: '/repo/worktree',
+          command: 'bash /tmp/setup.sh',
+          placement: expect.objectContaining({ kind: 'split' })
+        })
+      )
+    })
+  })
+
   it('uses Windows setup commands for Windows SSH runner paths', async () => {
     state.repos = [{ id: 'repo-1', connectionId: 'ssh-windows' }]
     state.worktreesByRepo['repo-1'] = [

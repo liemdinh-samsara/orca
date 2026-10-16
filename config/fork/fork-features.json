@@ -505,6 +505,8 @@
         "mobile/src/session/mobile-structured-agent-session-contract.ts",
         "mobile/src/session/use-mobile-native-chat-controller.ts",
         "mobile/src/session/use-mobile-native-chat-skills.ts",
+        "mobile/src/session/use-mobile-native-chat-streaming-text.ts",
+        "mobile/src/session/use-mobile-native-chat-visual-source.ts",
         "mobile/src/session/use-mobile-structured-agent-session.ts",
         "src/main/runtime/rpc/methods/index.ts",
         "src/main/runtime/rpc/methods/native-chat-skills.ts",

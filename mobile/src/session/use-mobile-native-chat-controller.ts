@@ -7,13 +7,12 @@ import { useMobileNativeChatAskDismiss } from './use-mobile-native-chat-ask-dism
 import { useMobileNativeChatDrafts } from './use-mobile-native-chat-drafts'
 import { useMobileNativeChatFileSearch } from './use-mobile-native-chat-file-search'
 import { useMobileNativeChatMessageSend } from './use-mobile-native-chat-message-send'
-import { mobileNativeChatStreamPreview } from './mobile-native-chat-streaming-gate'
 import { useMobileNativeChatSessionOptionController } from './use-mobile-native-chat-session-option-controller'
 import { useMobileNativeChatSessionLane } from './use-mobile-native-chat-session-lane'
 import { useMobileStructuredNativeChatSendBridge } from './use-mobile-structured-native-chat-send-bridge'
 import { useMobileNativeChatPrompts } from './use-mobile-native-chat-prompts'
 import { useNativeChatAcceptedAction } from './use-native-chat-action-outcomes'
-import { useThrottledLatestValue } from './use-throttled-latest-value'
+import { useMobileNativeChatStreamingText } from './use-mobile-native-chat-streaming-text'
 import type { MobileNativeChatController } from './mobile-native-chat-controller-contract'
 import { useMobileBridgeChatPromptWrites } from './use-mobile-bridge-chat-prompt-writes'
 import { useMobileNativeChatActiveResolution } from './use-mobile-native-chat-active-resolution'
@@ -21,8 +20,6 @@ import { useMobileNativeChatPromptCards } from './use-mobile-native-chat-prompt-
 import { mobileNativeChatScopeKey } from './mobile-native-chat-scope-key'
 
 export type { MobileNativeChatController } from './mobile-native-chat-controller-contract'
-
-const NATIVE_CHAT_STREAM_THROTTLE_MS = 50
 
 /** Owns mobile native-chat state and teardown outside the already dense session
  *  route. The route remains responsible only for choosing and rendering the view. */
@@ -142,13 +139,9 @@ export function useMobileNativeChatController(args: {
     : activeTabAgentWorking
   const nativeChatAgentWorking =
     nativeChatStreamLive && (activeChatStructured || activeChatResolution != null)
-  // Throttle the streaming bubble: OpenCode emits a status frame per streamed
-  // part, and each one re-renders and re-parses the whole accumulated markdown.
-  const nativeChatStreamingText = useThrottledLatestValue(
-    activeChatStructured
-      ? undefined
-      : mobileNativeChatStreamPreview(nativeChatStatus, nativeChatAgentWorking),
-    NATIVE_CHAT_STREAM_THROTTLE_MS
+  const nativeChatStreamingText = useMobileNativeChatStreamingText(
+    activeChatStructured ? null : nativeChatStatus,
+    nativeChatAgentWorking
   )
   const {
     permission: legacyNativeChatPermission,

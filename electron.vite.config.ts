@@ -314,9 +314,7 @@ export const electronViteConfig: UserConfig = {
       createPdfjsViewerAssetsPlugin(),
       createViteCacheRetentionPlugin()
     ],
-    worker: {
-      format: 'es'
-    },
+    worker: { format: 'es' },
     build: {
       manifest: true,
       reportCompressedSize: false,

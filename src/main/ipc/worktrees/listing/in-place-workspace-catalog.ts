@@ -1,3 +1,4 @@
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import type { DetectedWorktree, Worktree } from '../../../../shared/worktree/types'
@@ -37,6 +38,21 @@ export function appendInPlaceGitWorkspaces<T extends Worktree>(
 }
 
 /** Detected-listing twin: the sidebar refresh is authoritative, so a missing row would be purged. */
+/** In-place rows for a runtime listing, run through the caller's detector on its host. */
+export function detectInPlaceGitWorkspaces<T>(
+  repo: Repo,
+  worktrees: Worktree[],
+  metadata: Readonly<Record<string, WorktreeMeta>>,
+  hostId: ExecutionHostId,
+  detect: (worktree: Worktree, meta: WorktreeMeta | null) => T
+): T[] {
+  return appendInPlaceGitWorkspaces(repo, worktrees, metadata)
+    .slice(worktrees.length)
+    .map((worktree) =>
+      detect({ ...worktree, hostId: worktree.hostId ?? hostId }, metadata[worktree.id] ?? null)
+    )
+}
+
 export function appendInPlaceDetectedGitWorkspaces<T extends DetectedWorktree>(
   store: Pick<Store, 'getSettings'>,
   repo: Repo,

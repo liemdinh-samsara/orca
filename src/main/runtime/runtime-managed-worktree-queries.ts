@@ -1,5 +1,5 @@
 import type { DetectedWorktreeListResult, Worktree } from '../../shared/worktree/types'
-import { appendInPlaceGitWorkspaces } from '../ipc/worktrees/listing/in-place-workspace-catalog'
+import { detectInPlaceGitWorkspaces } from '../ipc/worktrees/listing/in-place-workspace-catalog'
 import {
   runtimeHiddenHostIds,
   runtimeHiddenRepoIds,
@@ -187,6 +187,8 @@ export class RuntimeManagedWorktreeQueries {
     const expectedHostId = getRepoExecutionHostId(repo)
     const repoOwnerCount = store.getRepos().filter((candidate) => candidate.id === repo.id).length
     const metaById = store.getAllWorktreeMeta()
+    const detect = (worktree: Worktree, meta: WorktreeMeta | null) =>
+      this.toDetected(repo, worktree, matcher, sourceDefaultsSupported, visibilitySettings, meta)
     const detected = scan.worktrees.map((gitWorktree) => {
       const id = `${repo.id}::${gitWorktree.path}`
       const meta =
@@ -196,29 +198,10 @@ export class RuntimeManagedWorktreeQueries {
         ...mergeWorktree(repo.id, gitWorktree, meta, repo.displayName),
         hostId: repoOwnerCount === 1 ? (meta?.hostId ?? expectedHostId) : expectedHostId
       }
-      const result = this.toDetected(
-        repo,
-        worktree,
-        matcher,
-        sourceDefaultsSupported,
-        visibilitySettings,
-        meta ?? null
-      )
+      const result = detect(worktree, meta ?? null)
       return scan.ok ? result : applyMetadataFallbackVisibility(result)
     })
-    const inPlaceDetected = appendInPlaceGitWorkspaces(repo, detected, metaById)
-      .slice(detected.length)
-      .map((worktree) =>
-        this.toDetected(
-          repo,
-          { ...worktree, hostId: worktree.hostId ?? expectedHostId },
-          matcher,
-          sourceDefaultsSupported,
-          visibilitySettings,
-          metaById[worktree.id] ?? null
-        )
-      )
-    detected.push(...inPlaceDetected)
+    detected.push(...detectInPlaceGitWorkspaces(repo, detected, metaById, expectedHostId, detect))
     return {
       repoId: repo.id,
       authoritative: scan.ok && !scan.superseded,

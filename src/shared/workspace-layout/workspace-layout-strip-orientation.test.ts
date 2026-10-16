@@ -14,10 +14,10 @@ function storedSession() {
 
 function withOrientation() {
   const session = storedSession()
-  session.tabGroups[GIT_KEY] = session.tabGroups[GIT_KEY]!.map((group) =>
+  const groups = (session.tabGroups?.[GIT_KEY] ?? []).map((group) =>
     group.id === 'group-b' ? { ...group, tabStripOrientation: 'vertical' as const } : group
   )
-  return session
+  return { ...session, tabGroups: { ...session.tabGroups, [GIT_KEY]: groups } }
 }
 
 function load(session: ReturnType<typeof storedSession>) {
@@ -34,7 +34,7 @@ describe('workspace layout tab strip orientation', () => {
   it('keeps each group orientation through load and save', () => {
     const loaded = load(withOrientation())
     expect(loaded.changes).toEqual([])
-    const groups = saveWorkspaceLayout(loaded).tabGroups[GIT_KEY]!
+    const groups = saveWorkspaceLayout(loaded).tabGroups?.[GIT_KEY] ?? []
     expect(groups.find((group) => group.id === 'group-b')?.tabStripOrientation).toBe('vertical')
     expect(groups.find((group) => group.id === 'group-a')).not.toHaveProperty('tabStripOrientation')
   })

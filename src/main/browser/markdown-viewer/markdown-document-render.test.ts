@@ -24,6 +24,32 @@ describe('isMarkdownDocumentUrl', () => {
   })
 })
 
+describe('isMarkdownPath', () => {
+  it.each([
+    '/a.md',
+    '/a.markdown',
+    '/a.mdown',
+    '/a.mkd',
+    '/a.mkdn',
+    '/a.mdwn',
+    '/a.mdtxt',
+    '/a.mdtext',
+    '/a.MD',
+    '/A.MarkDown',
+    '/a.MDTEXT',
+    '/dir.with.dots/a.b.md'
+  ])('accepts %s', (path) => {
+    expect(isMarkdownPath(path)).toBe(true)
+  })
+
+  it.each(['/a.mdx', '/a.mdc', '/md', '/a.mdd', '/a.mkdnx', '/docs/', '/a.md/', '/a.md.bak', '/'])(
+    'rejects %s',
+    (path) => {
+      expect(isMarkdownPath(path)).toBe(false)
+    }
+  )
+})
+
 describe('renderMarkdownDocument', () => {
   it('renders GitHub-flavored tables, task lists and strikethrough', () => {
     const html = renderMarkdownDocument(
@@ -48,6 +74,26 @@ describe('renderMarkdownDocument', () => {
     expect(html).not.toContain('<hr>')
     expect(html).toContain('<h1>Body</h1>')
   })
+
+  it('reads CRLF front matter and a ... terminator as YAML', () => {
+    for (const source of [
+      '---\r\ntitle: Notes\r\n---\r\n# Body',
+      '---\ntitle: Notes\n...\n# Body'
+    ]) {
+      const html = renderMarkdownDocument(source)
+      expect(html).toMatch(/^<pre><code class="hljs language-yaml">/)
+      expect(html).toContain('title')
+      expect(html).not.toContain('<hr>')
+      expect(html).toContain('<h1>Body</h1>')
+    }
+  })
+
+  it('does not treat an unclosed --- block as front matter', () => {
+    const html = renderMarkdownDocument('---\ntitle: Notes\n\n# Body')
+    expect(html).not.toContain('language-yaml')
+    expect(html).toContain('<hr>')
+    expect(html).toContain('<h1>Body</h1>')
+  })
 })
 
 describe('assignHeadingIds', () => {
@@ -62,5 +108,15 @@ describe('assignHeadingIds', () => {
       'kept',
       ''
     ])
+  })
+})
+
+describe('githubHeadingSlug', () => {
+  it('keeps unicode letters, underscores and hyphens and drops other punctuation', () => {
+    expect(githubHeadingSlug('Café Über')).toBe('café-über')
+    expect(githubHeadingSlug('日本語 見出し')).toBe('日本語-見出し')
+    expect(githubHeadingSlug('snake_case and well-known')).toBe('snake_case-and-well-known')
+    expect(githubHeadingSlug('e\u0301 accent')).toBe('e\u0301-accent')
+    expect(githubHeadingSlug('Q&A: "why"? (v2.0) #1 100%')).toBe('qa-why-v20-1-100')
   })
 })

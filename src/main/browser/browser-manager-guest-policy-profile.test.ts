@@ -33,6 +33,7 @@ import { resetBrowserManagerMocks, resetBrowserManagerState } from './browser-ma
 import { getWorkspaceDocPageGuest } from './doc-preview-guest-policy'
 import { mintDocPreviewGrant, revokeAllDocPreviewGrants } from './doc-preview-grant-registry'
 import { buildDocPreviewUrl } from '../../shared/doc-preview-scheme'
+import type { PopupOwnerContext } from './browser-manager-types'
 
 type GuestFake = {
   id: number
@@ -117,6 +118,11 @@ function navigateTo(guest: GuestFake, url: string): boolean {
   return prevented
 }
 
+function attachBrowsingPolicies(guest: GuestFake, owner: PopupOwnerContext | null = null): void {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: GuestFake covers the WebContents surface the browsing policies touch.
+  browserManager.attachGuestPolicies(guest as never, owner)
+}
+
 const host = { id: 5001, send: vi.fn() } as unknown as Electron.WebContents
 
 beforeEach(() => {
@@ -161,6 +167,22 @@ describe('guest policy profiles', () => {
     expect(guest.debugger.attach).not.toHaveBeenCalled()
     expect(guest.debugger.sendCommand).not.toHaveBeenCalled()
     expect(navigateTo(guest, 'https://elsewhere.example/')).toBe(false)
+  })
+
+  // Why a count and not "fewer than a browsing guest": a sign-in child window also skips link routing,
+  // so the only dom-ready listener it could end up with is the markdown viewer's.
+  it('does not give a popup child window the markdown viewer', () => {
+    const browsing = createGuest(310, 'https://example.com/')
+    const popup = createGuest(311, 'https://accounts.example.com/')
+
+    attachBrowsingPolicies(browsing)
+    attachBrowsingPolicies(popup, {
+      browserTabId: 'tab-owner',
+      rootGuestWebContentsId: browsing.id
+    })
+
+    expect(listenerCount(browsing, 'dom-ready')).toBe(2)
+    expect(listenerCount(popup, 'dom-ready')).toBe(0)
   })
 
   it('gives a workspace-document guest none of it', () => {
@@ -234,6 +256,17 @@ describe('guest policy profiles', () => {
 
       expect(browserManager.getAuthorizedGuest(BROWSING_PAGE_ID, host.id)).toBe(browsing as never)
       expect(browserManager.getAuthorizedGuest(browserPageId, host.id)).toBe(document as never)
+    })
+
+    // Why: browsing guests have no destroyed listener of their own; unregisterGuest is what runs
+    // their policy cleanup, so a viewer listener left behind would pin the guest wrapper.
+    it('removes the markdown viewer listener when a browsing guest is unregistered', () => {
+      const guest = registerBrowsingGuest()
+      expect(listenerCount(guest, 'dom-ready')).toBe(2)
+
+      browserManager.unregisterGuest(BROWSING_PAGE_ID)
+
+      expect(listenerCount(guest, 'dom-ready')).toBe(0)
     })
 
     // Why this is the containment claim and not a lookup detail: page management, agent commands,

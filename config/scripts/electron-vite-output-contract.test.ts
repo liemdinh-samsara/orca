@@ -153,6 +153,15 @@ describe('Electron Vite output contract', () => {
     expect(electronViteConfig.main?.build?.externalizeDeps?.exclude).toContain('smol-toml')
   })
 
+  it('registers the guest-script bundle plugin in the main build', () => {
+    // Why: without it, the `?guest-script` import behind the markdown viewer has no loader.
+    const pluginNames = (electronViteConfig.main?.plugins ?? []).flatMap((plugin) =>
+      typeof plugin === 'object' && plugin !== null && 'name' in plugin ? [plugin.name] : []
+    )
+
+    expect(pluginNames).toContain('orca-guest-script-bundle')
+  })
+
   it('bundles validation dependencies used by the sandboxed preload', () => {
     expect(electronViteConfig.preload?.build?.externalizeDeps?.exclude).toContain('zod')
   })

@@ -2,12 +2,15 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountMarkdownViewer } from './markdown-viewer-mount'
+import { MARKDOWN_VIEWER_STYLES } from './markdown-viewer-styles'
 
 // Why: DOMPurify misbehaves under happy-dom (drops headings, keeps handlers); the e2e spec checks
 // sanitization in Chromium, so these cases cover mounting only.
 vi.mock('dompurify', () => ({ default: { sanitize: (html: string) => html } }))
 
 const LABELS = { showSource: 'Show source', showRendered: 'Show rendered' }
+// Mirrors MAX_MARKDOWN_SOURCE_LENGTH in the mount module, which is not exported.
+const FIVE_MIB = 5 * 1024 * 1024
 
 // Why: Chromium shows a text document as a lone <pre> holding the file's text.
 // The viewer reads only the path and hash, so a same-origin URL stands in for any host.
@@ -21,6 +24,7 @@ function loadTextDocument(pathAndHash: string, contentType: string, text: string
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   delete document.documentElement.dataset.orcaMarkdownView
   Reflect.deleteProperty(document, 'contentType')
 })
@@ -70,5 +74,65 @@ describe('mountMarkdownViewer', () => {
 
     mountMarkdownViewer(document, LABELS)
     expect(scrolledTo).toBe('usage')
+  })
+
+  it('renders text/x-markdown like text/markdown', () => {
+    loadTextDocument('/notes/README', 'text/x-markdown', '# Legacy type')
+
+    expect(mountMarkdownViewer(document, LABELS)).toBe('rendered')
+    expect(document.querySelector('.orca-markdown-body h1')?.textContent).toBe('Legacy type')
+  })
+
+  it('leaves a document over 5 MiB as raw text', () => {
+    loadTextDocument('/README.md', 'text/plain', 'a'.repeat(FIVE_MIB + 1))
+
+    expect(mountMarkdownViewer(document, LABELS)).toBe('too-large')
+    expect(document.querySelector('.orca-markdown-body')).toBeNull()
+    expect(document.querySelector('.orca-markdown-toggle')).toBeNull()
+    expect(document.documentElement.dataset.orcaMarkdownView).toBeUndefined()
+  })
+
+  it('still renders a document of exactly 5 MiB', () => {
+    loadTextDocument('/README.md', 'text/plain', 'a'.repeat(FIVE_MIB))
+
+    expect(mountMarkdownViewer(document, LABELS)).toBe('rendered')
+  })
+
+  it('ignores a malformed escape in the hash instead of failing the mount', () => {
+    loadTextDocument('/README.md#%E0%A4%A', 'text/plain', '# Intro\n\n## Usage')
+    expect(document.location.hash).toBe('#%E0%A4%A')
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
+
+    expect(mountMarkdownViewer(document, LABELS)).toBe('rendered')
+    expect(scroll).not.toHaveBeenCalled()
+    expect(document.documentElement.dataset.orcaMarkdownView).toBe('rendered')
+  })
+
+  it('decodes an escaped hash before looking for its heading', () => {
+    loadTextDocument('/README.md#caf%C3%A9', 'text/plain', '# Café')
+    const scrolledTo: string[] = []
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      scrolledTo.push(this.id)
+    })
+
+    mountMarkdownViewer(document, LABELS)
+    expect(scrolledTo).toEqual(['café'])
+  })
+
+  it('puts the toggle beside the article and the stylesheet in the head', () => {
+    loadTextDocument('/README.md', 'text/plain', '# Title')
+
+    mountMarkdownViewer(document, LABELS)
+    const article = document.querySelector('.orca-markdown-body')
+    const toggle = document.querySelector('.orca-markdown-toggle')
+    expect(toggle?.parentElement).toBe(document.body)
+    expect(article?.parentElement).toBe(document.body)
+    expect(article?.contains(toggle)).toBe(false)
+    expect(toggle?.textContent).toBe('Show source')
+    expect(document.head.querySelectorAll('style')).toHaveLength(1)
+    expect(document.head.querySelector('style')?.textContent).toBe(MARKDOWN_VIEWER_STYLES)
+    expect(document.body.querySelector('style')).toBeNull()
   })
 })

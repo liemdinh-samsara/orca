@@ -12,6 +12,7 @@
       "title": "In-place workspaces and a per-project start folder",
       "commits": ["8bd780e457", "2801dcb907"],
       "paths": [
+        "config/scripts/vitest-sqlite-runtime-files.mjs",
         "src/main/ipc/repos/local-repo-registration.ts",
         "src/main/ipc/repos/repo-update-handler.ts",
         "src/main/ipc/worktrees/create/register-worktree-create-handlers.ts",
@@ -324,6 +325,7 @@
       "commits": ["9e00973280"],
       "paths": [
         "config/scripts/run-ssh-docker-e2e.mjs",
+        "config/scripts/vitest-sqlite-runtime-files.mjs",
         "src/main/ipc/repos.ts",
         "src/main/ipc/repos/project-host-existing-folder-setup.ts",
         "src/main/ipc/repos/project-host-mapped-setup.ts",

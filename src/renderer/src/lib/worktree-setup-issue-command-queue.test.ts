@@ -83,17 +83,15 @@ describe('queueSetupAndIssueCommands setup cwd', () => {
     )
 
     expect(store.createTab).toHaveBeenCalledTimes(1)
+    // The setup command rides on createTab's pendingStartup, so it runs in that root-cwd tab.
     expect(store.createTab).toHaveBeenCalledWith(WORKTREE_ID, undefined, undefined, {
       recordInteraction: false,
-      startupCwd: '/projects/mono'
+      startupCwd: '/projects/mono',
+      pendingStartup: expect.objectContaining({ env: setup.envVars })
     })
     expect(store.setTabCustomTitle).toHaveBeenCalledWith('setup-tab', 'Setup', {
       recordInteraction: false
     })
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'setup-tab',
-      expect.objectContaining({ env: setup.envVars })
-    )
   })
 
   it('adds no startupCwd override when the repo has no start folder', () => {

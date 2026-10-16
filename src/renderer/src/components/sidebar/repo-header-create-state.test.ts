@@ -49,7 +49,7 @@ describe('repo header create state', () => {
       getRepoHeaderCreateState({
         repo: makeRepo({ inPlaceWorkspaces: true }),
         label: 'monorepo',
-        sshStatus: null
+        sshGate: { connectionId: null, status: null }
       })
     ).toEqual({
       disabled: false,
@@ -64,7 +64,7 @@ describe('repo header create state', () => {
       getRepoHeaderCreateState({
         repo: makeRepo({ inPlaceWorkspaces: false }),
         label: 'orca',
-        sshStatus: null
+        sshGate: { connectionId: null, status: null }
       })
     ).toMatchObject({
       tooltip: 'Create new worktree for orca',
@@ -77,7 +77,7 @@ describe('repo header create state', () => {
       getRepoHeaderCreateState({
         repo: makeRepo({ connectionId: 'ssh-1', inPlaceWorkspaces: true }),
         label: 'remote-mono',
-        sshStatus: 'connected'
+        sshGate: { connectionId: 'ssh-1', status: 'connected' }
       })
     ).toMatchObject({
       disabled: false,
@@ -91,7 +91,7 @@ describe('repo header create state', () => {
       getRepoHeaderCreateState({
         repo: makeRepo({ connectionId: 'ssh-1', inPlaceWorkspaces: true }),
         label: 'remote-mono',
-        sshStatus: 'disconnected'
+        sshGate: { connectionId: 'ssh-1', status: 'disconnected' }
       })
     ).toEqual({
       disabled: true,

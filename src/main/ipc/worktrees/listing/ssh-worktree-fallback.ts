@@ -6,6 +6,8 @@ import {
   getWorktreePathBasenameFromId
 } from '../../../../shared/worktree/id'
 import type { Repo } from '../../../../shared/repo-types'
+import { isInPlaceWorkspaceInstanceId } from '../../../../shared/in-place-workspaces'
+import { mergeFolderWorkspace } from '../folder-workspace-model'
 import type { GitWorktreeInfo, DetectedWorktree, Worktree } from '../../../../shared/worktree/types'
 import type { Store } from '../../../persistence/loading-store/store'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
@@ -122,12 +124,15 @@ export function listDisconnectedSshWorktrees(
     // applied to a REMOTE path — a Windows remote then renders its whole C:\... path as the name. Rows must
     // stay per-directory (repo.displayName would title every row identically), so use the separator-agnostic
     // basename instead.
-    const worktree = mergeWorktree(
-      repo.id,
-      synthesizeSshGitWorktree(repo, candidate.path, meta),
-      meta,
-      getWorktreePathBasenameFromId(candidate.id) ?? undefined
-    )
+    // Why: an in-place workspace id is not a path; the entry shares the project checkout.
+    const worktree = isInPlaceWorkspaceInstanceId(candidate.id)
+      ? { ...mergeFolderWorkspace(repo, candidate.id, meta), hostId: meta.hostId ?? expectedHostId }
+      : mergeWorktree(
+          repo.id,
+          synthesizeSshGitWorktree(repo, candidate.path, meta),
+          meta,
+          getWorktreePathBasenameFromId(candidate.id) ?? undefined
+        )
     byWorktreeId.delete(worktree.id)
     byWorktreeId.set(worktree.id, worktree)
   }

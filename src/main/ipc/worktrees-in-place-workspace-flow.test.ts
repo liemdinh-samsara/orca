@@ -6,8 +6,7 @@ import { makeWorktreeMeta } from './worktrees-test-fixtures'
 import {
   addWorktreeMock,
   listWorktreesMock,
-  removeWorktreeMock,
-  getSshGitProviderMock
+  removeWorktreeMock
 } from './worktrees-test-module-mocks'
 import * as nestedRemoval from './worktrees/removal/nested-worktree-removal'
 
@@ -198,7 +197,7 @@ describe('in-place git workspace removal', () => {
 
 describe('in-place git workspace IPC listings', () => {
   it.each([null, 'ssh-1'])(
-    'includes instance rows in visible and authoritative detected listings on host %s',
+    'includes instance rows in visible and detected listings on host %s',
     async (connectionId) => {
       const owner = { ...repo, connectionId, inPlaceWorkspaces: true }
       store.getRepo.mockReturnValue(owner)
@@ -217,15 +216,35 @@ describe('in-place git workspace IPC listings', () => {
         isMainWorktree: true
       }
       listWorktreesMock.mockResolvedValue([root])
-      const providerScan = vi.fn().mockResolvedValue([root])
-      getSshGitProviderMock.mockReturnValue({ listWorktrees: providerScan })
 
       const visible = await handlers['worktrees:list'](null, { repoId: repo.id })
+      const detected = await handlers['worktrees:listDetected'](null, { repoId: repo.id })
+      if (connectionId) {
+        // An unserved SSH host lists from metadata; the instance row keeps the checkout path.
+        expect(visible).toEqual([
+          expect.objectContaining({ id: instanceId, path: repo.path, displayName: 'api', hostId })
+        ])
+        expect(detected).toMatchObject({
+          authoritative: false,
+          source: 'metadata-fallback',
+          worktrees: [
+            expect.objectContaining({
+              id: instanceId,
+              path: repo.path,
+              isMainWorktree: false,
+              displayName: 'api',
+              instanceId: 'api-instance',
+              hostId
+            })
+          ]
+        })
+        expect(listWorktreesMock).not.toHaveBeenCalled()
+        return
+      }
       expect(visible).toEqual([
         expect.objectContaining({ id: `${repo.id}::${repo.path}` }),
         expect.objectContaining({ id: instanceId, path: repo.path, displayName: 'api', hostId })
       ])
-      const detected = await handlers['worktrees:listDetected'](null, { repoId: repo.id })
       expect(detected).toMatchObject({
         authoritative: true,
         worktrees: [
@@ -240,13 +259,7 @@ describe('in-place git workspace IPC listings', () => {
           })
         ]
       })
-      if (connectionId) {
-        expect(providerScan).toHaveBeenCalledWith(repo.path, expect.anything())
-        expect(listWorktreesMock).not.toHaveBeenCalled()
-      } else {
-        expect(listWorktreesMock).toHaveBeenCalled()
-        expect(providerScan).not.toHaveBeenCalled()
-      }
+      expect(listWorktreesMock).toHaveBeenCalled()
     }
   )
 })

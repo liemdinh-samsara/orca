@@ -36,6 +36,9 @@ test('reopens a closed file from another editor tab context menu', async ({
   await closedTab.hover()
   await closedTab.getByRole('button', { name: 'Close tab', exact: true }).click()
   await expect(closedTab).toHaveCount(0)
+  // Why: the editor refocuses the remaining file after a close, which dismisses a menu opened mid-swap.
+  await expect(orcaPage.locator('.editor-header-path').first()).toContainText('index.ts')
+  await expect(orcaPage.locator('.monaco-editor.focused')).toHaveCount(1)
 
   await remainingTab.click({ button: 'right' })
   const reopen = orcaPage.getByRole('menuitem', { name: /Reopen Closed Tab/ })

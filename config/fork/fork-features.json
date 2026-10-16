@@ -8,20 +8,655 @@
   "exempt": ["**/*.md", "docs/**"],
   "features": [
     {
+      "id": "in-place-workspaces",
+      "title": "In-place workspaces and a per-project start folder",
+      "commits": ["8bd780e457", "2801dcb907"],
+      "paths": [
+        "src/main/ipc/repos/local-repo-registration.ts",
+        "src/main/ipc/repos/repo-update-handler.ts",
+        "src/main/ipc/worktrees/create/register-worktree-create-handlers.ts",
+        "src/main/ipc/worktrees/listing/detected-provider-listing.ts",
+        "src/main/ipc/worktrees/listing/in-place-workspace-catalog.ts",
+        "src/main/ipc/worktrees/listing/register-worktree-catalog-handlers.ts",
+        "src/main/ipc/worktrees/removal/execute-worktree-removal.ts",
+        "src/main/ipc/worktrees/removal/register-worktree-removal-handlers.ts",
+        "src/main/persistence/loading-store/repo-lifecycle-operations.ts",
+        "src/main/persistence/tracking-repos/repo-update-operations.ts",
+        "src/main/project-start-folder-cwd.ts",
+        "src/main/runtime/orca-runtime-create-managed-worktree.ts",
+        "src/main/runtime/orca-runtime-get-worktree-ps.ts",
+        "src/main/runtime/orca-runtime-remove-orphan-or-folder-worktree.ts",
+        "src/main/runtime/orca-runtime-resolve-browser-network-execution-host-for-worktree.ts",
+        "src/main/runtime/repo-worktree-row-resolution.ts",
+        "src/main/runtime/runtime-managed-worktree-queries.ts",
+        "src/main/runtime/runtime-repository-settings-controller.ts",
+        "src/main/runtime/runtime-worktree-terminal-provisioning.ts",
+        "src/main/worktree-lineage-pruning.ts",
+        "src/renderer/src/components/TerminalLegacyTerminalPanes.tsx",
+        "src/renderer/src/components/settings/RepositoryPane.tsx",
+        "src/renderer/src/components/settings/RepositoryWorkspaceModeSection.tsx",
+        "src/renderer/src/components/settings/repository-git-worktree-search-entries.ts",
+        "src/renderer/src/components/sidebar/delete-worktree-dialog-copy.ts",
+        "src/renderer/src/components/sidebar/repo-header-create-state.ts",
+        "src/renderer/src/components/terminal-pane/TerminalOverlaySlot.tsx",
+        "src/renderer/src/hooks/composer-state/runtime-target-selection.ts",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/renderer/src/lib/launch-agent-background-session.ts",
+        "src/renderer/src/lib/launch-worktree-background-terminals.ts",
+        "src/renderer/src/lib/workspace-start-cwd.ts",
+        "src/renderer/src/lib/worktree-creation-ready-toast.tsx",
+        "src/renderer/src/lib/worktree-setup-issue-command-queue.ts",
+        "src/renderer/src/store/repos/repo-state.ts",
+        "src/shared/in-place-workspaces.ts",
+        "src/shared/repo-types.ts",
+        "src/shared/rpc-contract/repo-update-params.ts",
+        "src/shared/workspace-start-path.ts",
+        "tests/e2e/helpers/orca-app.ts",
+        "tests/e2e/helpers/orca-restart.ts"
+      ],
+      "unit": [
+        "src/main/ipc/repos-local-add-and-project-setup.test.ts",
+        "src/main/ipc/worktrees-in-place-workspace-flow.test.ts",
+        "src/main/ipc/worktrees-local-create-flow.test.ts",
+        "src/main/ipc/worktrees-removal-recovery.test.ts",
+        "src/main/ipc/worktrees/listing/in-place-workspace-catalog.test.ts",
+        "src/main/persistence-in-place-workspace-default.test.ts",
+        "src/main/persistence-repo-lifecycle.test.ts",
+        "src/main/project-start-folder-cwd.test.ts",
+        "src/main/runtime/orca-runtime-structured-session-start-folder.test.ts",
+        "src/main/runtime/orca-runtime-terminal-cwd.test.ts",
+        "src/main/runtime/repo-worktree-row-resolution.test.ts",
+        "src/main/runtime/runtime-managed-worktree-queries.test.ts",
+        "src/main/runtime/runtime-repository-settings-controller.test.ts",
+        "src/main/runtime/runtime-worktree-terminal-provisioning.test.ts",
+        "src/main/worktree-lineage-pruning.test.ts",
+        "src/renderer/src/components/settings/RepositoryWorkspaceModeSection.test.tsx",
+        "src/renderer/src/components/sidebar/delete-worktree-dialog-copy.test.ts",
+        "src/renderer/src/components/sidebar/repo-header-create-state.test.ts",
+        "src/renderer/src/components/terminal-startup-hold-placeholder.test.tsx",
+        "src/renderer/src/lib/launch-agent-background-session.test.ts",
+        "src/renderer/src/lib/launch-worktree-background-terminals.test.ts",
+        "src/renderer/src/lib/workspace-start-cwd.test.ts",
+        "src/renderer/src/lib/worktree-creation-ready-toast.test.tsx",
+        "src/renderer/src/lib/worktree-setup-issue-command-queue.test.ts",
+        "src/shared/in-place-workspaces.test.ts",
+        "src/shared/workspace-start-path.test.ts"
+      ],
+      "unitSupport": [
+        {
+          "file": "src/main/runtime/orca-runtime-tests/local-worktree-creation.spec.ts",
+          "runner": "src/main/runtime/orca-runtime.test.ts"
+        }
+      ],
+      "mobile": [],
+      "e2e": ["tests/e2e/in-place-workspace-create.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Build in e2e mode (VITE_EXPOSE_STORE=true npx electron-vite build --mode e2e) and run an untracked tests/e2e/zz-proof-in-place.spec.ts, copied from .claude/skills/orca-test-and-verify/assets/proof-shots.spec.template.ts, with SKIP_BUILD=1 ORCA_BACKGROUND_LAUNCH=1 pnpm exec playwright test --config tests/playwright.config.ts --project electron-headless so the window stays hidden and screenshots come from page.screenshot over CDP. In the fixture repo create a services/api folder, then call window.__store.getState().updateRepo(repoId, { inPlaceWorkspaces: true, workspaceStartPath: 'services/api' }). Screenshot 1: open Settings with state.openSettingsTarget({ pane: 'repo', repoId }) plus openSettingsPage(); it should show the switch Create workspaces without git worktrees turned on and the Start folder input reading services/api. Screenshot 2: open the sidebar composer (openSidebarWorkspaceComposer helper), type a name and click Create Workspace; the composer should show no branch or base fields, and the sidebar should list the root checkout row plus the new workspace row (data-worktree-id contains ::workspace:), with the header tooltip Create workspace for <project>. Screenshot 3: createTerminalTabFromMenu, execInTerminal 'pwd', and capture output ending in /services/api; record git worktree list --porcelain before and after into JSON to show no new git worktree. Screenshot 4: delete the workspace from the sidebar (dialog copy should say it only forgets the entry), then show the root row still present and services/api still on disk. For the subfolder add, call window.api.repos.add({ path: <repo>/services/api, kind: 'git' }) on a throwaway git repo and record repo.path (the git root), repo.displayName (api) and repo.workspaceStartPath. BEFORE is the same spec against an upstream/main build, where the setting is ignored: the sidebar shows a git worktree and the terminal starts at the checkout root. Use only disposable fixtures; delete the throwaway workspace and repo afterwards."
+      }
+    },
+    {
+      "id": "vertical-tab-strip",
+      "title": "Vertical tab strip per pane",
+      "commits": ["1c4ab052bb"],
+      "paths": [
+        "src/renderer/src/assets/main.css",
+        "src/renderer/src/components/tab-bar/TabBarItemRow.tsx",
+        "src/renderer/src/components/tab-bar/drop-indicator.ts",
+        "src/renderer/src/components/tab-bar/tab-bar-item-surface.tsx",
+        "src/renderer/src/components/tab-bar/tab-bar-props.ts",
+        "src/renderer/src/components/tab-bar/tab-bar-surface.tsx",
+        "src/renderer/src/components/tab-group/TabGroupPaneActionsMenu.tsx",
+        "src/renderer/src/components/tab-group/TabGroupPanel.tsx",
+        "src/renderer/src/components/tab-group/TabStripOrientationToggle.tsx",
+        "src/renderer/src/components/tab-group/tab-drag-data.ts",
+        "src/renderer/src/components/tab-group/tab-group-panel-split-target.ts",
+        "src/renderer/src/components/tab-group/tab-insertion.ts",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/renderer/src/store/slices/tabs/create-tabs-slice.ts",
+        "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts",
+        "src/renderer/src/store/slices/tabs/tabs-strip-orientation-actions.ts",
+        "src/shared/tab-types.ts",
+        "src/shared/workspace-session-schema.ts",
+        "src/shared/workspace-session-tab-group-schema.ts"
+      ],
+      "unit": [
+        "src/renderer/src/components/tab-bar/TabBar.vertical-orientation.test.ts",
+        "src/renderer/src/components/tab-bar/drop-indicator.test.ts",
+        "src/renderer/src/components/tab-group/TabGroupPaneActionsMenu.test.tsx",
+        "src/renderer/src/components/tab-group/TabGroupPanel.vertical-orientation.test.tsx",
+        "src/renderer/src/components/tab-group/TabStripOrientationToggle.test.tsx",
+        "src/renderer/src/components/tab-group/tab-group-panel-split-target.test.ts",
+        "src/renderer/src/components/tab-group/tab-insertion.test.ts",
+        "src/renderer/src/store/slices/tabs-hydration-group-validation.test.ts",
+        "src/renderer/src/store/slices/tabs-pane-layout-operations.test.ts",
+        "src/shared/workspace-session-schema.test.ts",
+        "src/shared/workspace-session-strip-orientation.test.ts",
+        "src/shared/workspace-session-tab-group-schema.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/vertical-tab-strip.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Use the e2e-mode build and an untracked tests/e2e/zz-proof-vertical-tabs.spec.ts based on proof-shots.spec.template.ts (SKIP_BUILD=1 ORCA_BACKGROUND_LAUNCH=1 playwright --project electron-headless, hidden window, page.screenshot over CDP). Reuse createBrowserSplitWithTabs from tests/e2e/vertical-tab-strip.spec.ts: ensureWorktreeRootGroup, createEmptySplitGroup(..., 'right'), then three createBrowserTab(worktreeId, 'about:blank', { targetGroupId }) calls and focusGroup. Screenshot 1 (horizontal): the right pane shows its three tabs in the normal strip. Click the button named Show tabs on the side inside [data-tab-group-strip-id=<groupId>]. Screenshot 2 should show a 13rem column on the left of that pane with a New tab row at the top, three stacked full-width rows with a 2px active marker on the left edge of the active row, and the browser body starting to the right of the column; record orientation and rect boxes to JSON. Drag the last row onto the top half of the first (mouse.down/move/up with steps) and screenshot 3 with the new order while group count stays 2. Finally click Show tabs on top and screenshot 4 showing the horizontal strip back. BEFORE (upstream/main) has no toggle button, so the same spec records only the horizontal strip."
+      }
+    },
+    {
+      "id": "local-build-skip-updates",
+      "title": "Local builds skip background update checks",
+      "commits": ["dc941c5618"],
+      "paths": ["src/main/updater/updater-setup.ts", "src/shared/app-version.ts"],
+      "unit": ["src/main/updater.startup-scheduling.test.ts", "src/shared/app-version.test.ts"],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": [],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "This is packaged-only behaviour (it depends on app.getVersion() carrying -local.<timestamp>.<commit>), so use .claude/skills/orca-test-and-verify/scripts/packaged-proof.sh against the installed local build (/Applications/Orca.app or dist/mac-*/Orca.app built by package-and-install.sh) launched hidden with ORCA_BACKGROUND_LAUNCH=1, a throwaway profile and --use-mock-keychain: packaged-proof.sh <Orca.app> <out.png> --wait-for '[aria-label=\"Update available\"]' --timeout 60000 --report-js 'Promise.all([window.api.updater.getVersion(), window.api.updater.getStatus()])'. The report should show a version containing -local. and a status that never becomes available/downloading, with found=false and a screenshot of the idle app with no Update available affordance. Then run --report-js 'window.api.updater.check().then(() => window.api.updater.getStatus())' to show an explicit check still goes to checking/idle or error rather than being blocked. BEFORE is the same script against an upstream/main packaged build (or the same app with a version stripped of the local suffix), which shows the Update available affordance after the startup check. Do not click any install button."
+      }
+    },
+    {
+      "id": "browser-okta-fastpass",
+      "title": "Okta FastPass in the built-in browser",
+      "commits": ["f54c3dbb04"],
+      "paths": [
+        "src/main/browser/browser-session-partition-policies.ts",
+        "src/main/browser/browser-session-permission-policy.ts"
+      ],
+      "unit": [
+        "src/main/browser/browser-session-partition-policies.test.ts",
+        "src/main/browser/browser-session-permission-policy.test.ts",
+        "src/main/browser/browser-session-registry.persistence.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/browser-local-network-access.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "A real Okta sign-in cannot be driven in CI or hidden screenshots, so say so in the report and prove the permission surface instead. Launch the e2e build hidden (SKIP_BUILD=1 ORCA_BACKGROUND_LAUNCH=1 playwright --project electron-headless) with an untracked zz-proof-okta.spec.ts that, like tests/e2e/browser-site-notification-mute.spec.ts, uses electronApp.evaluate to session.fromPartition('persist:orca-browser').protocol.handle('https', ...) to serve a probe page, opens it with window.__store.getState().createBrowserTab(worktreeId, 'https://okta-probe.example.test/', { activate: true }), and from the webview runs navigator.permissions.query for local-network-access and loopback-network (record state or the TypeError) and fetch('http://127.0.0.1:<port>/') against a tiny Node server started by the spec, with a screenshot of the tab. Also show the main-process side by running the focused unit tests (vitest on browser-session-registry.persistence.test.ts and the new policy tests) and quote the green output in the report. BEFORE (upstream/main) records denied/blocked for the loopback fetch and permission, AFTER records granted/success. Ask the owner to confirm the real Okta FastPass sign-in by hand."
+      }
+    },
+    {
+      "id": "browser-side-pane",
+      "title": "New browser tabs open in a right side pane",
+      "commits": ["941a1135ef"],
+      "paths": [
+        "src/renderer/src/components/use-terminal-create-actions.ts",
+        "src/renderer/src/lib/browser-side-pane-target.ts",
+        "src/renderer/src/lib/http-link-routing.ts",
+        "src/renderer/src/lib/workspace-port-actions.ts",
+        "src/renderer/src/store/slices/browser-slice-test-harness.ts",
+        "src/renderer/src/store/slices/browser/browser-side-pane-placement.ts",
+        "src/renderer/src/store/slices/browser/browser-slice-contract.ts",
+        "src/renderer/src/store/slices/browser/browser-tab-actions.ts"
+      ],
+      "unit": [
+        "src/renderer/src/components/editor/MarkdownPreview.link-routing.interaction.test.tsx",
+        "src/renderer/src/components/right-sidebar/PortsPanel.test.tsx",
+        "src/renderer/src/components/terminal-pane/terminal-link-action-routing.test.ts",
+        "src/renderer/src/components/terminal-pane/terminal-link-click-fallback.test.ts",
+        "src/renderer/src/components/terminal-pane/terminal-link-osc-url-routing.test.ts",
+        "src/renderer/src/components/terminal-pane/terminal-runtime-host-link-routing.test.ts",
+        "src/renderer/src/components/use-terminal-create-actions.test.tsx",
+        "src/renderer/src/lib/browser-side-pane-target.test.ts",
+        "src/renderer/src/lib/http-link-modifier-routing.test.ts",
+        "src/renderer/src/lib/http-link-routing.test.ts",
+        "src/renderer/src/store/slices/browser/browser-side-pane-placement.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/browser-side-pane.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Use the e2e-mode build and an untracked tests/e2e/zz-proof-browser-side-pane.spec.ts (copy of proof-shots.spec.template.ts) run with SKIP_BUILD=1 ORCA_BACKGROUND_LAUNCH=1 playwright --project electron-headless, so the window stays hidden and shots are CDP page.screenshot calls. Mirror tests/e2e/browser-side-pane.spec.ts: ensureTerminalVisible, terminalGroupId = ensureWorktreeRootGroup(worktreeId), then window.__store.getState().openNewBrowserTabInActiveWorkspace(terminalGroupId). Screenshot 1 after the first call: the terminal keeps the left half and a new right pane shows a vertical tab list with one New Browser Tab row. Record layoutByWorktree, browserGroupIds and orientationByGroup (terminal pane null, side pane 'vertical') to JSON. Call it again from the terminal group (second row appears in the same pane, still two groups) and once from the side pane group (third row) and screenshot 2. Also trigger a link route by evaluating openHttpLink-equivalent state (window.__store createBrowserTab(worktreeId, 'https://example.com/', { activate: true, placement: 'side-pane' })) and, if a local dev port is listening, openWorkspacePortInBrowser from the Ports panel, to show those land in the same pane. BEFORE (upstream/main) opens the browser as a tab beside the terminal tabs in the single pane, so the same spec records one group."
+      }
+    },
+    {
+      "id": "browser-slack-notification-mute",
+      "title": "Slack page notifications muted in the browser",
+      "commits": ["6c9afac338"],
+      "paths": [
+        "src/main/browser/browser-session-partition-policies.ts",
+        "src/main/browser/browser-session-permission-policy.ts"
+      ],
+      "unit": [
+        "src/main/browser/browser-session-partition-policies.test.ts",
+        "src/main/browser/browser-session-permission-policy.test.ts",
+        "src/main/browser/browser-session-registry.persistence.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/browser-site-notification-mute.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "The committed e2e spec is the proof template: run it as an untracked copy (tests/e2e/zz-proof-slack-mute.spec.ts) with SKIP_BUILD=1 ORCA_BACKGROUND_LAUNCH=1 playwright --project electron-headless so everything stays hidden. It registers session.fromPartition('persist:orca-browser').protocol.handle('https', ...) through electronApp.evaluate to serve a probe page, opens https://app.slack.com/client and a control https://notify.example.test/ with window.__store.getState().createBrowserTab(worktreeId, url, { activate: true }), and reads Notification.permission and await Notification.requestPermission() inside each webview. Record both pairs to JSON (Slack: denied/denied, control: granted/granted) and screenshot each tab (page.screenshot over CDP) so the page title Notify probe is visible. Also screenshot the app after the Slack request to show no permission-denied notice or banner appeared. BEFORE (upstream/main) records granted/granted for the Slack origin. Never open the real Slack web app in the proof; use the served probe page."
+      }
+    },
+    {
+      "id": "cross-host-workspace-nesting",
+      "title": "Nest one project's workspaces across hosts",
+      "commits": ["dcc5e6a9b4"],
+      "paths": [
+        "config/scripts/run-ssh-docker-e2e.mjs",
+        "src/main/ipc/worktrees/metadata/workspace-lineage-filtering.ts",
+        "src/main/runtime/runtime-worktree-lineage-controller.ts",
+        "src/renderer/src/components/new-workspace/ComposerParentWorktreePicker.tsx",
+        "src/renderer/src/components/sidebar/child-workspaces-toggle-target.ts",
+        "src/renderer/src/components/sidebar/workspace-delete-lineage.ts",
+        "src/renderer/src/components/sidebar/worktree-lineage-projection.ts",
+        "src/renderer/src/components/sidebar/worktree-parent-candidates.ts",
+        "src/shared/resolved-worktree-lineage.ts"
+      ],
+      "unit": [
+        "src/main/ipc/worktree-create-lineage.test.ts",
+        "src/main/ipc/worktrees-lineage-hydration.test.ts",
+        "src/main/runtime/orca-runtime.test.ts",
+        "src/renderer/src/components/sidebar/child-workspaces-toggle-target.test.ts",
+        "src/renderer/src/components/sidebar/workspace-delete-lineage.test.ts",
+        "src/renderer/src/components/sidebar/worktree-lineage-projection.test.ts",
+        "src/renderer/src/components/sidebar/worktree-list-groups-lineage-nesting.test.ts",
+        "src/renderer/src/components/sidebar/worktree-parent-eligibility.test.ts",
+        "src/renderer/src/components/sidebar/worktree-reveal-group-keys.test.ts",
+        "src/shared/resolved-worktree-lineage.test.ts"
+      ],
+      "unitSupport": [
+        {
+          "file": "src/main/runtime/orca-runtime-tests/lineage-and-scan-cache.spec.ts",
+          "runner": "src/main/runtime/orca-runtime.test.ts"
+        },
+        {
+          "file": "src/main/runtime/orca-runtime-tests/lineage-cross-repo-project.spec.ts",
+          "runner": "src/main/runtime/orca-runtime.test.ts"
+        }
+      ],
+      "mobile": [],
+      "e2e": ["tests/e2e/ssh-cross-host-workspace-nesting.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Needs one project registered on two hosts: a local checkout and an SSH checkout with the same git origin (Docker sshd relay target via tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox). Launch the app hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode (window.__store exposed), attach Playwright over CDP, wait until both main worktrees report the same projectId, call window.__store.getState().setGroupBy(\"repo\"), then drag the card [data-worktree-drag-id=<ssh id>] onto [data-worktree-card-parent-content] of the local card with CDP mouse events. The AFTER screenshot should show the local card with a \"Hide 1 child workspace\" chip and the SSH workspace indented one level beneath it; check worktreeLineageById[sshId].parentWorktreeId equals the local id. BEFORE screenshot is the same view with both cards at depth 0. Then open the delete dialog on the local parent: the \"delete with children\" list must not include the SSH child. Restart the app and confirm the nesting survives (hydration lists the edge under the SSH host snapshot)."
+      }
+    },
+    {
+      "id": "ssh-okta-verify-ports",
+      "title": "Okta Verify ports forwarded to the desktop from SSH tabs",
+      "commits": ["a47cabfa5d"],
+      "paths": ["src/main/browser/browser-route-session-policy.ts"],
+      "unit": [
+        "config/scripts/ssh-browser-e2e-routing.test.mjs",
+        "src/main/browser/browser-route-session-policy.electron.test.ts",
+        "src/main/browser/browser-route-session-policy.test.ts",
+        "src/main/browser/browser-route-session-registry.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/local-ssh-browser-routing.spec.ts"],
+      "checks": [
+        {
+          "name": "local SSH browser routing e2e",
+          "cmd": ["node", "config/scripts/run-local-ssh-browser-routing-e2e.mjs"],
+          "requires": ["docker"]
+        }
+      ],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Needs an SSH host (Docker sshd relay target or real devbox) connected in Orca with a workspace on it, and the setting that routes SSH-workspace browser tabs through the SSH host (Settings, Browser, SSH workspace routing) left on. Launch hidden with ORCA_BACKGROUND_LAUNCH=1 and e2e mode, attach over CDP. On the desktop start a small http stub on 127.0.0.1:65123 (or the first free Okta port from the end of the list) answering \"desktop-authenticator\" with access-control-allow-origin: *. In the SSH workspace create a browser tab with window.__store.getState().createBrowserTab(worktreeId, url, {activate: true}), then run fetch(\"http://127.0.0.1:65123/probe\") inside the guest via the webview executeJavaScript and fetch(\"http://127.0.0.1:18080/...\") against a port that only the SSH host serves. Expected: the first returns desktop-authenticator, the second lands in the SSH host fixture log. Capture the evaluated values plus a CDP screenshot of the browser tab as proof. A real Okta FastPass sign-in cannot be proven without Okta Verify installed, so say so in the report."
+      }
+    },
+    {
+      "id": "ssh-project-mapped-path",
+      "title": "SSH hosts set up at the project's mapped path",
+      "commits": ["9e00973280"],
+      "paths": [
+        "config/scripts/run-ssh-docker-e2e.mjs",
+        "src/main/ipc/repos.ts",
+        "src/main/ipc/repos/project-host-existing-folder-setup.ts",
+        "src/main/ipc/repos/project-host-mapped-setup.ts",
+        "src/main/ipc/repos/project-host-setup-handlers.ts",
+        "src/main/ipc/repos/repo-ipc-arg-schemas.ts",
+        "src/main/ipc/ssh-browse.ts",
+        "src/preload/api/projects-bridge.ts",
+        "src/preload/api/repository-api.ts",
+        "src/renderer/src/components/NewWorkspaceComposerCard.tsx",
+        "src/renderer/src/components/new-workspace/SetProjectLocationDialog.tsx",
+        "src/renderer/src/components/settings/SshHostAdvancedFields.tsx",
+        "src/renderer/src/components/settings/SshProjectPathPrefixField.tsx",
+        "src/renderer/src/components/settings/ssh-target-draft.ts",
+        "src/renderer/src/components/settings/ssh-target-save-payload.ts",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/renderer/src/store/projects/project-host-mapped-setup-actions.ts",
+        "src/renderer/src/store/projects/project-host-setup-actions.ts",
+        "src/renderer/src/store/projects/project-host-setup-result-merge.ts",
+        "src/renderer/src/store/repos/repo-state.ts",
+        "src/renderer/src/store/slices/repos.ts",
+        "src/shared/project-host-path-mapping.ts",
+        "src/shared/project-types.ts",
+        "src/shared/ssh-types.ts"
+      ],
+      "unit": [
+        "src/main/ipc/repos-local-add-and-project-setup.test.ts",
+        "src/main/ipc/repos/project-host-mapped-local-add.test.ts",
+        "src/main/ipc/repos/project-host-mapped-setup.test.ts",
+        "src/main/ipc/ssh-browse.test.ts",
+        "src/main/ipc/ssh-project-prefix-persistence.test.ts",
+        "src/renderer/src/components/NewWorkspaceComposerCard.set-location.test.tsx",
+        "src/renderer/src/components/new-workspace/SetProjectLocationDialog.test.tsx",
+        "src/renderer/src/components/settings/SshTargetForm.test.tsx",
+        "src/renderer/src/components/settings/ssh-target-draft.test.ts",
+        "src/renderer/src/components/settings/ssh-target-save-payload.test.ts",
+        "src/renderer/src/store/slices/repos-project-mapped-setup.test.ts",
+        "src/shared/project-host-path-mapping.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/ssh-project-path-prefix-setup.spec.ts"],
+      "checks": [
+        {
+          "name": "SSH docker e2e (all Docker-backed SSH specs, incl. the fork's three)",
+          "cmd": ["node", "config/scripts/run-ssh-docker-e2e.mjs"],
+          "requires": ["docker"]
+        }
+      ],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Needs a local checkout under $HOME (for example ~/co/mono_projects with a github origin) and an SSH host whose home mirrors it (Docker sshd relay target from tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox), both registered as the same project. Launch hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode, attach over CDP. In Settings, SSH, edit the host, Advanced, set Project path prefix (or leave it empty for home) and save. Open the composer with window.__store.getState().openModal(\"new-workspace-composer\", {}), click Browse run targets, click \"Set project location on <host>\". Case A (nothing on the host): the Set project location dialog opens on the existing-folder form with the mapped path prefilled and the hint \"Nothing was found at the matching path on <host>\" - screenshot it. Case B (create the folder and git checkout on the host first): the dialog does not open, a toast \"Project set up on <host>\" appears with the start folder, and window.__store.getState().projectHostSetups has a ready entry for the ssh host whose repo carries the same workspaceStartPath/inPlaceWorkspaces; then Create workspace produces a sub workspace under that path. Delete the throwaway host setup afterwards."
+      }
+    },
+    {
+      "id": "ssh-local-terminal",
+      "title": "Local terminal in the SSH workspace tab menu",
+      "commits": ["bb59cf22b9"],
+      "paths": [
+        "config/scripts/run-ssh-docker-e2e.mjs",
+        "src/renderer/src/components/tab-bar/TabBar.tsx",
+        "src/renderer/src/components/tab-bar/tab-bar-static-create-menu.tsx",
+        "src/renderer/src/components/tab-bar/tab-bar-surface.tsx",
+        "src/renderer/src/components/tab-bar/tab-create-menu-options.ts",
+        "src/renderer/src/components/tab-bar/use-tab-bar-local-terminal-menu.ts",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/renderer/src/lib/floating-workspace-tab-creation.ts",
+        "src/renderer/src/lib/local-terminal-for-remote-workspace.ts"
+      ],
+      "unit": [
+        "src/renderer/src/components/tab-bar/TabBar.local-terminal.test.ts",
+        "src/renderer/src/components/tab-bar/tab-create-menu-options.test.ts",
+        "src/renderer/src/components/tab-bar/use-tab-bar-local-terminal-menu.test.ts",
+        "src/renderer/src/lib/floating-workspace-terminal-actions.test.ts",
+        "src/renderer/src/lib/local-terminal-for-remote-workspace.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/ssh-local-terminal-from-remote-workspace.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Needs a workspace running on an SSH host (Docker sshd relay target from tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox) and a local checkout of the same project (same git origin) so both belong to one project. Launch hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode and attach over CDP. Activate the SSH workspace, click the \"New tab\" button, and in the menu click \"New Local Terminal\" (BEFORE screenshot: same menu on a local workspace has no such item). AFTER screenshot: the floating terminal panel ([data-floating-terminal-panel][aria-hidden=\"false\"]) is visible with a new tab; window.__store.getState().tabsByWorktree[\"global-floating-terminal\"].at(-1).startupCwd equals the local checkout start folder; write \"echo cwd=$(pwd -P)\" through window.api.pty.write on that tab pty and read the serialized pane text for the local path; the SSH workspace tab count is unchanged and it is still active. Kill the extra floating tab afterwards."
+      }
+    },
+    {
+      "id": "browser-mouse-side-buttons",
+      "title": "Mouse side buttons navigate browser tabs",
+      "commits": ["d3d5c6ca2f"],
+      "paths": [
+        "src/main/browser/browser-guest-side-button-navigation.ts",
+        "src/main/browser/browser-manager-bindings.ts"
+      ],
+      "unit": [
+        "src/main/browser/browser-guest-side-button-navigation.test.ts",
+        "src/main/browser/browser-manager-guest-lifecycle.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/browser-mouse-side-buttons.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "No special host needed. Launch the desktop app hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode and attach Playwright over CDP (do not use computer-use). Start a local http server with two pages (/a and /b), create a browser tab with window.__store.getState().createBrowserTab(worktreeId, url, { activate: true }), navigate the guest to /b, then dispatch CDP Input.dispatchMouseEvent mousePressed/mouseReleased with button \"back\" (buttons 8) at the centre of [data-browser-overlay-tab-id=<id>] webview. BEFORE (revert the fix or use the stock build): the guest stays on /b. AFTER: the guest URL returns to /a (screenshot shows Page A) and a \"forward\" click (buttons 16) returns to /b (screenshot shows Page B). A physical mouse cannot be used with the hidden window, so state that the proof uses synthesised side-button events."
+      }
+    },
+    {
+      "id": "browser-markdown-viewer",
+      "title": "Markdown files render in browser tabs",
+      "commits": ["8c91748bed"],
+      "paths": [
+        "config/build-plugins/guest-script-bundle.ts",
+        "electron.vite.config.ts",
+        "package.json",
+        "pnpm-lock.yaml",
+        "src/main/browser/browser-guest-markdown-viewer.ts",
+        "src/main/browser/browser-manager-guest-policy.ts",
+        "src/main/browser/markdown-viewer/markdown-document-path.ts",
+        "src/main/browser/markdown-viewer/markdown-document-render.ts",
+        "src/main/browser/markdown-viewer/markdown-viewer-guest-entry.ts",
+        "src/main/browser/markdown-viewer/markdown-viewer-mount.ts",
+        "src/main/browser/markdown-viewer/markdown-viewer-styles.ts",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/shared/guest-script-bundle.ts",
+        "src/types/guest-script-modules.ts"
+      ],
+      "unit": [
+        "config/scripts/electron-vite-output-contract.test.ts",
+        "config/scripts/guest-script-bundle.test.ts",
+        "src/main/browser/browser-guest-markdown-viewer.test.ts",
+        "src/main/browser/browser-manager-guest-policy-profile.test.ts",
+        "src/main/browser/markdown-viewer/markdown-document-render.test.ts",
+        "src/main/browser/markdown-viewer/markdown-viewer-mount.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/browser-markdown-viewer.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "No special host needed. Launch the desktop app hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode and attach over CDP. Serve a README.md as text/plain from a local http server (headings, a table, a ts fenced block, a task list, plus hostile html: <img onerror>, javascript: link, <script>), also try a file:// README. Create a browser tab with window.__store.getState().createBrowserTab(worktreeId, url, { activate: true }). BEFORE (stock build or the tab URL on a .txt path): the tab shows raw monospace markdown text. AFTER screenshot: the same URL shows the rendered GitHub-style page (h1 with underline, table, highlighted code) with a \"Show source\" button in the corner; document.title stays unchanged (no script ran). Click the button and screenshot again: raw text with \"Show rendered\". Click the relative guide.md link and confirm it renders in the same tab, and that Back returns to the first page still rendered."
+      }
+    },
+    {
+      "id": "mobile-apns-environment",
+      "title": "iOS build reports its entitled APNs environment",
+      "commits": ["6ab006ddd8", "8c1966cabf (docs only)"],
+      "paths": [
+        "mobile/app.config.js",
+        "mobile/src/notifications/push-token.ts",
+        "mobile/tests-typecheck-baseline.txt"
+      ],
+      "unit": ["config/scripts/mobile-ios-release-aps-environment.test.mjs"],
+      "unitSupport": [],
+      "mobile": [
+        "mobile/src/notifications/aps-environment-config.test.ts",
+        "mobile/src/notifications/push-token.test.ts"
+      ],
+      "e2e": [],
+      "checks": [],
+      "appProof": {
+        "surface": "mobile",
+        "steps": "iOS Simulator against an isolated headless host (AGENTS.md recipe: build the desktop with package-and-install.sh without --install, run dist/mac-arm64/Orca.app --serve --mobile-pairing with a SHORT profile dir, --use-mock-keychain, ORCA_BACKGROUND_LAUNCH=1). Make the host's push gateway observable: set ORCA_PUSH_GATEWAY_URL to a local node stub that logs POST bodies (plain http is accepted only for an unpackaged host; a packaged dist app needs an https origin, so use the self-hosted gateway orca-push.bell.drakestears.com and read `docker logs orca-push` instead). Build the phone app as a Release (non-__DEV__) simulator build twice, BEFORE at 6ab006ddd8^ and AFTER at HEAD, without ORCA_IOS_APS_ENVIRONMENT (development entitlement), pair via `xcrun simctl openurl`, then turn push on in the phone's notification settings. Capture the notifications.registerPush body: BEFORE shows apnsEnvironment 'production', AFTER shows 'sandbox'; rebuilding AFTER with ORCA_IOS_APS_ENVIRONMENT=production shows 'production'. Screenshot the settings toggle plus a terminal/log capture of the request body as the proof. Cheap corroboration without a device: `ORCA_IOS_APS_ENVIRONMENT=production npx expo config --type introspect` (prints extra.apsEnvironment next to the entitlement). If the simulator cannot mint an APNs token (getDevicePushTokenAsync rejects, so registration is skipped), state that plainly and fall back to a physical device build."
+      }
+    },
+    {
+      "id": "mobile-chat-skills",
+      "title": "Phone chat '/' menu lists the host's skills",
+      "commits": ["1e4b2ccf9f", "5e3f0c6081"],
+      "paths": [
+        "mobile/src/session/MobileNativeChatComposer.tsx",
+        "mobile/src/session/MobileNativeChatOverlay.tsx",
+        "mobile/src/session/MobileNativeChatView.tsx",
+        "mobile/src/session/mobile-native-chat-controller-contract.ts",
+        "mobile/src/session/mobile-native-chat-session-catalog.ts",
+        "mobile/src/session/mobile-native-chat-skill-read.ts",
+        "mobile/src/session/mobile-structured-agent-session-contract.ts",
+        "mobile/src/session/use-mobile-native-chat-controller.ts",
+        "mobile/src/session/use-mobile-native-chat-skills.ts",
+        "mobile/src/session/use-mobile-structured-agent-session.ts",
+        "src/main/runtime/rpc/methods/index.ts",
+        "src/main/runtime/rpc/methods/native-chat-skills.ts",
+        "src/main/runtime/runtime-rpc/runtime-rpc-mobile-method-allowlist.ts",
+        "src/renderer/src/components/native-chat/use-native-chat-skills.ts",
+        "src/shared/native-chat-skill-visibility.ts",
+        "src/shared/rpc-contract/native-chat-params.ts",
+        "src/shared/rpc-contract/rpc-params-catalog.generated.ts"
+      ],
+      "unit": [
+        "src/main/runtime/rpc/methods/native-chat-skills.test.ts",
+        "src/shared/rpc-contract/native-chat-params.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [
+        "mobile/src/session/MobileNativeChatComposer.test.ts",
+        "mobile/src/session/MobileNativeChatOverlay.test.ts",
+        "mobile/src/session/mobile-native-chat-session-catalog.test.ts",
+        "mobile/src/session/mobile-native-chat-skill-read.test.ts",
+        "mobile/src/session/use-mobile-native-chat-controller.test.ts",
+        "mobile/src/session/use-mobile-native-chat-skills.test.ts",
+        "mobile/src/session/use-mobile-structured-agent-session.test.tsx"
+      ],
+      "e2e": [],
+      "checks": [],
+      "appProof": {
+        "surface": "both",
+        "steps": "iOS Simulator paired with an isolated headless host (AGENTS.md recipe; also memory orca-mobile-simulator-proof-recipe: host = dist Orca.app run with --serve --mobile-pairing, short profile dir, --password-store=basic --use-mock-keychain, ORCA_BACKGROUND_LAUNCH=1; Release simulator build with ARCHS=arm64 on Xcode 27; tap/type through `orca emulator attach <udid> --worktree path:<repo>`). Build the phone twice (BEFORE at 1e4b2ccf9f^/5e3f0c6081^, AFTER at HEAD) against a host that includes nativeChat.skills. Create a throwaway test workspace inside the host with a global skill (~/.claude/skills/liem-test-skill/SKILL.md in the throwaway HOME) and a repo skill (.claude/skills/repo-test-skill/SKILL.md). On the phone open New Tab > Claude (a terminal-backed chat, not a structured agent-session), tap the composer and type '/liem': BEFORE shows only built-in commands (nothing for liem), AFTER lists /liem-test-skill with its description after the built-ins. Then, with the chat still open, create a second skill directory on the host, clear the composer, type '/' again: the new skill appears without restarting (the refresh happens on each new slash). Also type '/clear' to confirm a built-in keeps its name, and try a Codex tab to confirm no skills are listed. Pair against an older host build to confirm the menu stays as it was. Screenshot BEFORE/AFTER of the same '/liem' state with `xcrun simctl io <udid> screenshot`, delete the throwaway workspace and stop the host afterwards."
+      }
+    },
+    {
+      "id": "reopen-closed-tab",
+      "title": "Reopen Closed Tab in tab context menus",
+      "commits": ["1fcd3e3724"],
+      "paths": [
+        "src/renderer/src/components/tab-bar/BrowserTab.tsx",
+        "src/renderer/src/components/tab-bar/EditorFileTabContextMenu.tsx",
+        "src/renderer/src/components/tab-bar/ReopenClosedTabMenuItem.tsx",
+        "src/renderer/src/components/tab-bar/SortableTabContextMenu.tsx",
+        "src/renderer/src/components/tab-bar/TabStripBlankAreaMenu.tsx",
+        "src/renderer/src/components/tab-bar/tab-bar-surface.tsx",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/renderer/src/store/slices/browser/browser-tab-focus-actions.ts",
+        "src/renderer/src/store/slices/recently-closed-tabs.ts"
+      ],
+      "unit": [
+        "src/renderer/src/components/tab-bar/BrowserTab.test.tsx",
+        "src/renderer/src/components/tab-bar/EditorFileTab.test.tsx",
+        "src/renderer/src/components/tab-bar/EditorFileTabContextMenu.test.tsx",
+        "src/renderer/src/components/tab-bar/ReopenClosedTabMenuItem.test.tsx",
+        "src/renderer/src/components/tab-bar/SortableTab.rename-shortcut.test.tsx",
+        "src/renderer/src/components/tab-bar/SortableTabContextMenu.test.tsx",
+        "src/renderer/src/components/tab-bar/TabStripBlankAreaMenu.test.tsx",
+        "src/renderer/src/store/slices/recently-closed-tabs.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": [
+        "tests/e2e/browser-reopen-closed-tab.spec.ts",
+        "tests/e2e/editor-reopen-closed-tab.spec.ts"
+      ],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Desktop launched hidden from an e2e-mode build (VITE_EXPOSE_STORE=true npx electron-vite build --mode e2e, then the committed spec or a zz-proof-* spec run through .claude/skills/orca-test-and-verify/scripts/capture-before-after.sh with ORCA_BACKGROUND_LAUNCH=1, Playwright electron-headless, CDP page.screenshot; never computer-use). Seed a throwaway workspace with a local tab server and three browser tabs in the side pane via window.__store.getState().createBrowserTab(..., { placement: 'side-pane', targetGroupId }). BEFORE: right-click a tab and the menu ends at Open In Browser with no reopen entry; right-clicking the empty strip area shows no menu. AFTER: right-click a tab shows a final 'Reopen Closed Tab' item with the shortcut hint, disabled while nothing is closed; close the middle tab, right-click a remaining tab, click the item and screenshot that the tab returns to its old slot; right-click the blank area under the vertical tabs and screenshot the one-item menu; close every browser tab (the side pane disappears), right-click the terminal tab, reopen, and screenshot that the vertical side pane comes back with the page (before this change it landed in the terminal pane). Repeat on an editor file tab menu (currently only visible by hand, no spec)."
+      }
+    },
+    {
+      "id": "codex-business-credits",
+      "title": "Codex Business monthly credit limit",
+      "commits": ["116e554991"],
+      "paths": [
+        "src/main/rate-limits/codex-rate-limit-window-classification.ts",
+        "src/main/rate-limits/codex-rate-limit-window-mapper.ts",
+        "src/main/rate-limits/codex-rpc-rate-limit-probe.ts"
+      ],
+      "unit": [
+        "src/main/rate-limits/codex-fetcher-credit-balance.test.ts",
+        "src/main/rate-limits/codex-rate-limit-window-mapper.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": [],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Desktop launched hidden (ORCA_BACKGROUND_LAUNCH=1, throwaway HOME/profile with --password-store=basic --use-mock-keychain, e2e-mode or packaged dist app) with a stub `codex` executable first on PATH (resolveCodexCommand reads PATH): a tiny node script that answers the JSON-RPC lines `initialize` and `account/rateLimits/read` with the captured Business shape ({ rateLimits: { limitId: 'codex', primary: null, secondary: null, credits: { hasCredits: true, unlimited: false, balance: null }, individualLimit: { limit: '75000', used: '1583.476898431778', remainingPercent: 98, resetsAt: <future unix seconds> }, planType: 'business' } }). Create $CODEX_HOME/auth.json (any content) in the throwaway home so probeCodexAuthPresence passes. Over CDP, wait for the status-bar chip [data-usage-chip=\"codex\"] and screenshot it, then open the 'Usage' popover button and screenshot the Codex row. BEFORE (HEAD of 116e554991^) shows the bare Codex icon / 'No usage data'; AFTER shows about '2%' with a reset-countdown label (the chip prefers time-until-reset over a fixed window label) and a 'Monthly' section in the hover tooltip. Also run the stub with `individualLimit: null` and primary/secondary windows to confirm the existing 5h/weekly rendering is unchanged."
+      }
+    },
+    {
+      "id": "status-bar-credit-usage",
+      "title": "Claude usage credits in the status bar without windows",
+      "commits": ["588b9ea756"],
+      "paths": [
+        "src/main/rate-limits/service/service-result-policy.ts",
+        "src/renderer/src/components/status-bar/StatusBarProviderSegment.tsx",
+        "src/renderer/src/components/status-bar/UsageRosterPanel.tsx",
+        "src/renderer/src/components/status-bar/status-bar-provider-visibility.ts",
+        "src/renderer/src/components/status-bar/usage-credit-summary.ts",
+        "src/renderer/src/i18n/locales/en.json",
+        "src/shared/currency-format.ts"
+      ],
+      "unit": [
+        "src/main/rate-limits/service-refresh-orchestration.test.ts",
+        "src/renderer/src/components/status-bar/status-bar-provider-visibility.test.ts",
+        "src/renderer/src/components/status-bar/usage-credit-summary.test.tsx",
+        "src/shared/currency-format.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/status-bar-credit-usage.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Desktop launched hidden from an e2e-mode build (VITE_EXPOSE_STORE=true electron-vite build --mode e2e; ORCA_BACKGROUND_LAUNCH=1; Playwright electron-headless over CDP; screenshots with page.screenshot, never computer-use). Seed disposable state only: through window.__store.getState().setRateLimitsFromPush({ ...state.rateLimits, claude: { provider: 'claude', session: null, weekly: null, extraUsage: { unit: 'currency', balance: 980.4, currencyCode: 'USD', spent: 19.6, spendLimit: 1000, spentPercent: 1.96, enabled: true, disabledReason: null, resetsAt: null }, status: 'ok', ... } }) exactly as tests/e2e/status-bar-credit-usage.spec.ts does. BEFORE (588b9ea756^): the footer .status-bar-usage-cluster [data-usage-chip=\"claude\"] is a bare icon and the 'Usage' popover row says 'No usage data'. AFTER: the chip reads '$19.60 / $1,000' with a spend bar and the popover row shows the same text plus a 'credits' bar at 2%. Then check the edge states by pushing variants: balance only (no spend limit) -> '$980.40 bal' without a bar; status 'error' on the same snapshot -> text stays with a warning triangle; shrink the window (Playwright setViewportSize or CDP Emulation.setDeviceMetricsOverride) to see the letter-badge dot and the +N overflow chip title ('Also: Claude $19.60 / $1,000'); and toggle the usage display mode (compact vs verbose) to confirm the bar disappears in compact. The main-process half (credit-only snapshot kept through a failed refresh) has no UI to drive hidden; it is proven by the service unit test."
+      }
+    },
+    {
+      "id": "repo-skill-tooling",
+      "title": "orca-test-and-verify skill scripts",
+      "commits": ["a8a9564840", "3870e14aa3", "bbf2c429f2"],
+      "paths": [
+        ".claude/skills/orca-test-and-verify/**",
+        "tests/tools/orca-skill-script-sandbox.mjs"
+      ],
+      "unit": [
+        "tests/tools/orca-test-and-verify-capture.test.mjs",
+        "tests/tools/orca-test-and-verify-install.test.mjs",
+        "tests/tools/orca-test-and-verify-skill.test.mjs"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": [],
+      "checks": [],
+      "appProof": {
+        "surface": "none",
+        "steps": "Exercise the workflow end to end on a disposable trivial renderer change, hidden and background only (ORCA_BACKGROUND_LAUNCH=1, never computer-use): `source .claude/skills/orca-test-and-verify/scripts/env.sh` (confirm Node 24 and ORCA_REPO), copy assets/proof-shots.spec.template.ts to tests/e2e/zz-proof-skill-check.spec.ts, run capture-before-after.sh before then after into a scratch dir (check `git stash list` is empty and the working-tree edit survived), write a manifest.json referencing the before/after PNGs, and build the page twice: `build-report.py manifest.json out-fragment.html --fragment` and without the flag; open out.html through CDP/Playwright (file:// URL) and screenshot to confirm images render, the lightbox opens and the full page has the wrapper while the fragment does not, then publish the fragment through the Artifact tool. Run package-and-install.sh WITHOUT --install and packaged-proof.sh against dist/mac-arm64/Orca.app (hidden, mock keychain, throwaway profile) for a CDP screenshot. To prove the bbf2c429f2 warning, run package-and-install.sh --install on a spare machine/profile with Orca's quit confirmation left open and read the '[install] WARNING' lines; if that cannot be done safely say so. Before trusting the report builder, also run it with /usr/bin/python3 (3.9) to see the str | None TypeError."
+      }
+    },
+    {
       "id": "fork-sync-tooling",
       "title": "Fork contract gate and weekly upstream sync",
       "commits": [],
       "paths": [
         "config/fork/**",
         "config/scripts/fork-contract*.mjs",
-        "config/scripts/fork-upstream-sync*.mjs"
+        "config/scripts/fork-upstream-sync*.mjs",
+        ".claude/skills/fork-upstream-sync/**"
       ],
-      "unit": ["config/scripts/fork-contract.test.mjs"],
+      "unit": [
+        "config/scripts/fork-contract.test.mjs",
+        "config/scripts/fork-contract-run.test.mjs",
+        "config/scripts/fork-upstream-sync.test.mjs",
+        "tests/tools/fork-upstream-sync-skill.test.mjs"
+      ],
       "unitSupport": [],
       "mobile": [],
       "e2e": [],
       "checks": [],
-      "appProof": { "surface": "none", "steps": "Tooling only." }
+      "appProof": {
+        "surface": "none",
+        "steps": "Tooling only; the weekly sync run itself is the proof."
+      }
     }
   ]
 }

@@ -79,6 +79,7 @@ Open each BEFORE image with the Read tool. A screenshot of the wrong state, such
 - When a behavior change breaks upstream tests, update them only when the new behavior is intended. If the change touches a path the request didn't cover, scope it out instead. Example: moving tabs on the paired-runtime (remote Orca server) path broke 5 specs and stole focus, so that path was excluded.
 - Upstream e2e helpers seed repos through `window.api.repos.add`. If you change a new-project default, opt the fixtures out in `tests/e2e/helpers/orca-app.ts` and `orca-restart.ts`, the way `inPlaceWorkspaces: false` is set there.
 - User-facing strings use `translate(key, default)`; run `pnpm run sync:localization-catalog`.
+- Register the change in `config/fork/fork-features.json`: a new feature entry, or the existing feature's `paths`, tests and `appProof`. The weekly upstream sync runs exactly these tests, so an unregistered change is unprotected.
 
 ## 4. Verify
 
@@ -91,6 +92,8 @@ pnpm run check:code-quality:changed            # no type assertions, no restyled
 pnpm exec oxfmt --check <changed files>
 node config/scripts/ensure-native-runtime.mjs --runtime=node
 pnpm exec vitest run --config config/vitest.config.ts <dirs you touched>
+node config/scripts/fork-contract.mjs check            # every fork change registered with tests
+node config/scripts/fork-contract.mjs run              # all fork unit, mobile and check tests
 ```
 
 Without `--config config/vitest.config.ts`, hundreds of unrelated tests fail on missing app environment setup. Don't chase those.

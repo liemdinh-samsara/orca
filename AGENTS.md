@@ -59,6 +59,10 @@ Tests passing is not proof. For every change to the Orca app (desktop or `mobile
 
 If the change cannot be exercised (for example no simulator or device is available), say so plainly in the report and the final message instead of claiming it works.
 
+## Register Every Fork Change
+
+This fork merges upstream weekly (`.claude/skills/fork-upstream-sync`), and the merge is only safe if every fork change has tests the sync runs. When you add or change fork behavior, add or update its feature in `config/fork/fork-features.json` (owned `paths`, `unit`/`mobile`/`e2e` tests, `appProof`), then make `node config/scripts/fork-contract.mjs check` pass before committing. An unregistered file fails the check; register it with tests rather than exempting it.
+
 # Writing Pull Requests
 
 Fill in [`.github/pull_request_template.md`](./.github/pull_request_template.md), written for a reviewer who has never seen this code:

@@ -191,7 +191,7 @@ describe('credit-only usage in the status bar', () => {
 
   it('includes a hidden credit-only provider and its spend in the overflow title', () => {
     const markup = renderToStaticMarkup(
-      <UsageOverflowChip hidden={[claudeCredits()]} display="used" />
+      <UsageOverflowChip hidden={[claudeCredits()]} providerCount={1} display="used" />
     )
     expect(markup).toContain('title="Also: Claude $19.60 / $1,000"')
   })

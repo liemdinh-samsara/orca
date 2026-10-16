@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "remote": "upstream",
+    "url": "https://github.com/stablyai/orca.git",
+    "branch": "main"
+  },
+  "exempt": ["**/*.md", "docs/**"],
+  "features": [
+    {
+      "id": "fork-sync-tooling",
+      "title": "Fork contract gate and weekly upstream sync",
+      "commits": [],
+      "paths": [
+        "config/fork/**",
+        "config/scripts/fork-contract*.mjs",
+        "config/scripts/fork-upstream-sync*.mjs"
+      ],
+      "unit": ["config/scripts/fork-contract.test.mjs"],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": [],
+      "checks": [],
+      "appProof": { "surface": "none", "steps": "Tooling only." }
+    }
+  ]
+}

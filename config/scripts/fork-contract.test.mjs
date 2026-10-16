@@ -492,11 +492,14 @@ describe('CLI and git integration', () => {
     expect(steps[1].status).toBeUndefined()
     expect(existsSync(join(scratch, 'must-not-exist.json'))).toBe(false)
   })
-  it('dry-runs the exact seed registry with default kinds', () => {
+  it('dry-runs the real registry with default kinds', () => {
     write(registryPath, readFileSync(join(repoRoot, registryPath), 'utf8'))
     const result = cli('run', '--dry-run')
     expect(result.code, result.stderr).toBe(0)
-    expect(JSON.parse(result.stdout)[1].args).toContain('config/scripts/fork-contract.test.mjs')
+    const tooling = JSON.parse(result.stdout).find(
+      (step) => step.name === 'fork-sync-tooling: unit'
+    )
+    expect(tooling.args).toContain('config/scripts/fork-contract.test.mjs')
   })
   it.each([
     [],

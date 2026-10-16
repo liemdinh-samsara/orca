@@ -438,7 +438,7 @@ describe('canReopenClosedTab', () => {
     const store = makeSeededStore()
     store.setState({
       recentlyClosedEditorTabsByWorktree: {
-        [WT]: [makeOpenFile({ filePath: '/path/wt1/a.ts', worktreeId: WT })]
+        [WT]: [makeOpenFile({ id: '/path/wt1/a.ts', filePath: '/path/wt1/a.ts', worktreeId: WT })]
       },
       recentlyClosedTabKindsByWorktree: { [WT]: ['editor'] }
     })

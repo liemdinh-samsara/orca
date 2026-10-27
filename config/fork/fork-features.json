@@ -673,6 +673,24 @@
         "surface": "none",
         "steps": "Tooling only; the weekly sync run itself is the proof."
       }
+    },
+    {
+      "id": "awake-no-display-lock",
+      "title": "Keep-awake prevents system sleep only, never the display",
+      "commits": ["bf54346059"],
+      "paths": ["src/main/agent-awake-service.ts"],
+      "unit": [
+        "src/main/agent-awake-service.test.ts",
+        "src/main/agent-awake-service-platform-assertions.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": [],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Power assertions are only visible in macOS, so prove the real service in stock Electron with no window: bundle it with node_modules/.bin/esbuild src/main/agent-awake-service.ts --bundle --platform=node --external:electron --format=cjs (once at HEAD, once at bf54346059^ for BEFORE), then run a tiny Electron main script that does `new AgentAwakeService({ platform: 'win32', powerMonitor: null })`, `setMode('on')`, waits ~1.5s, and prints the lines of `pmset -g assertions` that contain its own pid, then `setMode('off')` and prints them again. 'win32' makes the service use the real powerSaveBlocker, which on a Mac is the only path that can hold the display. BEFORE shows NoDisplaySleepAssertion; AFTER shows NoIdleSleepAssertion; both clear on 'off'. A Mac with caffeinate working never reaches the blocker, so the full Orca app cannot show the difference."
+      }
     }
   ]
 }

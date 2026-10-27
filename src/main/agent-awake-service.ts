@@ -14,7 +14,7 @@ export {
 } from './agent-awake-status-lease'
 
 type PowerSaveBlocker = {
-  start: (type: 'prevent-app-suspension' | 'prevent-display-sleep') => number
+  start: (type: 'prevent-app-suspension') => number
   stop: (id: number) => void
   isStarted: (id: number) => boolean
 }
@@ -190,7 +190,8 @@ export class AgentAwakeService {
       }
     }
     try {
-      const id = this.blocker.start('prevent-display-sleep')
+      // Why: only the system stays awake; the display must still be free to sleep on its own timer.
+      const id = this.blocker.start('prevent-app-suspension')
       this.blockerId = id
       this.reconcileBlocker('post-start')
     } catch (err) {

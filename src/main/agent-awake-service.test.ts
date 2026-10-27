@@ -119,7 +119,7 @@ describe('AgentAwakeService', () => {
     service.setStatuses([workingStatus()])
 
     expect(blocker.start).toHaveBeenCalledTimes(1)
-    expect(blocker.start).toHaveBeenCalledWith('prevent-display-sleep')
+    expect(blocker.start).toHaveBeenCalledWith('prevent-app-suspension')
     expect(macosAssertion.start).toHaveBeenCalledTimes(1)
     expect(linuxAssertion.start).toHaveBeenCalledTimes(1)
   })
@@ -130,9 +130,34 @@ describe('AgentAwakeService', () => {
 
     service.setMode('on')
 
-    expect(blocker.start).toHaveBeenCalledWith('prevent-display-sleep')
+    expect(blocker.start).toHaveBeenCalledWith('prevent-app-suspension')
     expect(service.getStatus()).toEqual({ mode: 'on', active: true })
   })
+
+  it.each(['darwin', 'win32', 'linux'] as const)(
+    'never asks the OS to keep the display on (%s)',
+    (platform) => {
+      const blocker = createBlocker()
+      const macosAssertion = createMacosAssertion()
+      macosAssertion.start.mockImplementation(() => false)
+      const service = new AgentAwakeService({
+        blocker,
+        macosAssertion,
+        linuxAssertion: createLinuxAssertion(),
+        platform,
+        now: () => 1_000,
+        powerMonitor: null,
+        logger: { debug: vi.fn(), warn: vi.fn() }
+      })
+
+      service.setMode('on')
+      service.setMode('auto')
+      service.setStatuses([workingStatus()])
+
+      expect(blocker.start).toHaveBeenCalled()
+      expect(blocker.start).not.toHaveBeenCalledWith('prevent-display-sleep')
+    }
+  )
 
   it('publishes Auto activity changes to status subscribers', () => {
     const service = createService(() => 1_000)

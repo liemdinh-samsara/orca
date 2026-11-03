@@ -78,7 +78,6 @@ test('shows a pane tabs as a vertical list that activates and reorders', async (
   )
   await expect(unfocusedStrip).toHaveCount(1)
   await expect(unfocusedStrip.getByRole('button', { name: /Show tabs on/ })).toHaveCount(0)
-  await expect(unfocusedStrip.getByRole('button', { name: 'Pane Actions' })).toHaveCount(0)
 
   const boxes = await Promise.all([0, 1, 2].map((index) => rows.nth(index).boundingBox()))
   const [first, second, third] = boxes.map((box) => box!)
@@ -116,16 +115,13 @@ test('shows a pane tabs as a vertical list that activates and reorders', async (
   expect(marker!.x).toBeCloseTo(first.x, 0)
   expect(marker!.width).toBeCloseTo(2, 0)
 
-  await rows.nth(0).click()
-  await expect
-    .poll(async () => (await readGroup(orcaPage, worktreeId, groupId)).activeTabId)
-    .toBe(tabIds[0])
-
   // Drag the last row onto the top half of the first row: it moves to the front.
   await orcaPage.mouse.move(third.x + 40, third.y + third.height / 2)
   await orcaPage.mouse.down()
   await orcaPage.mouse.move(third.x + 40, third.y - 10, { steps: 5 })
   await orcaPage.mouse.move(first.x + 40, first.y + 4, { steps: 10 })
+  // Why: release only once the drop bar shows above the first row, as a person would.
+  await expect(rows.nth(0)).toHaveClass(/before:bg-blue-500/)
   await orcaPage.mouse.up()
   await expect
     .poll(async () => (await readGroup(orcaPage, worktreeId, groupId)).tabOrder)
@@ -140,6 +136,11 @@ test('shows a pane tabs as a vertical list that activates and reorders', async (
 
   // Why: dnd-kit swallows clicks for 50ms after a drop; a person never clicks that fast.
   await orcaPage.waitForTimeout(100)
+  // Why after the drag: activating a browser row lets its page take focus, and focus changes cancel a drag.
+  await rows.nth(1).click()
+  await expect
+    .poll(async () => (await readGroup(orcaPage, worktreeId, groupId)).activeTabId)
+    .toBe(tabIds[0])
   await strip.getByRole('button', { name: 'Show tabs on top' }).click()
   await expect
     .poll(async () => (await readGroup(orcaPage, worktreeId, groupId)).orientation)

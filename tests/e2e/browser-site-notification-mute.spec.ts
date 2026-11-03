@@ -8,11 +8,13 @@ const CONTROL_URL = 'https://notify.example.test/'
 // Why: a suffix-only match would mute a look-alike host that merely starts with slack.com.
 const LOOKALIKE_URL = 'https://slack.com.evil.test/'
 
+// Why: Orca now asks before a site may notify; muted Slack pages must be denied without that prompt.
 async function readNotificationPermission(
   page: Page,
   worktreeId: string,
-  url: string
-): Promise<{ current: string; requested: string }> {
+  url: string,
+  answer?: 'Allow'
+): Promise<{ requested: string; after: string }> {
   const tabId = await page.evaluate(
     ({ worktreeId, url }) =>
       window.__store?.getState().createBrowserTab(worktreeId, url, { activate: true })?.id ?? null,
@@ -28,9 +30,10 @@ async function readNotificationPermission(
       script
     )
   await expect.poll(() => run('location.href').catch(() => null), { timeout: 30_000 }).toBe(url)
-  const current = String(await run('Notification.permission'))
-  const requested = String(await run('Notification.requestPermission()'))
-  return { current, requested }
+  const allowButton = page.getByRole('button', { name: 'Allow', exact: true })
+  const requested = run('Notification.requestPermission()').then(String)
+  await (answer ? allowButton.click() : expect(allowButton).toHaveCount(0))
+  return { requested: await requested, after: String(await run('Notification.permission')) }
 }
 
 test('withholds notification permission from Slack pages only', async ({
@@ -53,20 +56,20 @@ test('withholds notification permission from Slack pages only', async ({
     const worktreeId = await waitForActiveWorktree(orcaPage)
 
     expect(await readNotificationPermission(orcaPage, worktreeId, SLACK_URL)).toEqual({
-      current: 'denied',
-      requested: 'denied'
+      requested: 'denied',
+      after: 'denied'
     })
     expect(await readNotificationPermission(orcaPage, worktreeId, ENTERPRISE_SLACK_URL)).toEqual({
-      current: 'denied',
-      requested: 'denied'
+      requested: 'denied',
+      after: 'denied'
     })
-    expect(await readNotificationPermission(orcaPage, worktreeId, CONTROL_URL)).toEqual({
-      current: 'granted',
-      requested: 'granted'
+    expect(await readNotificationPermission(orcaPage, worktreeId, CONTROL_URL, 'Allow')).toEqual({
+      requested: 'granted',
+      after: 'granted'
     })
-    expect(await readNotificationPermission(orcaPage, worktreeId, LOOKALIKE_URL)).toEqual({
-      current: 'granted',
-      requested: 'granted'
+    expect(await readNotificationPermission(orcaPage, worktreeId, LOOKALIKE_URL, 'Allow')).toEqual({
+      requested: 'granted',
+      after: 'granted'
     })
   } finally {
     await electronApp.evaluate(({ session }) => {

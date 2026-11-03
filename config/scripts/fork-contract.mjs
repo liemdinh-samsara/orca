@@ -163,8 +163,8 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
       }
       if (classification) {
         errors.push(
-          ...classification.unregistered.map((file) => `Unregistered file: ${file}`),
-          ...classification.unlistedTests.map((file) => `Unlisted test: ${file}`)
+          ...classification.unregistered.map((file) => `Unregistered file: ${String(file)}`),
+          ...classification.unlistedTests.map((file) => `Unlisted test: ${String(file)}`)
         )
       }
       printCheck({ errors, files, classification }, opts['--json'])

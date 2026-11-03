@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({
-  connection: { current: {} as object | undefined },
-  resolveRemoteDirectory: vi.fn()
-}))
+const mocks = vi.hoisted(() => {
+  const connection: { current: object | undefined } = { current: {} }
+  return { connection, resolveRemoteDirectory: vi.fn() }
+})
 
 vi.mock('../../ssh/targets/ssh-target-registry', () => ({
   getSshConnectionManager: () => ({ getConnection: () => mocks.connection.current })

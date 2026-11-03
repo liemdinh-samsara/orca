@@ -98,11 +98,11 @@ const keptTree = 'proof spec\nclaude state\ntest state\n'
 
 describe('capture-before-after.sh argument checks', () => {
   const missingArgument = [
-    [[], 'before|after'],
-    [['before'], 'path to tests/e2e/zz-proof-*.spec.ts'],
-    [['before', proofSpec], 'output directory']
+    { args: [], message: 'before|after' },
+    { args: ['before'], message: 'path to tests/e2e/zz-proof-*.spec.ts' },
+    { args: ['before', proofSpec], message: 'output directory' }
   ]
-  for (const [args, message] of missingArgument) {
+  for (const { args, message } of missingArgument) {
     unix(`requires phase, spec and output directory: missing "${message}"`, async () => {
       const f = await captureSandbox()
       const result = await capture(f, args)

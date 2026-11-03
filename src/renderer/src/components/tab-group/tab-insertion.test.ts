@@ -20,7 +20,7 @@ function makeDragData(overrides: Partial<TabDragItemData> = {}): TabDragItemData
 }
 
 function isTabDragData(value: unknown): value is TabDragItemData {
-  return Boolean(value) && typeof value === 'object' && (value as TabDragItemData).kind === 'tab'
+  return typeof value === 'object' && value !== null && 'kind' in value && value.kind === 'tab'
 }
 
 function makeDragEvent({
@@ -32,6 +32,7 @@ function makeDragEvent({
   overData: TabDragItemData | null
   overRect?: { left: number; width: number; top?: number; height?: number }
 }) {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: resolveTabInsertion reads only active, over and delta, which this fixture fills.
   return {
     active: { data: { current: activeData } },
     over: overData

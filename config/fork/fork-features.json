@@ -276,7 +276,8 @@
       "commits": ["a47cabfa5d"],
       "paths": [
         "src/main/browser/browser-route-session-policy.ts",
-        "tests/e2e/helpers/okta-verify-desktop-stub.ts"
+        "tests/e2e/helpers/okta-verify-desktop-stub.ts",
+        "config/scripts/pr-e2e-source-routing.mjs"
       ],
       "unit": [
         "src/main/browser/browser-route-session-policy.electron.test.ts",

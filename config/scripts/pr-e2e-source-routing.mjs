@@ -233,10 +233,12 @@ export const PR_E2E_SOURCE_ROUTES = [
     id: 'ssh.orcad-browser-routing',
     specs: ['tests/e2e/ssh-orcad-browser-routing.spec.ts'],
     matches: (file) =>
-      isProductSource(file) &&
-      /^src\/(?:main\/browser\/local-ssh-browser|main\/ipc\/browser\.ts$|renderer\/src\/(?:lib\/(?:ssh-workspace-browser-route-eligibility|worktree-host-connection-phase)|components\/browser-pane\/use-ssh-workspace-browser-route|store\/repos\/converted-ssh-browser-pages|store\/slices\/browser\/browser-tab-actions|hooks\/ipc-events\/ssh-managed-server-state-effects))/.test(
-        file
-      )
+      // Why: the fork's Okta Verify loopback stub is used only by this journey.
+      file === 'tests/e2e/helpers/okta-verify-desktop-stub.ts' ||
+      (isProductSource(file) &&
+        /^src\/(?:main\/browser\/local-ssh-browser|main\/ipc\/browser\.ts$|renderer\/src\/(?:lib\/(?:ssh-workspace-browser-route-eligibility|worktree-host-connection-phase)|components\/browser-pane\/use-ssh-workspace-browser-route|store\/repos\/converted-ssh-browser-pages|store\/slices\/browser\/browser-tab-actions|hooks\/ipc-events\/ssh-managed-server-state-effects))/.test(
+          file
+        ))
   },
   {
     id: 'ssh.orcad-terminal-browser-link',

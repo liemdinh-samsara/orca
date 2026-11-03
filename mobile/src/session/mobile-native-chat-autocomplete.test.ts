@@ -7,14 +7,40 @@ import {
 } from './mobile-native-chat-autocomplete'
 
 describe('detectAutocompleteTrigger', () => {
-  it('detects a slash command only at the start', () => {
+  it('detects a slash at the start of the message', () => {
     expect(detectAutocompleteTrigger('/rev', 4)).toEqual({
       kind: 'slash',
       query: 'rev',
       start: 0,
       end: 4
     })
-    expect(detectAutocompleteTrigger('hi /rev', 7)).toBeNull()
+  })
+
+  it('detects a slash after whitespace in the middle of a prompt', () => {
+    expect(detectAutocompleteTrigger('fix this then /liem-', 20)).toEqual({
+      kind: 'slash',
+      query: 'liem-',
+      start: 14,
+      end: 20
+    })
+    expect(detectAutocompleteTrigger('line one\n/rev', 13)).toMatchObject({
+      kind: 'slash',
+      query: 'rev',
+      start: 9
+    })
+    expect(detectAutocompleteTrigger('hi /', 4)).toMatchObject({ kind: 'slash', query: '' })
+  })
+
+  it('leaves file paths, URLs and fractions as prose', () => {
+    expect(detectAutocompleteTrigger('open src/main', 13)).toBeNull()
+    expect(detectAutocompleteTrigger('see https://a.dev/x', 19)).toBeNull()
+    expect(detectAutocompleteTrigger('about 3/4 done', 9)).toBeNull()
+    expect(detectAutocompleteTrigger('run /usr/bin', 12)).toBeNull()
+    expect(detectAutocompleteTrigger('and/or', 6)).toBeNull()
+  })
+
+  it('closes a mid-prompt slash token once a space is typed', () => {
+    expect(detectAutocompleteTrigger('fix this then /liem-x ', 22)).toBeNull()
   })
 
   it('detects an @ mention after whitespace or at start', () => {
@@ -39,6 +65,17 @@ describe('detectAutocompleteTrigger', () => {
 })
 
 describe('applyAutocomplete', () => {
+  it('inserts a skill mid-prompt without touching the text before it', () => {
+    const trigger = detectAutocompleteTrigger('fix this then /liem-up', 22)!
+    const { text, cursor } = applyAutocomplete(
+      'fix this then /liem-up',
+      trigger,
+      '/liem-upload-report'
+    )
+    expect(text).toBe('fix this then /liem-upload-report ')
+    expect(cursor).toBe(text.length)
+  })
+
   it('replaces the trigger span and leaves a trailing space + cursor', () => {
     const trigger = detectAutocompleteTrigger('look at @comp', 13)!
     const { text, cursor } = applyAutocomplete('look at @comp', trigger, '@src/App.tsx')

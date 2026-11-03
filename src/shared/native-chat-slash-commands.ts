@@ -231,3 +231,9 @@ export function classifyNativeChatSend(
   }
   return 'chat'
 }
+
+// `/` is the composer's only trigger, for every agent. A draft-leading slash is the one that can
+// dispatch; elsewhere the token starts after whitespace and its query stops at the next `/` so
+// file paths stay prose.
+export const LEADING_SLASH_TRIGGER = /^\/(\S*)$/
+export const MID_PROMPT_SLASH_TRIGGER = /\s\/([^\s/]*)$/

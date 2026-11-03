@@ -456,6 +456,71 @@ describe('MobileNativeChatComposer', () => {
     }
   )
 
+  it.each([true, false])(
+    'offers reported skills after other words in the prompt (structured=%s)',
+    async (structured) => {
+      const onChangeText = vi.fn()
+      const draft = 'fix this then /liem'
+      await act(async () => {
+        renderer = create(
+          createElement(MobileNativeChatComposer, {
+            value: draft,
+            onChangeText,
+            onSend: vi.fn().mockResolvedValue(true),
+            sendSurfaceId: 'tab-a',
+            getSendCompletionGeneration: getCurrentSendCompletionGeneration,
+            agent: 'claude',
+            structuredCommands: structured ? [] : undefined,
+            sessionCommands: [
+              { name: 'liem-upload-report', kind: 'skill', description: 'Publish a report' },
+              { name: 'review', kind: 'skill' }
+            ]
+          })
+        )
+      })
+      const input = renderer!.root.find((node) => node.type === 'TextInput')
+      await act(async () =>
+        input.props.onSelectionChange({ nativeEvent: { selection: { end: draft.length } } })
+      )
+      const texts = renderer!.root
+        .findAll((node) => node.type === 'Text')
+        .map((node) => node.props.children)
+      expect(texts).toContain('/liem-upload-report')
+      expect(texts).not.toContain('/review')
+
+      const suggestion = renderer!.root.findAll(
+        (node) => node.type === 'Pressable' && !node.props.accessibilityLabel
+      )[0] as { props: { onPress: () => void } }
+      await act(async () => suggestion.props.onPress())
+      expect(onChangeText).toHaveBeenCalledWith('fix this then /liem-upload-report ')
+    }
+  )
+
+  it('keeps file paths in the prompt from opening the slash menu', async () => {
+    const draft = 'open src/main and /usr/bin'
+    await act(async () => {
+      renderer = create(
+        createElement(MobileNativeChatComposer, {
+          value: draft,
+          onChangeText: vi.fn(),
+          onSend: vi.fn().mockResolvedValue(true),
+          sendSurfaceId: 'tab-a',
+          getSendCompletionGeneration: getCurrentSendCompletionGeneration,
+          agent: 'claude',
+          sessionCommands: [{ name: 'usr-skill', kind: 'skill' }]
+        })
+      )
+    })
+    const input = renderer!.root.find((node) => node.type === 'TextInput')
+    await act(async () =>
+      input.props.onSelectionChange({ nativeEvent: { selection: { end: draft.length } } })
+    )
+    const texts = renderer!.root
+      .findAll((node) => node.type === 'Text')
+      .map((node) => node.props.children)
+    expect(texts).not.toContain('/usr-skill')
+  })
+
   it('adds host skills arriving after the terminal chat slash menu opened', async () => {
     const props = {
       value: '/liem',

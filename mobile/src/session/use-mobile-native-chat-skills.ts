@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
+import {
+  LEADING_SLASH_TRIGGER,
+  MID_PROMPT_SLASH_TRIGGER
+} from '../../../src/shared/native-chat-slash-commands'
 import type { RpcClient } from '../transport/rpc-client'
 import {
   readMobileNativeChatSkills,
@@ -45,8 +49,10 @@ export function useMobileNativeChatSkills(args: {
   return known !== null && known.key === key ? known.skills : NO_SKILLS
 }
 
-// A slash token still being typed: `/` or `/liem`, not `/liem some text`.
-const SLASH_TOKEN = /^\/\S*$/
+// The composer's own slash rule (message start, or after whitespace) applied to the text typed so far.
+function endsInSlashToken(text: string): boolean {
+  return LEADING_SLASH_TRIGGER.test(text) || MID_PROMPT_SLASH_TRIGGER.test(text)
+}
 
 /** The host's skills as the reported `/` entries a composer already knows how to list. */
 export function useMobileNativeChatHostSkills(args: {
@@ -55,7 +61,7 @@ export function useMobileNativeChatHostSkills(args: {
   agent: string | null
   composerText: string
 }): readonly AgentSessionSlashCommand[] {
-  const skills = useMobileNativeChatSkills({ ...args, wanted: SLASH_TOKEN.test(args.composerText) })
+  const skills = useMobileNativeChatSkills({ ...args, wanted: endsInSlashToken(args.composerText) })
   return useMemo(
     () =>
       skills.map((skill): AgentSessionSlashCommand => ({

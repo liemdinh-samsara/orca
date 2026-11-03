@@ -34,7 +34,10 @@ function closeServer(server: Server): Promise<void> {
   )
 }
 
-export async function startLocalHttpsServer(): Promise<LocalHttpsServer> {
+// Why: `hostname` lets a spec serve this loopback server under a name mapped by --host-resolver-rules.
+export async function startLocalHttpsServer(
+  options: { hostname?: string } = {}
+): Promise<LocalHttpsServer> {
   let documentRequestCount = 0
   let assetRequestCount = 0
   let webSocketConnectionCount = 0
@@ -105,11 +108,12 @@ export async function startLocalHttpsServer(): Promise<LocalHttpsServer> {
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const port = (server.address() as AddressInfo).port
-  secureOrigin = `https://127.0.0.1:${port}`
+  const hostname = options.hostname ?? '127.0.0.1'
+  secureOrigin = `https://${hostname}:${port}`
 
   return {
     secureUrl: `${secureOrigin}/`,
-    schemeLessUrl: `127.0.0.1:${port}/`,
+    schemeLessUrl: `${hostname}:${port}/`,
     documentRequestCount: () => documentRequestCount,
     assetRequestCount: () => assetRequestCount,
     webSocketConnectionCount: () => webSocketConnectionCount,

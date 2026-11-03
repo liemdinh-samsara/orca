@@ -673,6 +673,29 @@
         "surface": "none",
         "steps": "Tooling only; the weekly sync run itself is the proof."
       }
+    },
+    {
+      "id": "browser-devbox-certificate-proceed",
+      "title": "Proceed Anyway on Samsara devbox certificate warnings",
+      "commits": [],
+      "paths": [
+        "src/main/browser/browser-certificate-trust-controller.ts",
+        "src/shared/browser-certificate-proceed-hosts.ts",
+        "src/shared/browser-url.ts",
+        "tests/e2e/helpers/local-https-test-server.ts"
+      ],
+      "unit": [
+        "src/main/browser/browser-certificate-trust-controller.test.ts",
+        "src/shared/browser-certificate-proceed-hosts.test.ts"
+      ],
+      "unitSupport": [],
+      "mobile": [],
+      "e2e": ["tests/e2e/browser-devbox-certificate-trust.spec.ts"],
+      "checks": [],
+      "appProof": {
+        "surface": "desktop",
+        "steps": "Use the e2e-mode build and an untracked tests/e2e/zz-proof-devbox-cert.spec.ts based on proof-shots.spec.template.ts with test.use({ orcaAppExtraArgs: [\"--host-resolver-rules=MAP orca-e2e.3.us-west-2.devbox.internal.samsara.com 127.0.0.1\"] }). Start startLocalHttpsServer({ hostname: <that host> }) from tests/e2e/helpers/local-https-test-server.ts (self-signed localhost certificate), open a browser tab on its URL and screenshot the certificate warning. AFTER shows a Proceed Anyway (Unsafe) button; click it and screenshot the page heading Local HTTPS request 1 with __localTlsState {asset:true, webSocket:true}. BEFORE (upstream/main) shows the same warning with no Proceed button. Real devbox check: open https://<user>.<n>.us-west-2.devbox.internal.samsara.com:3000/ and click Proceed Anyway."
+      }
     }
   ]
 }

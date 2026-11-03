@@ -46,13 +46,13 @@ export function classifySchemeLessLocalDevAddress(rawInput: string): URL | null 
   }
 }
 
-function normalizeCertificateHostname(hostname: string): string {
+export function normalizeCertificateHostname(hostname: string): string {
   const lower = hostname.trim().toLowerCase()
   const unbracketed = lower.startsWith('[') && lower.endsWith(']') ? lower.slice(1, -1) : lower
   return unbracketed.endsWith('.') ? unbracketed.slice(0, -1) : unbracketed
 }
 
-function isValidDnsName(name: string): boolean {
+export function isValidDnsName(name: string): boolean {
   if (name.length === 0 || name.length > 253) {
     return false
   }

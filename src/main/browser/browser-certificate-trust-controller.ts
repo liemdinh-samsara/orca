@@ -3,10 +3,8 @@ import type {
   BrowserCertificateFailure,
   BrowserCertificateProceedResult
 } from '../../shared/browser-workspace-types'
-import {
-  isEligibleLocalCertificateHost,
-  toSecureCertificateEndpoint
-} from '../../shared/browser-url'
+import { toSecureCertificateEndpoint } from '../../shared/browser-url'
+import { isCertificateProceedEligibleHost } from '../../shared/browser-certificate-proceed-hosts'
 import {
   certificateChallengeIdentityMatches,
   CERTIFICATE_CHALLENGE_TTL_MS,
@@ -95,7 +93,7 @@ export class BrowserCertificateTrustController {
         args.isMainFrame &&
         parsed.protocol === 'https:' &&
         error === SUPPORTED_CERTIFICATE_ERROR &&
-        isEligibleLocalCertificateHost(parsed.hostname) &&
+        isCertificateProceedEligibleHost(parsed.hostname) &&
         this.requestGuard.canOfferCertificate(args.webContents.session, identity)
       ) {
         this.recordPendingChallenge({

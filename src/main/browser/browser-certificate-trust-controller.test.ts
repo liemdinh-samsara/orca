@@ -302,6 +302,24 @@ describe('BrowserCertificateTrustController', () => {
     expect(onFailureChanged).not.toHaveBeenCalled()
   })
 
+  it('offers approval for a devbox host serving a self-signed certificate', () => {
+    const devboxUrl = 'https://liem.3.us-west-2.devbox.internal.samsara.com:3000/app'
+    controller.onMainFrameNavigationStarted(guest.id)
+    const first = certificateEvent({ controller, guest, url: devboxUrl })
+
+    expect(first.callback).toHaveBeenCalledWith(false)
+    expect(controller.getFailure('page-1')).toMatchObject({
+      origin: 'https://liem.3.us-west-2.devbox.internal.samsara.com:3000',
+      errorCode: -202,
+      canProceed: true
+    })
+    expect(controller.proceed('page-1', 'challenge-1')).toEqual({ ok: true })
+    expect(guest.loadURL).toHaveBeenCalledWith(devboxUrl)
+    expect(certificateEvent({ controller, guest, url: devboxUrl }).callback).toHaveBeenCalledWith(
+      true
+    )
+  })
+
   it('queues an early challenge until the guest receives its browser page identity', () => {
     pageByGuestId.set(guest.id, null)
     certificateEvent({ controller, guest })

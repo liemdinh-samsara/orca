@@ -15,21 +15,34 @@ log_dir="$(mktemp -d "${TMPDIR:-/tmp}/orca-package.XXXXXX")"
 pnpm run --silent ensure:electron-runtime
 echo "[package] pnpm build (log: $log_dir/build.log)"
 pnpm build > "$log_dir/build.log" 2>&1 || { tail -30 "$log_dir/build.log" >&2; exit 1; }
+"$(dirname "$0")/ensure-orcad-template.sh"
 
 # Reuses the repo's own local-version format: <base>-local.<timestamp>.<commit>.
 identity_json="$(node --input-type=module -e "import('./config/scripts/build-mac-local.mjs').then((m) => console.log(JSON.stringify(m.getLocalBuildIdentity())))")"
 commit="$(node -p "JSON.parse(process.argv[1]).commit" "$identity_json")"
 version="$(node -p "JSON.parse(process.argv[1]).version" "$identity_json")"
 echo "[package] electron-builder $version (log: $log_dir/pack.log)"
+# Why aside: electron-builder's afterPack verifies the full release matrix (Windows and musl
+# included), so the template this Mac can build is added to the app after packaging instead.
+orcad_targets="linux-x64-glibc,linux-arm64-glibc,darwin-$arch"
+template_aside="$ORCA_REPO/out/.orcad-template-local"
+rm -rf "$template_aside"
+mv "$ORCA_REPO/out/orcad-template" "$template_aside"
+trap 'mv "$template_aside" "$ORCA_REPO/out/orcad-template" 2>/dev/null || true' EXIT
 ORCA_BUILD_COMMIT="$commit" ORCA_LOCAL_BUILD_VERSION="$version" \
   pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --dir "--$arch" \
   > "$log_dir/pack.log" 2>&1 || { tail -30 "$log_dir/pack.log" >&2; exit 1; }
 
 app="$ORCA_REPO/dist/mac-$arch/Orca.app"
 "$(dirname "$0")/ensure-signing-identity.sh"
+node "$(dirname "$0")/add-orcad-template-to-app.mjs" "$app" "$template_aside" \
+  "${ORCA_LOCAL_SIGN_IDENTITY:-Orca Local Signing}" "$orcad_targets"
 codesign --force --deep --sign "${ORCA_LOCAL_SIGN_IDENTITY:-Orca Local Signing}" \
   --entitlements resources/build/entitlements.mac.plist "$app" 2>&1 | grep -v 'replacing existing signature' || true
 codesign --verify --deep "$app"
+# Why again after sealing: the outer signature must not have rewritten the template's binaries.
+node -e "require('./config/scripts/verify-packaged-orcad-template.cjs').verifyPackagedOrcadTemplate(process.argv[1], process.argv[2].split(','))" \
+  "$app/Contents/Resources" "$orcad_targets"
 echo "[package] $app"
 echo "[package] version $(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString)"
 codesign -d -r- "$app" 2>&1 | grep designated

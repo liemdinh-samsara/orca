@@ -136,10 +136,40 @@ describe('SKILL.md stays in sync with the repo', () => {
     ['capture-before-after.sh', 'tests/playwright.config.ts'],
     ['package-and-install.sh', 'config/electron-builder.config.cjs'],
     ['package-and-install.sh', 'resources/build/entitlements.mac.plist'],
-    ['package-and-install.sh', 'config/scripts/build-mac-local.mjs']
+    ['package-and-install.sh', 'config/scripts/build-mac-local.mjs'],
+    ['package-and-install.sh', 'config/scripts/verify-packaged-orcad-template.cjs'],
+    ['ensure-orcad-template.sh', 'config/scripts/build-orcad-prebuilds.mjs'],
+    ['ensure-orcad-template.sh', 'config/scripts/build-orcad-template.mjs'],
+    ['ensure-orcad-template.sh', 'src/shared/node-runtime-pin.ts'],
+    ['ensure-orcad-template.sh', '.github/workflows/ssh-hostile-hosts.yml'],
+    ['ensure-orcad-template.sh', '.github/workflows/node-server-tests.yml'],
+    ['add-orcad-template-to-app.mjs', 'config/scripts/packaged-orcad-template.cjs'],
+    ['add-orcad-template-to-app.mjs', 'config/scripts/verify-packaged-orcad-template.cjs']
   ])('%s relies on %s, which exists in the repo', (script, repoFile) => {
     expect(readFileSync(join(scripts, script), 'utf8')).toContain(repoFile)
     expect(existsSync(join(root, repoFile))).toBe(true)
+  })
+
+  it('finds the template helpers add-orcad-template-to-app.mjs calls', () => {
+    const require = createRequire(import.meta.url)
+    const packaged = require(join(root, 'config/scripts/packaged-orcad-template.cjs'))
+    const verify = require(join(root, 'config/scripts/verify-packaged-orcad-template.cjs'))
+    expect(packaged.ORCAD_TEMPLATE_RESOURCE_DIR).toBe('orcad-template')
+    expect(packaged.findOrcadTemplateMachOFiles).toBeTypeOf('function')
+    expect(packaged.resealOrcadTemplateManifest).toBeTypeOf('function')
+    expect(verify.verifyPackagedOrcadTemplate).toBeTypeOf('function')
+  })
+
+  it('builds orcad slots in the same pinned images CI uses', () => {
+    const script = readFileSync(join(scripts, 'ensure-orcad-template.sh'), 'utf8')
+    const images = script.match(/quay\.io\/pypa\/manylinux_2_28_\w+@sha256:[0-9a-f]{64}/g) ?? []
+    expect(images).toHaveLength(2)
+    const workflows = ['ssh-hostile-hosts.yml', 'node-server-tests.yml']
+      .map((name) => readFileSync(join(root, '.github/workflows', name), 'utf8'))
+      .join('\n')
+    for (const image of images) {
+      expect(workflows, image).toContain(image)
+    }
   })
 
   it('selects the electron-headless Playwright project the capture script runs', () => {

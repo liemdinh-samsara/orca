@@ -127,7 +127,10 @@ Read every `after-*.png` next to its `before-*.png`. A passing test only shows t
 .claude/skills/orca-test-and-verify/scripts/package-and-install.sh --install
 ```
 
-This runs `pnpm build`, then electron-builder `--dir` for this Mac's arch with a `<base>-local.<timestamp>.<commit>` version, then signing and install.
+This runs `pnpm build`, then `scripts/ensure-orcad-template.sh`, then electron-builder `--dir` for this Mac's arch with a `<base>-local.<timestamp>.<commit>` version, then signing and install.
+
+- **SSH server template:** every SSH connect deploys the orcad server from `Resources/orcad-template`, so a build without it reaches no SSH host ("this Orca build doesn't include the server"). The script builds the template for linux-x64-glibc, linux-arm64-glibc and this Mac. The Linux node-pty slots compile in CI's manylinux images under Docker, once (~15 min emulated for x64), then come from `~/.cache/orca-local-build/orcad-prebuilds`. Packaging fails, and nothing is installed, if Docker is missing on that first run or the packaged template doesn't verify.
+- **SSH proof:** for changes near SSH, or after an upstream sync, run the Docker SSH specs against the template before installing: `ORCA_E2E_SSH_DOCKER=1 ORCA_E2E_ORCAD_CONVERT_HOST=docker ORCA_E2E_ORCAD_CONVERT_TEMPLATE=$PWD/out/orcad-template` with `tests/e2e/ssh-orcad-auto-convert.spec.ts` and the specs in `config/scripts/run-ssh-docker-e2e.mjs`. Without the template variable those specs skip silently, which proves nothing.
 
 - **Signing:** it signs with the self-signed "Orca Local Signing" identity, creating it on first use. Never sign ad-hoc (`--sign -`). Ad-hoc signing ties keychain trust to each build's hash, so the "orca Safe Storage" password prompt returns after every reinstall even with Always Allow. With the stable identity the user clicks Always Allow once.
 - **Install:** it quits Orca and immediately swaps `/Applications/Orca.app`; the old copy goes to `~/.Trash`. The swap happens right away because agent hooks relaunch Orca by bundle ID within seconds. Terminals survive because the terminal daemon keeps running.

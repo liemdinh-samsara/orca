@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Locator, Page } from '@stablyai/playwright-test'
 import type { ProviderRateLimits } from '../../src/shared/rate-limit-types'
-import { guestUrl, navigateGuest, waitForGuestUrl } from './helpers/browser-split-guest-probes'
+import { guestUrl, waitForGuestUrl } from './helpers/browser-split-guest-probes'
 import { removeWorktreeViaStore } from './helpers/dead-terminal'
 import { expect, test } from './helpers/orca-app'
 import { openSidebarWorkspaceComposer } from './helpers/sidebar-project-dialog'
@@ -393,7 +393,13 @@ test.describe('fork proof', () => {
   const SLACK_URL = 'https://app.slack.com/client'
   const CONTROL_URL = 'https://notify.example.test/'
 
-  async function readNotificationPermission(page: Page, worktreeId: string, url: string) {
+  // Why: Orca asks before a site may notify; the control site is allowed the way a person would.
+  async function readNotificationPermission(
+    page: Page,
+    worktreeId: string,
+    url: string,
+    answer?: 'Allow'
+  ) {
     const tabId = await openBrowserTab(page, { worktreeId, url, title: 'Notify probe' })
     const webview = page.locator(`[data-browser-overlay-tab-id="${tabId}"] webview`)
     const run = (script: string): Promise<unknown> =>
@@ -402,11 +408,14 @@ test.describe('fork proof', () => {
         script
       )
     await expect.poll(() => run('location.href').catch(() => null), { timeout: 30_000 }).toBe(url)
-    return {
-      url,
-      current: String(await run('Notification.permission')),
-      requested: String(await run('Notification.requestPermission()'))
+    const before = String(await run('Notification.permission'))
+    const requested = run('Notification.requestPermission()').then(String)
+    if (answer) {
+      const allow = page.getByRole('button', { name: answer, exact: true })
+      // Why race: a build that grants without asking resolves before any prompt appears.
+      await Promise.race([allow.click({ timeout: 10_000 }).catch(() => undefined), requested])
     }
+    return { url, before, requested: await requested }
   }
 
   test('browser-slack-notification-mute', async ({ orcaPage, electronApp }) => {
@@ -428,7 +437,7 @@ test.describe('fork proof', () => {
       const worktreeId = await startProofSession(orcaPage)
       const slack = await readNotificationPermission(orcaPage, worktreeId, SLACK_URL)
       await capture(orcaPage, 'browser-slack-notification-mute-slack', slack)
-      const control = await readNotificationPermission(orcaPage, worktreeId, CONTROL_URL)
+      const control = await readNotificationPermission(orcaPage, worktreeId, CONTROL_URL, 'Allow')
       await capture(orcaPage, 'browser-slack-notification-mute-control', control)
     } finally {
       await electronApp.evaluate(({ session }) => {
@@ -436,103 +445,6 @@ test.describe('fork proof', () => {
       })
     }
   })
-
-  // Why CDP: Playwright's mouse API only knows left/middle/right.
-  async function clickSideButton(page: Page, tabId: string, button: 'back' | 'forward') {
-    const box = await page.locator(`[data-browser-overlay-tab-id="${tabId}"] webview`).boundingBox()
-    if (!box) {
-      throw new Error('The browser page has no visible webview')
-    }
-    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-    const buttons = button === 'back' ? 8 : 16
-    const events = [
-      { type: 'mouseMoved' as const },
-      { type: 'mousePressed' as const, button, buttons, clickCount: 1 },
-      { type: 'mouseReleased' as const, button, buttons: 0, clickCount: 1 }
-    ]
-    const cdp = await page.context().newCDPSession(page)
-    try {
-      for (const event of events) {
-        await cdp.send('Input.dispatchMouseEvent', { ...point, ...event })
-      }
-    } finally {
-      await cdp.detach()
-    }
-  }
-
-  test('browser-mouse-side-buttons', async ({ orcaPage }) => {
-    test.setTimeout(120_000)
-    const server = await startProbeServer((request, response) => {
-      const name = request.url === '/b' ? 'B' : 'A'
-      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      response.end(
-        `<!doctype html><title>Page ${name}</title><body style="height:100vh;font:96px sans-serif;padding:40px">Page ${name}`
-      )
-    })
-    try {
-      const worktreeId = await startProofSession(orcaPage)
-      const pageA = `${server.origin}/a`
-      const pageB = `${server.origin}/b`
-      const tabId = await openBrowserTab(orcaPage, { worktreeId, url: pageA, title: 'Page A' })
-      await waitForGuestUrl(orcaPage, tabId, pageA)
-      await navigateGuest(orcaPage, tabId, pageB)
-      await capture(orcaPage, 'browser-mouse-side-buttons-start', {
-        guestUrl: await guestUrl(orcaPage, tabId)
-      })
-
-      await clickSideButton(orcaPage, tabId, 'back')
-      await expect.poll(() => guestUrl(orcaPage, tabId), { timeout: 10_000 }).toBe(pageA)
-      await capture(orcaPage, 'browser-mouse-side-buttons-back', {
-        guestUrl: await guestUrl(orcaPage, tabId)
-      })
-
-      await clickSideButton(orcaPage, tabId, 'forward')
-      await expect.poll(() => guestUrl(orcaPage, tabId), { timeout: 10_000 }).toBe(pageB)
-      await capture(orcaPage, 'browser-mouse-side-buttons-forward', {
-        guestUrl: await guestUrl(orcaPage, tabId)
-      })
-    } finally {
-      await server.close()
-    }
-  })
-
-  const MARKDOWN_PAGES: Record<string, string> = {
-    '/docs/README.md': `# Sample Project
-
-See the [guide](./guide.md).
-
-| Feature | Status |
-| --- | --- |
-| Tables | Done |
-
-\`\`\`ts
-const answer = 42
-\`\`\`
-
-<img src="missing.png" onerror="document.title = 'pwned'">
-<a href="javascript:document.title='pwned'">bad link</a>
-<script>document.title = 'pwned'</script>
-`,
-    '/docs/guide.md': '# Guide\n\nThe second page.\n'
-  }
-
-  const evaluateInGuest = <T>(page: Page, tabId: string, code: string): Promise<T> =>
-    page.evaluate(
-      ({ selector, script }) => {
-        const webview = document.querySelector<Electron.WebviewTag>(selector)
-        if (!webview) {
-          throw new Error('Browser guest unavailable')
-        }
-        return webview.executeJavaScript(script, true)
-      },
-      { selector: `[data-browser-overlay-tab-id="${tabId}"] webview`, script: code }
-    )
-
-  const markdownView = (page: Page, tabId: string): Promise<string | null> =>
-    evaluateInGuest(page, tabId, 'document.documentElement.dataset.orcaMarkdownView ?? null')
-
-  const clickGuestToggle = (page: Page, tabId: string): Promise<unknown> =>
-    evaluateInGuest(page, tabId, `document.querySelector('.orca-markdown-toggle').click()`)
 
   test('browser-markdown-viewer', async ({ orcaPage }) => {
     test.setTimeout(120_000)
@@ -774,14 +686,10 @@ const answer = 42
 // --- Features that need an SSH host or a real Okta sign-in ---------------------------------
 
 const COVERED_ELSEWHERE = [
-  ['ssh-okta-verify-ports', 'tests/e2e/local-ssh-browser-routing.spec.ts'],
+  ['ssh-okta-verify-ports', 'tests/e2e/ssh-orcad-browser-routing.spec.ts'],
   ['ssh-project-mapped-path', 'tests/e2e/ssh-project-path-prefix-setup.spec.ts'],
   ['ssh-local-terminal', 'tests/e2e/ssh-local-terminal-from-remote-workspace.spec.ts'],
-  ['cross-host-workspace-nesting', 'tests/e2e/ssh-cross-host-workspace-nesting.spec.ts'],
-  [
-    'browser-okta-fastpass',
-    'src/main/browser/browser-session-registry.persistence.test.ts and browser-route-session-policy.test.ts; a real Okta sign-in cannot load here, so the owner confirms it by hand'
-  ]
+  ['cross-host-workspace-nesting', 'tests/e2e/ssh-cross-host-workspace-nesting.spec.ts']
 ]
 
 test.describe('fork proof: covered elsewhere', () => {

@@ -28,6 +28,10 @@ function controller(
   })
 ): TabBarCreateMenuController {
   return {
+    agentMenu: { state: 'loading', placeholderCount: 0 },
+    agentPickerInventory: { getSnapshot: () => [], subscribe: () => () => {} },
+    selectPickerAgent: vi.fn(),
+    launchAgentRow: vi.fn(),
     createMenuOptions: options,
     newTabMenuOpen: false,
     setNewTabMenuOpen: vi.fn(),

@@ -49,7 +49,6 @@ describe('getWorktreeRevealCollapsedGroupKeys across hosts', () => {
         pinnedDisplayPolicy: 'single-location',
         prCache: null,
         workspaceStatuses: [],
-        settings: null,
         projectGroups: []
       })
     ).toEqual(['host:ssh:box', parentKey])

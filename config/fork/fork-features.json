@@ -411,7 +411,8 @@
         "src/main/browser/markdown-viewer/markdown-viewer-styles.ts",
         "src/renderer/src/i18n/locales/en.json",
         "src/shared/guest-script-bundle.ts",
-        "src/types/guest-script-modules.ts"
+        "src/types/guest-script-modules.ts",
+        "config/tsconfig.test.pane-launch.json"
       ],
       "unit": [
         "config/scripts/electron-vite-output-contract.test.ts",

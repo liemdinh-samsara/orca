@@ -220,6 +220,7 @@ async function renderMenu(
     mode?: 'edit' | 'check-details'
     unifiedTabId?: string
     filePath?: string
+    canShowMarkdownPreview?: boolean
   } = {}
 ): Promise<unknown> {
   const {

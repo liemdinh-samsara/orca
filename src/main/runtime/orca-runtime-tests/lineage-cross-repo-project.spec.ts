@@ -3,6 +3,7 @@ import { OrcaRuntimeService, join, listWorktrees, tmpdir } from '../orca-runtime
 import type { WorktreeLineage, WorktreeMeta } from '../orca-runtime-test-mocks.spec'
 import { makeWorktreeInfo, makeWorktreeMeta, store } from '../orca-runtime-test-fixtures.spec'
 import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { HostWorktreeTarget } from '../../../shared/worktree/host-qualified-identity'
 import type { Repo } from '../../../shared/repo-types'
 import type { RuntimeStore } from '../runtime-store-contract'
 
@@ -30,7 +31,9 @@ function projectLineageScenario(childHostId?: ExecutionHostId, parentHostId?: Ex
       hostId: parentHostId
     })
   }
-  const setWorktreeLineage = vi.fn((_worktreeId: string, lineage: WorktreeLineage) => lineage)
+  const setWorktreeLineage = vi.fn(
+    (_target: HostWorktreeTarget, lineage: WorktreeLineage) => lineage
+  )
   const setWorkspaceLineage = vi.fn<NonNullable<RuntimeStore['setWorkspaceLineage']>>()
   const runtimeStore: RuntimeStore = {
     ...store,
@@ -38,7 +41,7 @@ function projectLineageScenario(childHostId?: ExecutionHostId, parentHostId?: Ex
     getRepo: (id: string) => repos.find((repo) => repo.id === id),
     getAllWorktreeMeta: () => metaById,
     getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
-    setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+    setWorktreeMeta: ({ id: worktreeId }: HostWorktreeTarget, meta: Partial<WorktreeMeta>) => {
       metaById[worktreeId] = { ...metaById[worktreeId], ...meta }
       return metaById[worktreeId]
     },
@@ -64,7 +67,7 @@ describe('OrcaRuntimeService manual lineage across repos of one project', () => 
     })
 
     expect(setWorktreeLineage).toHaveBeenCalledWith(
-      childId,
+      expect.objectContaining({ id: childId }),
       expect.objectContaining({
         parentWorktreeId: parentId,
         parentWorktreeInstanceId: 'parent-instance'
@@ -86,7 +89,7 @@ describe('OrcaRuntimeService manual lineage across repos of one project', () => 
       })
 
       expect(setWorktreeLineage).toHaveBeenCalledExactlyOnceWith(
-        childId,
+        expect.objectContaining({ id: childId }),
         expect.objectContaining({
           worktreeId: childId,
           worktreeInstanceId: 'child-instance',

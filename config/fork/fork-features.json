@@ -495,12 +495,13 @@
     },
     {
       "id": "mobile-chat-skills",
-      "title": "Phone chat '/' menu lists the host's skills",
-      "commits": ["1e4b2ccf9f", "5e3f0c6081"],
+      "title": "Phone chat '/' menu lists the host's skills, at the start of a message and after other words",
+      "commits": ["1e4b2ccf9f", "5e3f0c6081", "41ceef2c51"],
       "paths": [
         "mobile/src/session/MobileNativeChatComposer.tsx",
         "mobile/src/session/MobileNativeChatOverlay.tsx",
         "mobile/src/session/MobileNativeChatView.tsx",
+        "mobile/src/session/mobile-native-chat-autocomplete.ts",
         "mobile/src/session/mobile-native-chat-controller-contract.ts",
         "mobile/src/session/mobile-native-chat-session-catalog.ts",
         "mobile/src/session/mobile-native-chat-skill-read.ts",
@@ -513,8 +514,10 @@
         "src/main/runtime/rpc/methods/index.ts",
         "src/main/runtime/rpc/methods/native-chat-skills.ts",
         "src/main/runtime/runtime-rpc/runtime-rpc-mobile-method-routing.ts",
+        "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
         "src/renderer/src/components/native-chat/use-native-chat-skills.ts",
         "src/shared/native-chat-skill-visibility.ts",
+        "src/shared/native-chat-slash-commands.ts",
         "src/shared/rpc-contract/native-chat-params.ts",
         "src/shared/rpc-contract/rpc-params-catalog.generated.ts"
       ],
@@ -526,6 +529,7 @@
       "mobile": [
         "mobile/src/session/MobileNativeChatComposer.test.ts",
         "mobile/src/session/MobileNativeChatOverlay.test.ts",
+        "mobile/src/session/mobile-native-chat-autocomplete.test.ts",
         "mobile/src/session/mobile-native-chat-session-catalog.test.ts",
         "mobile/src/session/mobile-native-chat-skill-read.test.ts",
         "mobile/src/session/use-mobile-native-chat-controller-skill-catalog.test.ts",

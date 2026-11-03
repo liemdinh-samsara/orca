@@ -9,6 +9,29 @@ import {
   setWorktreeLineageForRuntime
 } from './worktree-lineage-refresh'
 import { hostRouteForWorktreeOwner } from '../listing/worktree-owner-target'
+import { isCrossHostWorktreeLineage } from './worktree-lineage-host-merge'
+import {
+  desktopHeldWorktreeLineage,
+  writeCrossHostWorktreeLineage
+} from './cross-host-worktree-lineage'
+
+// Why: one edge per child; a host's own edge is cleared first so the two stores never disagree.
+async function nestAcrossHosts(
+  set: WorktreeSliceSet,
+  get: WorktreeSliceGet,
+  worktreeId: string,
+  parentWorktreeId: string
+): Promise<void> {
+  if (get().worktreeLineageById[worktreeId] && !desktopHeldWorktreeLineage(get(), worktreeId)) {
+    const ownerRoute = hostRouteForWorktreeOwner(get(), worktreeId)
+    applyWorktreeLineageUpdate(
+      set,
+      worktreeId,
+      await setWorktreeLineageForRuntime(ownerRoute, worktreeId, { noParent: true })
+    )
+  }
+  await writeCrossHostWorktreeLineage(set, get, worktreeId, parentWorktreeId)
+}
 
 // Why: this runs inside a catch, so letting the refresh reject would replace the failure it recovers from.
 async function refreshWorktreeLineageBestEffort(
@@ -59,6 +82,19 @@ export function createUpdateWorktreeLineage(
   get: WorktreeSliceGet
 ): WorktreeSlice['updateWorktreeLineage'] {
   return async (worktreeId, args) => {
+    if (
+      args.parentWorktreeId &&
+      isCrossHostWorktreeLineage(get(), worktreeId, args.parentWorktreeId)
+    ) {
+      await nestAcrossHosts(set, get, worktreeId, args.parentWorktreeId)
+      return
+    }
+    if (desktopHeldWorktreeLineage(get(), worktreeId)) {
+      await writeCrossHostWorktreeLineage(set, get, worktreeId, null)
+      if (args.noParent === true) {
+        return
+      }
+    }
     // User-initiated unresolved routes must reject so both callers can toast, rather than silently skip.
     const ownerRoute = hostRouteForWorktreeOwner(get(), worktreeId)
     try {
@@ -80,6 +116,13 @@ export function createAssignWorktreeParent(
   get: WorktreeSliceGet
 ): WorktreeSlice['assignWorktreeParent'] {
   return async (worktreeId, args) => {
+    if (isCrossHostWorktreeLineage(get(), worktreeId, args.parentWorktreeId)) {
+      await nestAcrossHosts(set, get, worktreeId, args.parentWorktreeId)
+      return
+    }
+    if (desktopHeldWorktreeLineage(get(), worktreeId)) {
+      await writeCrossHostWorktreeLineage(set, get, worktreeId, null)
+    }
     const ownerRoute = hostRouteForWorktreeOwner(get(), worktreeId)
     try {
       applyWorktreeLineageUpdate(

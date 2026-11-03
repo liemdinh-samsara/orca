@@ -5,6 +5,7 @@ import type { Worktree } from './worktree/types'
 import type { WorktreeLineageBoundary } from './resolved-worktree-lineage'
 import {
   projectResolvedWorktreeLineage,
+  sharesDesktopWorktreeLineageBoundary,
   sharesWorktreeLineageBoundary
 } from './resolved-worktree-lineage'
 
@@ -99,8 +100,34 @@ describe('sharesWorktreeLineageBoundary', () => {
   it.each([
     ['child', project({ hostId: 'runtime:env-a' }), project()],
     ['parent', project(), project({ hostId: 'runtime:env-a' })]
-  ])('rejects a cross-host edge when the %s is on a paired runtime', (_label, child, parent) => {
-    expect(sharesWorktreeLineageBoundary(child, parent)).toBe(false)
+  ])(
+    'keeps runtimes and phones host-scoped when the %s is on a runtime host',
+    (_label, child, parent) => {
+      expect(sharesWorktreeLineageBoundary(child, parent)).toBe(false)
+    }
+  )
+
+  it.each([
+    ['child', project({ hostId: 'runtime:env-a' }), project()],
+    ['parent', project(), project({ hostId: 'runtime:env-a' })],
+    ['child and parent', project({ hostId: 'runtime:env-a' }), project({ hostId: 'runtime:env-b' })]
+  ])(
+    'lets the desktop nest a same-project %s on a managed runtime host',
+    (_label, child, parent) => {
+      expect(sharesDesktopWorktreeLineageBoundary(child, parent)).toBe(true)
+    }
+  )
+
+  it('keeps the desktop boundary within one project', () => {
+    expect(
+      sharesDesktopWorktreeLineageBoundary(
+        project({ hostId: 'runtime:env-a' }),
+        project({ projectId: 'github:other/project' })
+      )
+    ).toBe(false)
+    expect(
+      sharesDesktopWorktreeLineageBoundary(project(), boundary({ hostId: 'ssh:remote' }))
+    ).toBe(false)
   })
 })
 

@@ -238,7 +238,18 @@
         "src/renderer/src/components/sidebar/workspace-delete-lineage.ts",
         "src/shared/sidebar-list/worktree-lineage-projection.ts",
         "src/renderer/src/components/sidebar/worktree-parent-candidates.ts",
-        "src/shared/resolved-worktree-lineage.ts"
+        "src/shared/resolved-worktree-lineage.ts",
+        "src/main/ipc/worktrees.ts",
+        "src/main/ipc/worktrees/metadata/cross-host-lineage.ts",
+        "src/main/ipc/worktrees/metadata/register-worktree-metadata-handlers.ts",
+        "src/preload/api/worktree-api.ts",
+        "src/preload/api/worktrees-bridge.ts",
+        "src/renderer/src/store/slices/worktrees/metadata/cross-host-worktree-lineage.ts",
+        "src/renderer/src/store/slices/worktrees/metadata/worktree-lineage-actions.ts",
+        "src/renderer/src/store/slices/worktrees/metadata/worktree-lineage-host-merge.ts",
+        "src/renderer/src/web/preload-api/web-worktrees-api.ts",
+        "src/shared/worktree/cross-host-lineage-request.ts",
+        "src/renderer/src/store/slices/worktrees-slice-test-harness.ts"
       ],
       "unit": [
         "src/main/ipc/worktree-create-lineage.test.ts",
@@ -250,7 +261,9 @@
         "src/renderer/src/components/sidebar/worktree-list-groups-lineage-nesting.test.ts",
         "src/renderer/src/components/sidebar/worktree-parent-eligibility.test.ts",
         "src/renderer/src/components/sidebar/worktree-reveal-group-keys.test.ts",
-        "src/shared/resolved-worktree-lineage.test.ts"
+        "src/shared/resolved-worktree-lineage.test.ts",
+        "src/main/ipc/worktrees/metadata/cross-host-lineage.test.ts",
+        "src/renderer/src/store/slices/worktrees-lineage-cross-host.test.ts"
       ],
       "unitSupport": [
         {
@@ -267,7 +280,7 @@
       "checks": [],
       "appProof": {
         "surface": "desktop",
-        "steps": "Needs one project registered on two hosts: a local checkout and an SSH checkout with the same git origin (Docker sshd relay target via tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox). Launch the app hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode (window.__store exposed), attach Playwright over CDP, wait until both main worktrees report the same projectId, call window.__store.getState().setGroupBy(\"repo\"), then drag the card [data-worktree-drag-id=<ssh id>] onto [data-worktree-card-parent-content] of the local card with CDP mouse events. The AFTER screenshot should show the local card with a \"Hide 1 child workspace\" chip and the SSH workspace indented one level beneath it; check worktreeLineageById[sshId].parentWorktreeId equals the local id. BEFORE screenshot is the same view with both cards at depth 0. Then open the delete dialog on the local parent: the \"delete with children\" list must not include the SSH child. Restart the app and confirm the nesting survives (worktrees:listLineage returns the edge after restart)."
+        "steps": "Run tests/e2e/ssh-cross-host-workspace-nesting.spec.ts on Docker (ORCA_E2E_SSH_DOCKER=1 ORCA_E2E_ORCAD_CONVERT_HOST=docker ORCA_E2E_ORCAD_CONVERT_TEMPLATE=<template>): it seeds a relay-era SSH host, converts it to a managed runtime host, adds a local checkout with the same git origin, groups by repo, drags the devbox card onto the Mac card body and checks the lineage parent, the \"Hide 1 child workspace\" chip, the desktop listLineage record, that a devbox lineage refresh keeps the edge, and that it survives a restart; it saves cross-host-nested.png. BEFORE (rule rejecting runtime hosts) the Mac card never becomes a drop target. On a real setup: group by repo, drag a devbox workspace onto a Mac workspace of the same project, confirm it nests and stays nested after reopening Orca."
       }
     },
     {

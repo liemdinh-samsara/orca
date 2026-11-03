@@ -35,6 +35,35 @@ export function getWorktreeHostId(
   return repo ? getRepoExecutionHostId(repo) : null
 }
 
+type HostLookupState = Pick<
+  AppState,
+  'repos' | 'settings' | 'worktreesByRepo' | 'detectedWorktreesByRepo'
+>
+
+/** True for an edge whose parent is on another host; only the desktop's own store holds those. */
+export function isCrossHostWorktreeLineage(
+  state: HostLookupState,
+  childWorktreeId: string,
+  parentWorktreeId: string
+): boolean {
+  const childHostId = getWorktreeHostId(state, childWorktreeId)
+  const parentHostId = getWorktreeHostId(state, parentWorktreeId)
+  return childHostId !== null && parentHostId !== null && childHostId !== parentHostId
+}
+
+// Why: a host's own snapshot never carries cross-host edges, so only the desktop's refresh may drop them.
+function isOwnedByHostRefresh(
+  state: HostLookupState,
+  hostId: ExecutionHostId,
+  childWorktreeId: string,
+  parentWorktreeId: string | null
+): boolean {
+  if (parentWorktreeId && isCrossHostWorktreeLineage(state, childWorktreeId, parentWorktreeId)) {
+    return hostId === 'local'
+  }
+  return getWorktreeHostId(state, childWorktreeId) === hostId
+}
+
 export function mergeLineageForHost(
   state: Pick<
     AppState,
@@ -50,7 +79,10 @@ export function mergeLineageForHost(
     lineageAtRequestStart[worktreeId] !== state.worktreeLineageById[worktreeId]
   const next: Record<string, WorktreeLineage> = {}
   for (const [worktreeId, existing] of Object.entries(state.worktreeLineageById)) {
-    if (getWorktreeHostId(state, worktreeId) !== hostId || writtenSinceRequestStart(worktreeId)) {
+    if (
+      !isOwnedByHostRefresh(state, hostId, worktreeId, existing.parentWorktreeId) ||
+      writtenSinceRequestStart(worktreeId)
+    ) {
       next[worktreeId] = existing
     }
   }
@@ -83,10 +115,13 @@ export function mergeWorkspaceLineageForHost(
     const childScope = parseWorkspaceKey(existing.childWorkspaceKey)
     const childHostId =
       childScope?.type === 'worktree' ? getWorktreeHostId(state, childScope.worktreeId) : null
+    const parentScope = parseWorkspaceKey(existing.parentWorkspaceKey)
+    const parentWorktreeId = parentScope?.type === 'worktree' ? parentScope.worktreeId : null
     // A focused host refresh can no longer prove unknown-host child rows are current.
     if (
       childScope?.type !== 'worktree' ||
-      (childHostId !== null && childHostId !== hostId) ||
+      (childHostId !== null &&
+        !isOwnedByHostRefresh(state, hostId, childScope.worktreeId, parentWorktreeId)) ||
       writtenSinceRequestStart(childKey)
     ) {
       next[childKey] = existing

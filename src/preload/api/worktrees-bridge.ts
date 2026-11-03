@@ -63,6 +63,7 @@ export const worktreesApi = {
   listLineage: () => ipcRenderer.invoke('worktrees:listLineage'),
 
   updateLineage: (args) => ipcRenderer.invoke('worktrees:updateLineage', args),
+  setCrossHostLineage: (args) => ipcRenderer.invoke('worktrees:setCrossHostLineage', args),
 
   persistSortOrder: (args) => ipcRenderer.invoke('worktrees:persistSortOrder', args),
 

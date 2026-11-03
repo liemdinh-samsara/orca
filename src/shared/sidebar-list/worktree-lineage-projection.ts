@@ -1,7 +1,8 @@
 import {
   getCyclicLineageChildKeys,
   getCyclicWorktreeLineageChildIds,
-  isValidResolvedWorktreeLineageEdge
+  isValidResolvedWorktreeLineageEdge,
+  sharesDesktopWorktreeLineageBoundary
 } from '../resolved-worktree-lineage'
 import type { ExecutionHostId } from '../execution-host'
 import {
@@ -72,13 +73,27 @@ export function getCyclicProjectedWorktreeLineageIds(
       continue
     }
     const parent = worktreeMap.get(lineage.parentWorktreeId)
-    if (parent && isValidResolvedWorktreeLineageEdge(worktree, parent, lineage)) {
+    if (parent && isValidSidebarLineageEdge(worktree, parent, lineage)) {
       validLineageByChildId.set(worktree.id, lineage)
     }
   }
   const cyclicLineageIds = getCyclicWorktreeLineageChildIds(validLineageByChildId)
   projection.cyclicLineageIds = cyclicLineageIds
   return cyclicLineageIds
+}
+
+// Why the desktop boundary: the sidebar shows the edges this desktop holds across its hosts.
+function isValidSidebarLineageEdge(
+  child: Worktree,
+  parent: Worktree,
+  lineage: WorktreeLineage
+): boolean {
+  return isValidResolvedWorktreeLineageEdge(
+    child,
+    parent,
+    lineage,
+    sharesDesktopWorktreeLineageBoundary
+  )
 }
 
 export function getLineageRenderInfo(
@@ -95,7 +110,7 @@ export function getLineageRenderInfo(
   if (
     cyclicLineageIds.has(worktree.id) ||
     !parent ||
-    !isValidResolvedWorktreeLineageEdge(worktree, parent, lineage)
+    !isValidSidebarLineageEdge(worktree, parent, lineage)
   ) {
     return { state: 'missing', lineage }
   }
@@ -226,7 +241,7 @@ export function getSidebarLineageParent(
     : (getRowsById(rowsByHostIdentity).get(lineage.parentWorktreeId) ?? []).filter((row) =>
         isOnOtherKnownHost(row, worktree)
       )
-  return candidates.find((parent) => isValidResolvedWorktreeLineageEdge(worktree, parent, lineage))
+  return candidates.find((parent) => isValidSidebarLineageEdge(worktree, parent, lineage))
 }
 
 /** Host-keyed nesting parents; cycles have none. Cache assumes callers replace both inputs rather than mutate them. */

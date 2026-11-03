@@ -393,7 +393,13 @@ describe('buildRows workspace lineage nesting', () => {
       { hostId: 'ssh:other-host' as const, projectId: 'github:other/project' },
       [0, 0]
     ],
-    ['paired runtime host', { hostId: 'runtime:env-a' as const }, [0, 0]]
+    // The desktop holds this edge: a managed SSH devbox is a runtime host of the same project.
+    ['same-project runtime host', { hostId: 'runtime:env-a' as const }, [0, 1]],
+    [
+      'runtime host and project',
+      { hostId: 'runtime:env-a' as const, projectId: 'github:other/project' },
+      [0, 0]
+    ]
   ] as const)('applies the known %s lineage boundary', (_label, boundary, depths) => {
     const boundedParent = {
       ...parent,

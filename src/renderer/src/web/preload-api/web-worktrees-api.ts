@@ -260,6 +260,10 @@ export function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees
       })
       return result.worktree.lineage ?? null
     },
+    // Why: cross-host edges live in a desktop's own store, which a paired client cannot reach.
+    setCrossHostLineage: async () => {
+      throw new Error('Nesting across hosts is available only in the desktop app.')
+    },
     persistSortOrder: async ({ orderedIds, hostIds }) => {
       await callRuntimeResult('worktree.persistSortOrder', { orderedIds, hostIds })
     },

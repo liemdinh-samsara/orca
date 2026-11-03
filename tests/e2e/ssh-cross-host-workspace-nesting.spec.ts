@@ -4,20 +4,18 @@ import os from 'node:os'
 import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { quotePosixShell } from '../../src/shared/shell-argument-quoting'
 import {
-  cleanupDockerSshRelayTarget,
-  execDockerSshRelayTargetCommand,
-  shellQuote,
-  startDockerSshRelayTarget,
-  type DockerSshRelayTarget
-} from './helpers/docker-ssh-relay-target'
-import { connectDockerSshRelayTarget } from './helpers/docker-ssh-relay-connection'
-import { waitForSessionReady } from './helpers/store'
+  launchManagedWorkspace,
+  relaunchManagedApp,
+  skipUnlessManagedDockerHost,
+  withManagedHost
+} from './helpers/orcad-managed-workspace'
 
-const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'
+skipUnlessManagedDockerHost()
+
 // Why one origin: Orca files both checkouts under one project, which is what lets them nest.
 const ORIGIN = 'https://github.com/orca-e2e/cross-host-nesting.git'
-const REMOTE_REPO = '/tmp/orca-cross-host-nesting'
 
 function seedLocalRepo(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-cross-host-nesting-'))
@@ -34,119 +32,117 @@ function seedLocalRepo(): string {
   return dir
 }
 
-function seedRemoteRepo(target: DockerSshRelayTarget): void {
-  execDockerSshRelayTargetCommand(
-    target,
-    [
-      `rm -rf ${shellQuote(REMOTE_REPO)}`,
-      `mkdir -p ${shellQuote(REMOTE_REPO)}`,
-      `cd ${shellQuote(REMOTE_REPO)}`,
-      'git init -b main',
-      "printf 'remote checkout\\n' > README.md",
-      'git add README.md',
-      'git commit -m initial',
-      `git remote add origin ${shellQuote(ORIGIN)}`
-    ].join(' && ')
-  )
+type Row = { id: string; projectId?: string; hostId?: string }
+
+function readRow(page: Page, worktreeId: string): Promise<Row | null> {
+  return page.evaluate((worktreeId) => {
+    for (const rows of Object.values(window.__store!.getState().worktreesByRepo)) {
+      const row = rows.find((worktree) => worktree.id === worktreeId)
+      if (row) {
+        return { id: row.id, projectId: row.projectId, hostId: row.hostId }
+      }
+    }
+    return null
+  }, worktreeId)
 }
 
-async function readMainWorktree(
-  page: Page,
-  repoId: string
-): Promise<{ id: string; projectId?: string; hostId?: string } | null> {
+function localMainWorktreeId(page: Page, repoId: string): Promise<string | null> {
   return page.evaluate(async (repoId) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('Store unavailable')
-    }
+    const store = window.__store!
     await store.getState().fetchWorktrees(repoId)
-    const row = (store.getState().worktreesByRepo[repoId] ?? []).find(
-      (worktree) => worktree.isMainWorktree
+    return (
+      (store.getState().worktreesByRepo[repoId] ?? []).find((row) => row.isMainWorktree)?.id ?? null
     )
-    return row ? { id: row.id, projectId: row.projectId, hostId: row.hostId } : null
   }, repoId)
 }
 
-test.use({ seedTestRepo: false })
+function parentOf(page: Page, worktreeId: string): Promise<string | null> {
+  return page.evaluate(
+    (id) => window.__store!.getState().worktreeLineageById[id]?.parentWorktreeId ?? null,
+    worktreeId
+  )
+}
 
-test.describe('SSH cross-host workspace nesting', () => {
-  test.skip(!RUN_DOCKER_SSH, 'Set ORCA_E2E_SSH_DOCKER=1 to run Docker-backed SSH tests.')
-  test.skip(process.platform === 'win32', 'Docker SSH tests use POSIX ssh tooling.')
-
-  test('nests an SSH workspace under a local workspace of the same project by drag', async ({
-    orcaPage
-  }, testInfo) => {
-    test.setTimeout(300_000)
-    const target = startDockerSshRelayTarget(testInfo)
-    const localDir = seedLocalRepo()
-    try {
-      seedRemoteRepo(target)
-      await waitForSessionReady(orcaPage)
-      const localRepoId = await orcaPage.evaluate(async (repoPath) => {
-        const result = await window.api.repos.add({ path: repoPath })
-        if ('error' in result) {
-          throw new Error(result.error)
+test('nests a managed devbox workspace under a Mac workspace of the same project by drag', async (// oxlint-disable-next-line no-empty-pattern -- Owns app launch.
+{}, testInfo) => {
+  test.setTimeout(6 * 60_000)
+  const localDir = seedLocalRepo()
+  try {
+    await withManagedHost(testInfo, async (fixture) => {
+      fixture.host.exec!(
+        `cd ${quotePosixShell(fixture.host.remoteRepoPath)} && git remote add origin ${quotePosixShell(ORIGIN)}`
+      )
+      let localRepoId = ''
+      const workspace = await launchManagedWorkspace(fixture, {
+        beforeSeed: async (page) => {
+          localRepoId = await page.evaluate(async (repoPath) => {
+            const result = await window.api.repos.add({ path: repoPath })
+            if ('error' in result) {
+              throw new Error(result.error)
+            }
+            return result.repo.id
+          }, localDir)
         }
-        await window.__store?.getState().fetchRepos()
-        return result.repo.id
-      }, localDir)
-      const remote = await connectDockerSshRelayTarget(orcaPage, target, {
-        remotePath: REMOTE_REPO,
-        seedInitialTab: false
       })
-
+      let page = workspace.page
+      const childId = workspace.seeded.worktreeId
+      const parentId = (await localMainWorktreeId(page, localRepoId))!
       await expect
         .poll(
           async () => {
-            const [local, ssh] = await Promise.all([
-              readMainWorktree(orcaPage, localRepoId),
-              readMainWorktree(orcaPage, remote.repoId)
+            const [child, parent] = await Promise.all([
+              readRow(page, childId),
+              readRow(page, parentId)
             ])
-            return local?.projectId && local.projectId === ssh?.projectId
+            return Boolean(parent?.projectId && parent.projectId === child?.projectId)
           },
           { timeout: 90_000, message: 'both checkouts never joined one project' }
         )
         .toBe(true)
-      const local = (await readMainWorktree(orcaPage, localRepoId))!
-      const ssh = (await readMainWorktree(orcaPage, remote.repoId))!
-      expect(local.hostId).toBe('local')
-      expect(ssh.hostId).toMatch(/^ssh:/)
-      await orcaPage.evaluate(() => window.__store!.getState().setGroupBy('repo'))
+      expect((await readRow(page, childId))?.hostId).toBe(`runtime:${workspace.environmentId}`)
+      expect((await readRow(page, parentId))?.hostId).toBe('local')
+      await page.evaluate(() => window.__store!.getState().setGroupBy('repo'))
 
-      const source = orcaPage.locator(`[data-worktree-drag-id="${ssh.id}"]`).first()
-      const parentCard = orcaPage.locator(`[data-worktree-drag-id="${local.id}"]`).first()
+      // The devbox card sits in its own project group; drop it on the Mac card's body.
+      const source = page.locator(`[data-worktree-drag-id="${childId}"]`).first()
+      const parentCard = page.locator(`[data-worktree-drag-id="${parentId}"]`).first()
       const parentContent = parentCard.locator('[data-worktree-card-parent-content]').first()
       await expect(source).toBeVisible({ timeout: 30_000 })
       await expect(parentContent).toBeVisible({ timeout: 30_000 })
-
       const from = (await source.boundingBox())!
       const to = (await parentContent.boundingBox())!
-      await orcaPage.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
-      await orcaPage.mouse.down()
-      await orcaPage.mouse.move(from.x + from.width / 2, from.y + from.height / 2 - 12, {
-        steps: 4
-      })
-      await orcaPage.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 - 12, { steps: 4 })
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
       await expect(parentCard.locator('[data-worktree-lineage-drop-target]')).toHaveCount(1)
-      await orcaPage.mouse.up()
+      await page.mouse.up()
 
-      await expect
-        .poll(
-          () =>
-            orcaPage.evaluate(
-              (sshId) =>
-                window.__store!.getState().worktreeLineageById[sshId]?.parentWorktreeId ?? null,
-              ssh.id
-            ),
-          { timeout: 20_000 }
-        )
-        .toBe(local.id)
+      await expect.poll(() => parentOf(page, childId), { timeout: 20_000 }).toBe(parentId)
       await expect(parentCard.getByRole('button', { name: 'Hide 1 child workspace' })).toBeVisible({
         timeout: 10_000
       })
-    } finally {
-      cleanupDockerSshRelayTarget(target)
-      rmSync(localDir, { recursive: true, force: true })
-    }
-  })
+      await page.screenshot({ path: testInfo.outputPath('cross-host-nested.png') })
+      // The desktop holds the edge; the devbox's own lineage refresh must not wipe it.
+      const desktopLineage = await page.evaluate(() => window.api.worktrees.listLineage())
+      expect(desktopLineage.lineage[childId]?.parentWorktreeId).toBe(parentId)
+      await page.evaluate(
+        (hostId) => window.__store!.getState().fetchWorktreeLineage({ executionHostId: hostId }),
+        `runtime:${workspace.environmentId}` as const
+      )
+      expect(await parentOf(page, childId)).toBe(parentId)
+
+      page = await relaunchManagedApp(fixture)
+      await page.evaluate(() => window.__store!.getState().setGroupBy('repo'))
+      await expect.poll(() => parentOf(page, childId), { timeout: 60_000 }).toBe(parentId)
+      await expect(
+        page
+          .locator(`[data-worktree-drag-id="${parentId}"]`)
+          .first()
+          .getByRole('button', { name: 'Hide 1 child workspace' })
+      ).toBeVisible({ timeout: 30_000 })
+    })
+  } finally {
+    rmSync(localDir, { recursive: true, force: true })
+  }
 })

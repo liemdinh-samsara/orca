@@ -16,6 +16,8 @@ import { isRemovedFolderWorkspaceInstance } from '../../../folder-workspace-meta
 import { resolveWorktreeMetaOwner } from '../../../persistence/host-qualified-worktree-meta'
 import { hostWorktreeTarget } from '../../../../shared/worktree/host-qualified-identity'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
+import { writeCrossHostWorktreeLineage } from './cross-host-lineage'
+import type { CrossHostLineageRequest } from '../../../../shared/worktree/cross-host-lineage-request'
 import {
   isWslMoveSourceHost,
   isWslMoveWorkspaceBlocked,
@@ -106,6 +108,10 @@ export function registerWorktreeMetadataHandlers(context: WorktreeIpcContext): v
       notifyWorktreesChanged(mainWindow, parseWorktreeId(args.worktreeId).repoId)
       return store.getWorktreeLineage(args.worktreeId) ?? null
     }
+  )
+
+  ipcMain.handle('worktrees:setCrossHostLineage', (_event, args: CrossHostLineageRequest) =>
+    writeCrossHostWorktreeLineage(store, args)
   )
 
   ipcMain.handle('worktrees:persistSortOrder', (_event, args: WorktreeSortOrderRequest) => {

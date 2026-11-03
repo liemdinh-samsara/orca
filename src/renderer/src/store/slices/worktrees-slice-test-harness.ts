@@ -86,7 +86,8 @@ export const mockApi = {
       stubMock<[{ worktreeId: string; updates: Partial<WorktreeMeta> }]>().mockResolvedValue(
         undefined
       ),
-    updateLineage: stubMock().mockResolvedValue(null)
+    updateLineage: stubMock().mockResolvedValue(null),
+    setCrossHostLineage: stubMock().mockResolvedValue(null)
   },
   pty: {
     kill: stubMock().mockResolvedValue(undefined)

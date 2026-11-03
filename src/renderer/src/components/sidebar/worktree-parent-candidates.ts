@@ -1,5 +1,5 @@
 import { getWorktreeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
-import { sharesWorktreeLineageBoundary } from '../../../../shared/resolved-worktree-lineage'
+import { sharesDesktopWorktreeLineageBoundary } from '../../../../shared/resolved-worktree-lineage'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
@@ -64,7 +64,7 @@ export function isEligibleWorktreeParent({
     childHostId !== null &&
     parentHostId !== null &&
     // Why: the same rule the backend enforces, so a same-project parent on another host is offered.
-    sharesWorktreeLineageBoundary(
+    sharesDesktopWorktreeLineageBoundary(
       { hostId: childHostId, projectId: child.projectId },
       { hostId: parentHostId, projectId: candidateParent.projectId }
     ) &&

@@ -20,8 +20,8 @@ export function sharesWorktreeLineageBoundary(
     return true
   }
   // Why: one project can be set up on several hosts this desktop drives (a Mac checkout and an
-  // SSH devbox), and its workspaces nest across those setups. A paired runtime owns its own
-  // lineage, so it never nests across hosts.
+  // SSH devbox), and its workspaces nest across those setups. A runtime host owns its own
+  // lineage, so runtimes and phones never see an edge across it.
   return (
     child.projectId !== undefined &&
     child.projectId === parent.projectId &&
@@ -34,6 +34,18 @@ function isRuntimeHost(hostId: ExecutionHostId | undefined): boolean {
   return parseExecutionHostId(hostId)?.kind === 'runtime'
 }
 
+/** The desktop's own view: it stores cross-host edges itself, so a managed SSH devbox (a runtime
+ *  host since the managed-server move) nests under a Mac workspace of the same project. */
+export function sharesDesktopWorktreeLineageBoundary(
+  child: WorktreeLineageBoundary,
+  parent: WorktreeLineageBoundary
+): boolean {
+  if (child.hostId === undefined || parent.hostId === undefined || child.hostId === parent.hostId) {
+    return true
+  }
+  return child.projectId !== undefined && child.projectId === parent.projectId
+}
+
 export function sharesResolvedWorktreeLineageBoundary(child: Worktree, parent: Worktree): boolean {
   return sharesWorktreeLineageBoundary(child, parent)
 }
@@ -41,13 +53,17 @@ export function sharesResolvedWorktreeLineageBoundary(child: Worktree, parent: W
 export function isValidResolvedWorktreeLineageEdge(
   child: Worktree,
   parent: Worktree,
-  lineage: WorktreeLineage
+  lineage: WorktreeLineage,
+  sharesBoundary: (
+    child: Worktree,
+    parent: Worktree
+  ) => boolean = sharesResolvedWorktreeLineageBoundary
 ): boolean {
   return (
     child.id !== parent.id &&
     lineage.worktreeId === child.id &&
     lineage.parentWorktreeId === parent.id &&
-    sharesResolvedWorktreeLineageBoundary(child, parent) &&
+    sharesBoundary(child, parent) &&
     child.instanceId === lineage.worktreeInstanceId &&
     parent.instanceId === lineage.parentWorktreeInstanceId
   )

@@ -10,6 +10,7 @@ import type {
 } from '../../shared/detected-worktree-provider-contract'
 import type { NestedWorktreeRemovalApproval } from '../../shared/worktree/nested-removal'
 import type { ExecutionHostId } from '../../shared/execution-host'
+import type { CrossHostLineageRequest } from '../../shared/worktree/cross-host-lineage-request'
 import type { WorkspaceSleepOutcome, WorkspaceSleepRequest } from '../../shared/workspace-sleep'
 import type { RetiredNameRegistry } from '../../shared/worktree/retired-name-registry'
 import type {
@@ -138,6 +139,8 @@ export type WorktreeApi = {
     parentWorktreeId?: string
     noParent?: boolean
   }) => Promise<WorktreeLineage | null>
+  /** Desktop-held edge between workspaces on different hosts of one project. */
+  setCrossHostLineage: (args: CrossHostLineageRequest) => Promise<WorktreeLineage | null>
   persistSortOrder: (args: { orderedIds: string[]; hostIds?: string[] }) => Promise<void>
   /** Last failure output; memory-only, cleared on restart or when the failure clears. */
   getBranchRenameFailureOutput: (args: { worktreeId: string }) => Promise<string | null>

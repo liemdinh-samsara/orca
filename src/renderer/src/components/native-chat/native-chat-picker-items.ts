@@ -1,5 +1,9 @@
 import type { DiscoveredSkill, SkillSourceKind } from '../../../../shared/skills'
-import type { SlashCommandSuggestion } from '../../../../shared/native-chat-slash-commands'
+import {
+  LEADING_SLASH_TRIGGER,
+  MID_PROMPT_SLASH_TRIGGER,
+  type SlashCommandSuggestion
+} from '../../../../shared/native-chat-slash-commands'
 import {
   isSafeDisplayCharacter,
   stripUnsafeDisplayCharacters
@@ -268,11 +272,7 @@ function comparePickerSkills(
   )
 }
 
-// `/` is the composer's only trigger, for every agent. A draft-leading slash is
-// the one that can dispatch; elsewhere the token starts after whitespace and its
-// query stops at the next `/` so file paths stay prose.
-export const LEADING_SLASH_TRIGGER = /^\/(\S*)$/
-export const MID_PROMPT_SLASH_TRIGGER = /\s\/([^\s/]*)$/
+export { LEADING_SLASH_TRIGGER, MID_PROMPT_SLASH_TRIGGER }
 
 /** Replaces the typed `/token` with the item's own token, which for a skill is
  *  the agent-native form even though every agent is typed the same way. */

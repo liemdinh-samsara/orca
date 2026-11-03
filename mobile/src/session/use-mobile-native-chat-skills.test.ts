@@ -214,6 +214,19 @@ describe('useMobileNativeChatHostSkills', () => {
     expect(read.fn).toHaveBeenCalledTimes(1)
   })
 
+  it('also asks when the slash comes after other words, but not for paths or prose', async () => {
+    read.fn.mockReset()
+    read.fn.mockResolvedValue([REPORT])
+
+    await type('please open src/main and')
+    await type('about 3/4 done, see https://a.dev/x')
+    expect(read.fn).not.toHaveBeenCalled()
+
+    await type('fix this then /liem')
+    expect(read.fn).toHaveBeenCalledTimes(1)
+    expect(result?.map((entry) => entry.name)).toEqual(['liem-upload-report'])
+  })
+
   it('omits the description key when the host skill has no description', async () => {
     read.fn.mockReset()
     read.fn.mockResolvedValue([{ name: 'report', description: null }])

@@ -2,7 +2,11 @@
 // `/slash` commands. Detection is pure (text + cursor → active trigger) so it's
 // unit-testable and the composer stays a thin view over it.
 
-import type { SlashCommandSuggestion } from '../../../src/shared/native-chat-slash-commands'
+import {
+  LEADING_SLASH_TRIGGER,
+  MID_PROMPT_SLASH_TRIGGER,
+  type SlashCommandSuggestion
+} from '../../../src/shared/native-chat-slash-commands'
 
 export type AutocompleteKind = 'file' | 'slash'
 
@@ -19,9 +23,10 @@ export type AutocompleteTrigger = {
 const TOKEN_CHAR = /[^\s]/
 
 /** Detect an active autocomplete trigger at the cursor. A `@` mention triggers
- *  anywhere it follows whitespace/start; a `/` command only at the very start of
- *  the input (slash commands are line-leading). Returns null when the cursor is
- *  not inside such a token. */
+ *  anywhere it follows whitespace/start. A `/` triggers at the start of the input or
+ *  after whitespace (desktop's rule), so a skill can be named mid-prompt; a token
+ *  holding a second `/` stays prose, which keeps file paths and URLs out of the menu.
+ *  Returns null when the cursor is not inside such a token. */
 export function detectAutocompleteTrigger(
   text: string,
   cursor: number
@@ -38,8 +43,11 @@ export function detectAutocompleteTrigger(
     return null
   }
   const before = triggerIndex === 0 ? '' : text[triggerIndex - 1]!
-  if (triggerChar === '/' && triggerIndex !== 0) {
-    // Slash commands are only offered at the very start of the message.
+  if (
+    triggerChar === '/' &&
+    !LEADING_SLASH_TRIGGER.test(text.slice(0, pos)) &&
+    !MID_PROMPT_SLASH_TRIGGER.test(text.slice(0, pos))
+  ) {
     return null
   }
   if (triggerChar === '@' && triggerIndex !== 0 && !/\s/.test(before)) {

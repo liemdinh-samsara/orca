@@ -58,6 +58,12 @@ async function installSandbox(extraEnv = {}) {
   })
   const { repo, copiedScripts, git } = copyScriptsIntoRepo(box)
   await git(['init'])
+  // Why: the real step compiles node-pty in Docker; the stub leaves the template it would build.
+  stubExecutable(
+    copiedScripts,
+    'ensure-orcad-template.sh',
+    `echo ensure-orcad-template >> "$CALLS"\nmkdir -p out/orcad-template`
+  )
   stubExecutable(box.bin, 'node', nodeStub)
   stubExecutable(box.bin, 'pnpm', pnpmStub)
   stubExecutable(box.bin, 'pgrep', pgrepStub)
@@ -93,6 +99,15 @@ function install(fixture, args = [], extraEnv = {}) {
   })
 }
 
+// Why: the orcad template is set aside in out/ around electron-builder; only app moves matter here.
+const isTemplateMove = (line) => line.startsWith('mv ') && line.includes('/out/')
+
+function appTouches(fixture) {
+  return callLog(fixture).filter(
+    (line) => /^(osascript|mv|ditto|open) /.test(line) && !isTemplateMove(line)
+  )
+}
+
 function callLog(fixture) {
   return existsSync(fixture.calls)
     ? readFileSync(fixture.calls, 'utf8').split('\n').filter(Boolean)
@@ -107,13 +122,16 @@ describe('package-and-install.sh build, sign and verify', () => {
     expect(callLog(f)).toEqual([
       'pnpm run --silent ensure:electron-runtime',
       'pnpm build',
+      'ensure-orcad-template',
+      `mv ${f.cwd}/out/orcad-template ${f.cwd}/out/.orcad-template-local`,
       `pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --dir --${arch}`,
       `builder commit=${identity.commit} version=${identity.version}`,
       'security find-identity -p codesigning',
       `codesign --force --deep --sign ${defaultSigner} --entitlements resources/build/entitlements.mac.plist ${f.app}`,
       `codesign --verify --deep ${f.app}`,
       `defaults read ${f.app}/Contents/Info.plist CFBundleShortVersionString`,
-      `codesign -d -r- ${f.app}`
+      `codesign -d -r- ${f.app}`,
+      `mv ${f.cwd}/out/.orcad-template-local ${f.cwd}/out/orcad-template`
     ])
     expect(result.stdout).toContain(`[package] ${f.app}`)
     expect(result.stdout).toContain(`[package] version ${identity.version}`)
@@ -123,8 +141,7 @@ describe('package-and-install.sh build, sign and verify', () => {
   mac('never touches /Applications without --install', async () => {
     const f = await installSandbox()
     passed(await install(f))
-    const touched = callLog(f).filter((line) => /^(osascript|mv|ditto|open) /.test(line))
-    expect(touched).toEqual([])
+    expect(appTouches(f)).toEqual([])
   })
 
   mac('signs with ORCA_LOCAL_SIGN_IDENTITY when it is set', async () => {
@@ -159,7 +176,8 @@ describe('package-and-install.sh build, sign and verify', () => {
     const result = await install(f, ['--install'])
     expect(result.code).toBe(1)
     expect(result.stderr).toContain('pack exploded')
-    expect(callLog(f).some((line) => /^(codesign|osascript|mv|ditto) /.test(line))).toBe(false)
+    expect(callLog(f).some((line) => line.startsWith('codesign'))).toBe(false)
+    expect(appTouches(f)).toEqual([])
   })
 })
 
@@ -168,7 +186,7 @@ describe('package-and-install.sh --install', () => {
     const f = await installSandbox()
     const result = await install(f, ['--install'])
     passed(result)
-    const swap = callLog(f).filter((line) => /^(osascript|mv|ditto|open) /.test(line))
+    const swap = appTouches(f)
     const backup = /^mv \/Applications\/Orca\.app .+\/\.Trash\/Orca-prev-\d{8}-\d{6}\.app$/
     expect(swap[0]).toBe('osascript -e tell application "Orca" to quit')
     expect(swap.filter((line) => line.startsWith('mv '))).toHaveLength(

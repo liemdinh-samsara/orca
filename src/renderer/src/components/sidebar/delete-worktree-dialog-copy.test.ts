@@ -94,14 +94,13 @@ describe('in-place delete copy', () => {
   it('forgets the entry only for a single in-place workspace delete', () => {
     const copy = getDeleteWorktreeDialogCopy({
       isBatchDelete: false,
-      worktree: { displayName: 'api' },
       worktreeCount: 1,
       folderWorkspaceDeleteCount: 1,
       isFolderWorkspaceDelete: isFolderWorkspaceDelete(repoMap, inPlaceWorktree)
     })
 
-    expect(copy.descriptionSuffix).toBe(
-      'from Orca. The project folder on disk will not be deleted.'
+    expect(copy.description).toBe(
+      'Remove <target/> from Orca. The project folder on disk will not be deleted.'
     )
     expect(copy.mainWorktreeBlocker).toBe(
       'Remove the folder project instead of deleting this workspace.'
@@ -111,13 +110,12 @@ describe('in-place delete copy', () => {
   it('removes from git and disk for a plain git worktree delete', () => {
     const copy = getDeleteWorktreeDialogCopy({
       isBatchDelete: false,
-      worktree: { displayName: 'feature' },
       worktreeCount: 1,
       folderWorkspaceDeleteCount: 0,
       isFolderWorkspaceDelete: isFolderWorkspaceDelete(repoMap, gitWorktree)
     })
 
-    expect(copy.descriptionSuffix).toBe('from git and delete its workspace folder.')
+    expect(copy.description).toBe('Remove <target/> from git and delete its workspace folder.')
     expect(copy.mainWorktreeBlocker).toBe('Git does not allow removing the main worktree.')
   })
 })

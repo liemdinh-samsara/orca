@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { getWorktreeLineageGroupKey } from './worktree-list/grouping/group-keys'
+import { getWorktreeLineageGroupKey } from '../../../../shared/sidebar-list/group-keys'
 import { getWorktreeRevealCollapsedGroupKeys } from './worktree-list/navigation/worktree-reveal-group-keys'
 import { repo, worktree } from './worktree-list-groups-test-fixtures'
 

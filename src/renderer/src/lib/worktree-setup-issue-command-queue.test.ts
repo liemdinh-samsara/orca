@@ -117,8 +117,9 @@ describe('queueSetupAndIssueCommands setup cwd', () => {
     )
   })
 
+  // Split setup placement was retired upstream (#29819); a stale preference still gets the root-cwd tab.
   it.each(['split-horizontal', 'split-vertical'] as const)(
-    'queues a %s setup split and creates no tab',
+    'opens the Setup tab at the workspace root for a retired %s preference',
     (mode) => {
       appState.settings = { setupScriptLaunchMode: mode }
       appState.repos = [makeRepo({ workspaceStartPath: 'services/api' })]
@@ -134,13 +135,14 @@ describe('queueSetupAndIssueCommands setup cwd', () => {
         undefined
       )
 
-      expect(store.createTab).not.toHaveBeenCalled()
-      expect(store.queueTabStartupCommand).not.toHaveBeenCalled()
-      expect(store.queueTabSetupSplit).toHaveBeenCalledWith(
-        'terminal-tab',
+      expect(store.queueTabSetupSplit).not.toHaveBeenCalled()
+      expect(store.createTab).toHaveBeenCalledWith(
+        WORKTREE_ID,
+        undefined,
+        undefined,
         expect.objectContaining({
-          direction: mode === 'split-horizontal' ? 'horizontal' : 'vertical',
-          env: setup.envVars
+          startupCwd: '/projects/mono',
+          pendingStartup: expect.objectContaining({ env: setup.envVars })
         })
       )
     }

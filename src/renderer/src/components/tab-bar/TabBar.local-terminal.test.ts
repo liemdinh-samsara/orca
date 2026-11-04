@@ -24,6 +24,7 @@ import {
 } from './tab-bar-windows-shell-launch-test-harness'
 
 vi.mock('react', async () => await stubHeadlessReact())
+vi.mock('@/store/plugin-new-files', () => ({ usePluginNewFiles: () => [] }))
 vi.mock('zustand/react/shallow', () => stubShallowSelector())
 vi.mock('lucide-react', async () => (await import('./lucide-icon-stub-fixture')).stubEveryIcon())
 vi.mock('@dnd-kit/sortable', () => stubSortableContext())
@@ -90,7 +91,8 @@ describe('TabBar local terminal entry', () => {
     vi.resetModules()
     resetAppStoreSnapshot()
     vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
-    vi.stubGlobal('window', { api: {} })
+    // The setup prompt's image cache listens for window focus at load.
+    vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), api: {} })
     appStoreSnapshot.repos = [
       { id: 'repo-ssh', connectionId: 'ssh-1' },
       { id: 'repo-local', connectionId: null }
@@ -119,7 +121,12 @@ describe('TabBar local terminal entry', () => {
   })
 
   it('omits the local entry for an SSH workspace in the web client', async () => {
-    vi.stubGlobal('window', { api: {}, __ORCA_WEB_CLIENT__: true })
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      api: {},
+      __ORCA_WEB_CLIENT__: true
+    })
     const tree = await renderTabBar('wt-ssh')
     expect(findDropdownMenuItemByText(tree, 'New Local Terminal')).toBeNull()
     expect(findDropdownMenuItemByText(tree, 'New Terminal')).not.toBeNull()

@@ -107,11 +107,13 @@ describe('TabGroupPanel strip controls', () => {
     ).toBe(false)
   })
 
-  it('shows Pane Actions only for a focused split group and wires closeGroup', async () => {
+  it('shows Pane Actions for every split group and wires closeGroup', async () => {
     const view = render(panel({ hasSplitGroups: false }))
     expect(view.queryByRole('button', { name: 'Pane Actions' })).toBeNull()
+    // Why: unfocused splits keep their (dimmed) pane actions; only the orientation toggle is focus-only.
     view.rerender(panel({ isFocused: false }))
-    expect(view.queryByRole('button', { name: 'Pane Actions' })).toBeNull()
+    expect(view.getByRole('button', { name: 'Pane Actions' })).toBeTruthy()
+    expect(view.queryByRole('button', { name: /Show tabs/ })).toBeNull()
     view.rerender(panel())
     const trigger = view.getByRole('button', { name: 'Pane Actions' })
     fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })

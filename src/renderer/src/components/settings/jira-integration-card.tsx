@@ -1,5 +1,5 @@
+import { taskProviderErrorMessage } from '@/lib/task-provider-error-copy'
 import { UnsealedCredentialNotice } from './UnsealedCredentialNotice'
-import { KeychainCredentialNotice } from './keychain-credential-notice'
 import { useState } from 'react'
 import { AlertCircle, CheckCircle2, LoaderCircle, Unlink } from 'lucide-react'
 import { JiraConnectDialog } from '@/components/jira-connect-dialog'
@@ -72,7 +72,9 @@ export function JiraIntegrationCard(): React.JSX.Element {
     }
     setTestResultBySite((prev) => ({
       ...prev,
-      [siteId]: result.ok ? { state: 'ok' } : { state: 'error', error: result.error }
+      [siteId]: result.ok
+        ? { state: 'ok' }
+        : { state: 'error', error: taskProviderErrorMessage(result) }
     }))
     setTestingSiteId(null)
   }
@@ -138,11 +140,6 @@ export function JiraIntegrationCard(): React.JSX.Element {
             'auto.components.settings.jira.integration.card.jiraTokenName',
             'Your Jira API token'
           )}
-        />
-        <KeychainCredentialNotice
-          service="Jira"
-          status={contextMatches ? jiraStatus : {}}
-          statusContextKey={jiraStatusContextKey}
         />
         <ProviderHostScopeControl
           labelPrefix={translate(

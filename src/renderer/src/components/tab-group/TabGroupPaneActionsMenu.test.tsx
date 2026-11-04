@@ -18,7 +18,7 @@ describe('TabGroupPaneActionsMenu', () => {
     const bubble = vi.fn()
     const view = render(
       <div onClick={bubble}>
-        <TabGroupPaneActionsMenu className="" onClosePane={onClosePane} />
+        <TabGroupPaneActionsMenu isFocused onCloseGroup={onClosePane} />
       </div>
     )
     const trigger = view.getByRole('button', { name: 'Pane Actions' })

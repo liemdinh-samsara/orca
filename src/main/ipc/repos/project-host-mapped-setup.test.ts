@@ -1,8 +1,9 @@
 import type * as FsModule from 'node:fs'
 import type * as OsModule from 'node:os'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Store } from '../../persistence'
+import type { Store } from '../../persistence/loading-store/store'
 import type { Repo } from '../../../shared/repo-types'
+import type { RepoHostTarget } from '../../../shared/repo-host-identity'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 
 const mocks = vi.hoisted(() => {
@@ -25,10 +26,10 @@ vi.mock('node:fs', async (importOriginal) => ({
   ...(await importOriginal<typeof FsModule>()),
   realpathSync: mocks.realpathSync
 }))
-vi.mock('../../ssh/ssh-target-registry', () => ({
+vi.mock('../../ssh/targets/ssh-target-registry', () => ({
   getSshConnectionManager: () => ({ getConnection: () => mocks.connection.current })
 }))
-vi.mock('../ssh-browse', () => ({
+vi.mock('../ssh/ssh-browse', () => ({
   resolveRemoteDirectory: async (_conn: object, path: string) =>
     mocks.remoteDirs.has(path) ? path : null
 }))
@@ -94,11 +95,13 @@ function makeStore(
       return id === 'mac' ? repo : extra ? { ...repo, id, path: extra.path } : undefined
     },
     getSshTarget: (id: string) => ({ projectPathPrefix: id === 'other' ? '/srv/code' : prefix }),
-    updateRepo: vi.fn((id: string, updates: Partial<Repo>): Repo | null | undefined => ({
-      ...repo,
-      id,
-      ...updates
-    }))
+    updateRepo: vi.fn(
+      (target: RepoHostTarget, updates: Partial<Repo>): Repo | null | undefined => ({
+        ...repo,
+        id: target.id,
+        ...updates
+      })
+    )
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the mapped setup reads only these members; folder registration is mocked.
   return { store: fake as unknown as Store, updateRepo: fake.updateRepo }
@@ -144,7 +147,7 @@ describe('setupProjectAtMappedPath', () => {
       path: '/home/ubuntu/co/mono',
       kind: 'git'
     })
-    expect(updateRepo).toHaveBeenCalledWith('devbox-repo', {
+    expect(updateRepo).toHaveBeenCalledWith(expect.objectContaining({ id: 'devbox-repo' }), {
       workspaceStartPath: 'projects/ray',
       inPlaceWorkspaces: true
     })
@@ -332,7 +335,7 @@ describe('setupProjectAtMappedPath', () => {
 
     await setupProjectAtMappedPath(store, { projectId: PROJECT, hostId: DEVBOX })
 
-    expect(updateRepo).toHaveBeenCalledWith('devbox-repo', {})
+    expect(updateRepo).toHaveBeenCalledWith(expect.objectContaining({ id: 'devbox-repo' }), {})
     expect(updateRepo.mock.calls[0][1]).not.toHaveProperty('workspaceStartPath')
     expect(updateRepo.mock.calls[0][1]).not.toHaveProperty('inPlaceWorkspaces')
   })
@@ -348,7 +351,9 @@ describe('setupProjectAtMappedPath', () => {
 
       const outcome = await setupProjectAtMappedPath(store, { projectId: PROJECT, hostId: DEVBOX })
 
-      expect(updateRepo).toHaveBeenCalledWith('devbox-repo', { workspaceStartPath: 'projects/ray' })
+      expect(updateRepo).toHaveBeenCalledWith(expect.objectContaining({ id: 'devbox-repo' }), {
+        workspaceStartPath: 'projects/ray'
+      })
       expect(outcome).toEqual({ status: 'ready', ...setup })
       if (outcome.status !== 'ready') {
         throw new Error('Expected a ready setup')

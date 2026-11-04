@@ -6,7 +6,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { ReopenClosedTabMenuItem } from './ReopenClosedTabMenuItem'
-import { TAB_CONTEXT_MENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 
 /** The strip's own right-click menu for the empty space around its tabs, as in Chrome. */
 export function TabStripBlankAreaMenu({
@@ -64,7 +63,7 @@ export function TabStripBlankAreaMenu({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className={TAB_CONTEXT_MENU_CONTENT_CLASS}
+          className="min-w-[13rem] max-w-[calc(100vw-1rem)] whitespace-nowrap"
           sideOffset={0}
           align="start"
         >

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Repo } from '../../shared/repo-types'
-import { ensureStructuredAgentSessionHost } from './structured-agent-session-runtime'
+import { ensureStructuredAgentSessionHost } from './agent-session/structured-agent-session-runtime'
 import { OrcaRuntimeService } from './orca-runtime'
 
 vi.mock('electron', () => ({
@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
   ipcMain: { on: vi.fn(), removeListener: vi.fn() },
   app: { getPath: vi.fn(() => '/tmp') }
 }))
-vi.mock('./structured-agent-session-runtime', async (importOriginal) => ({
+vi.mock('./agent-session/structured-agent-session-runtime', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureStructuredAgentSessionHost: vi.fn(async () => undefined)
 }))

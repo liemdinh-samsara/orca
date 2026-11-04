@@ -3,6 +3,7 @@ import type { Project, ProjectHostSetup } from '../../../../shared/project-types
 import type { Repo } from '../../../../shared/repo-types'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { repoMatchesHostIdentity } from '../slices/repo-host-identity'
+import { upsertProjectHostSetup } from './project-host-routing'
 
 /** Upserts the repo, project and setup rows a host setup produced. */
 export function mergeProjectHostSetupResult(
@@ -19,8 +20,6 @@ export function mergeProjectHostSetupResult(
     projects: s.projects.some((entry) => entry.id === project.id)
       ? s.projects.map((entry) => (entry.id === project.id ? project : entry))
       : [...s.projects, project],
-    projectHostSetups: s.projectHostSetups.some((entry) => entry.id === setup.id)
-      ? s.projectHostSetups.map((entry) => (entry.id === setup.id ? setup : entry))
-      : [...s.projectHostSetups, setup]
+    projectHostSetups: upsertProjectHostSetup(s.projectHostSetups, setup)
   }
 }

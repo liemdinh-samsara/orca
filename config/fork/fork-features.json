@@ -341,6 +341,7 @@
         "src/preload/api/repository-api.ts",
         "src/renderer/src/components/NewWorkspaceComposerCard.tsx",
         "src/renderer/src/components/new-workspace/SetProjectLocationDialog.tsx",
+        "src/renderer/src/components/new-workspace/use-mapped-project-location.ts",
         "src/renderer/src/components/settings/SshHostAdvancedFields.tsx",
         "src/renderer/src/components/settings/SshProjectPathPrefixField.tsx",
         "src/renderer/src/components/settings/ssh-target-draft.ts",

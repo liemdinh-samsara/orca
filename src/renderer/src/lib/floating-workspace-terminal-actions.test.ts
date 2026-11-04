@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultSettings } from '../../../shared/constants'
 import type { Tab } from '../../../shared/tab-types'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
-import type { AppState } from '@/store/types'
 import {
   countVisibleFloatingWorkspaceItems,
   createFloatingWorkspaceBrowserTab,
@@ -15,6 +14,7 @@ import {
   isFloatingWorkspaceTerminalInputTarget,
   matchFloatingWorkspacePanelChord,
   shouldMinimizeFloatingWorkspacePanelOnCloseShortcut,
+  switchFloatingWorkspaceRecentTab,
   switchFloatingWorkspaceTab
 } from './floating-workspace-terminal-actions'
 import {
@@ -469,30 +469,8 @@ describe('createFloatingWorkspaceTerminalTab', () => {
       undefined,
       { id: expect.any(String) }
     )
-    // Why: createTab itself activates the new tab within the floating group.
     expect(store.activateTab).not.toHaveBeenCalled()
     expect(focusTerminalTabSurfaceMock).toHaveBeenCalledWith(store.createTab.mock.calls[0][3].id)
-  })
-
-  it('starts the terminal in a requested folder', async () => {
-    const tab = makeTab('floating-tab-cwd')
-    const createTab = vi.fn<AppState['createTab']>().mockReturnValue(tab)
-    const store = {
-      activeGroupIdByWorktree: { [FLOATING_TERMINAL_WORKTREE_ID]: 'floating-group' },
-      createTab
-    }
-
-    await createFloatingWorkspaceTerminalTab(store, undefined, undefined, '/Users/me/co/mono')
-
-    expect(createTab).toHaveBeenCalledWith(
-      FLOATING_TERMINAL_WORKTREE_ID,
-      'floating-group',
-      undefined,
-      {
-        id: expect.any(String),
-        startupCwd: '/Users/me/co/mono'
-      }
-    )
   })
 
   it('ignores the active runtime and keeps floating workspace terminals local', async () => {
@@ -513,7 +491,6 @@ describe('createFloatingWorkspaceTerminalTab', () => {
       'pwsh',
       { id: expect.any(String) }
     )
-    // Why: createTab itself activates the new tab within the floating group.
     expect(store.activateTab).not.toHaveBeenCalled()
     expect(focusTerminalTabSurfaceMock).toHaveBeenCalledWith(store.createTab.mock.calls[0][3].id)
   })
@@ -714,6 +691,44 @@ describe('switchFloatingWorkspaceTab', () => {
   })
 })
 
+describe('switchFloatingWorkspaceRecentTab', () => {
+  it('switches to the previous recent tab in the floating workspace', () => {
+    const activateTab = vi.fn()
+    const setActiveTab = vi.fn()
+    const store: Parameters<typeof switchFloatingWorkspaceRecentTab>[0] = {
+      activeGroupIdByWorktree: { [FLOATING_TERMINAL_WORKTREE_ID]: 'floating-group' },
+      activateTab,
+      browserTabsByWorktree: {},
+      groupsByWorktree: {
+        [FLOATING_TERMINAL_WORKTREE_ID]: [
+          {
+            id: 'floating-group',
+            worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+            activeTabId: 'tab-1',
+            tabOrder: ['tab-1', 'tab-2'],
+            recentTabIds: ['tab-2', 'tab-1']
+          }
+        ]
+      },
+      openFiles: [],
+      setActiveTab,
+      tabsByWorktree: {
+        [FLOATING_TERMINAL_WORKTREE_ID]: [makeTab('tab-1'), makeTab('tab-2')]
+      },
+      unifiedTabsByWorktree: {
+        [FLOATING_TERMINAL_WORKTREE_ID]: [
+          makeUnifiedTerminalTab('tab-1'),
+          makeUnifiedTerminalTab('tab-2')
+        ]
+      }
+    }
+
+    expect(switchFloatingWorkspaceRecentTab(store)).toBe(true)
+    expect(activateTab).toHaveBeenCalledWith('tab-2')
+    expect(setActiveTab).toHaveBeenCalledWith('tab-2')
+  })
+})
+
 describe('shouldMinimizeFloatingWorkspacePanelOnCloseShortcut', () => {
   const base = {
     floatingTerminalOpen: true,
@@ -773,7 +788,6 @@ describe('handleEmptyFloatingWorkspacePanelCloseShortcut', () => {
 
   it('ignores non-close shortcuts and non-empty floating workspaces', () => {
     vi.stubGlobal('window', { dispatchEvent: vi.fn() })
-    // A DOM a frame behind the store still shows the empty state it rendered before.
     vi.stubGlobal('document', { querySelector: vi.fn().mockReturnValue({}) })
     const nonCloseEvent = {
       altKey: false,

@@ -43,44 +43,49 @@ describe('getDropIndicatorClasses', () => {
 })
 
 describe('ACTIVE_TAB_INDICATOR_CLASSES', () => {
-  it('renders a full-foreground 2px bottom-edge marker without shifting layout', () => {
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('tab-active-indicator')
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('absolute')
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('bottom-0')
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('h-[2px]')
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('bg-foreground')
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).toContain('pointer-events-none')
+  it('renders a themed 2px bottom-edge marker without shifting layout', () => {
+    const classes = ACTIVE_TAB_INDICATOR_CLASSES.split(' ')
+    // Why: the vertical strip's CSS moves the marker to the left edge through this hook class.
+    expect(classes).toContain('tab-active-indicator')
+    expect(classes).toContain('absolute')
+    expect(classes).toContain('bottom-0')
+    expect(classes).toContain('h-[2px]')
+    expect(classes).toContain('bg-tab-active-indicator')
+    expect(classes).toContain('pointer-events-none')
     expect(ACTIVE_TAB_INDICATOR_CLASSES).not.toContain('-top-px')
-    expect(ACTIVE_TAB_INDICATOR_CLASSES).not.toContain('bg-[#1e3d9c]')
   })
 })
 
 describe('getTabStripBorderClasses', () => {
   it('includes top and right borders by default', () => {
     expect(getTabStripBorderClasses(true)).toBe('border-t border-r border-border')
-    expect(getTabStripBorderClasses(false)).toBe('border-t border-border')
+    expect(getTabStripBorderClasses(false)).toBe(
+      'border-t border-r border-border border-r-transparent'
+    )
   })
 
   it('can omit the top border for rounded floating panel titlebars', () => {
     expect(getTabStripBorderClasses(true, { includeTopBorder: false })).toBe(
       'border-r border-border'
     )
-    expect(getTabStripBorderClasses(false, { includeTopBorder: false })).toBe('border-border')
+    expect(getTabStripBorderClasses(false, { includeTopBorder: false })).toBe(
+      'border-r border-border border-r-transparent'
+    )
   })
 })
 
 describe('getTabRootStateClasses', () => {
   it('returns the shared selected-tab surface treatment', () => {
     const classes = getTabRootStateClasses(true)
-    expect(classes).toContain('bg-[color-mix(in_srgb,var(--foreground)_6%,var(--card))]')
-    expect(classes).toContain('text-foreground')
-    expect(classes).not.toContain('hover:text-foreground')
+    expect(classes).toContain('bg-tab-active')
+    expect(classes).toContain('text-tab-active-foreground')
+    expect(classes).not.toContain('hover:')
   })
 
   it('returns the shared inactive-tab surface treatment', () => {
     const classes = getTabRootStateClasses(false)
-    expect(classes).toContain('bg-card')
-    expect(classes).toContain('text-muted-foreground')
-    expect(classes).toContain('hover:text-foreground')
+    expect(classes).toContain('bg-tab-inactive')
+    expect(classes).toContain('text-tab-inactive-foreground')
+    expect(classes).toContain('hover:text-tab-active-foreground')
   })
 })

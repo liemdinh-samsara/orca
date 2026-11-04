@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useAppStore } from '@/store'
 import { useTranslation } from 'react-i18next'
 import { shallow } from 'zustand/shallow'
 import type { GitFileStatus } from '../../../../shared/git-status-types'
@@ -11,8 +12,12 @@ import type { DropIndicator } from './drop-indicator'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import { getTabDragLabel, resolveTerminalItemTab, type TabBarItem } from './tab-bar-item-model'
 import type { TabBarItemActions } from './use-tab-bar-item-actions'
-import { useStructuredChatTabConversationName } from '@/runtime/structured-conversation-name'
+import {
+  useStructuredChatTabConversationName,
+  useStructuredChatTabNamingFailure
+} from '@/runtime/structured-conversation-name'
 import { agentTypeToIconAgent } from '@/lib/agent-status'
+import { formatSimulatorTabLabel } from '@/lib/simulator-tab-label'
 
 // Why only values and `actions`: anything a tab draws must be a compared prop, or a skipped render shows it stale.
 type TabBarItemRowProps = {
@@ -34,6 +39,7 @@ type TabBarItemRowProps = {
   /** Unified tab whose view mode the terminal tab toggles; absent when it has none. */
   viewModeTabId: string | undefined
   canDuplicate: boolean
+  canCloseSplitPane: boolean
   /** This editor tab's own status, so a git status write re-renders only the tabs it changed. */
   gitStatus: GitFileStatus | null
 }
@@ -56,11 +62,15 @@ function TabBarItemRow({
   isChatView,
   viewModeTabId,
   canDuplicate,
+  canCloseSplitPane,
   gitStatus
 }: TabBarItemRowProps): React.JSX.Element {
   // Why: the tabs' labels come from `translate()`, which a skipped render would leave in the old language.
   useTranslation()
   const conversationName = useStructuredChatTabConversationName(
+    item.type === 'agent-session' ? item.data : undefined
+  )
+  const namingFailure = useStructuredChatTabNamingFailure(
     item.type === 'agent-session' ? item.data : undefined
   )
   const dragData: TabDragItemData = {
@@ -70,7 +80,7 @@ function TabBarItemRow({
     unifiedTabId: item.unifiedTabId,
     visibleTabId: item.id,
     tabType: item.type,
-    label: getTabDragLabel(item, generatedTabTitlesEnabled),
+    label: getTabDragLabel(item, generatedTabTitlesEnabled, useAppStore.getState()),
     iconPath: item.type === 'editor' ? item.data.filePath : undefined,
     color: item.type === 'terminal' ? (item.data.color ?? null) : null,
     ...(stripOrientation ? { stripOrientation } : {})
@@ -82,6 +92,7 @@ function TabBarItemRow({
     hasTabsToLeft,
     tabCount,
     onTogglePin: () => actions.togglePinned(item),
+    onCloseSplitPane: canCloseSplitPane ? actions.closeSplitPane : undefined,
     dragData,
     dropIndicator,
     includeTopTabBorder
@@ -130,6 +141,8 @@ function TabBarItemRow({
         onToggleExpand={() => {}}
         canSplitTerminal={false}
         nativeChat={nativeChat}
+        // A tab the user named does not show the generated name, so neither does its failure.
+        namingFailure={item.data.customLabel ? null : namingFailure}
       />
     )
   }
@@ -161,7 +174,7 @@ function TabBarItemRow({
     onCloseAll: actions.closeAllFiles
   }
   if (item.type === 'simulator') {
-    const simulatorLabel = item.data.label || 'Mobile Emulator'
+    const simulatorLabel = formatSimulatorTabLabel(item.data.label)
     const simulatorFile: OpenFile & { tabId: string } = {
       id: item.id,
       tabId: item.id,

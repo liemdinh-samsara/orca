@@ -17,11 +17,14 @@ vi.mock('../../git/repo', async (importOriginal) =>
 vi.mock('../../git/runner', async (importOriginal) =>
   moduleMocks.gitRunnerModuleMock(reposMocks, await importOriginal<typeof GitRunner>())
 )
-vi.mock('../../git/worktree', () => moduleMocks.gitWorktreeModuleMock(reposMocks))
-vi.mock('../registered-worktree-roots-cache', () =>
+vi.mock('../../git/worktrees/catalog/worktree-scan-cache', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ...moduleMocks.gitWorktreeModuleMock(reposMocks)
+}))
+vi.mock('../worktrees/removal/registered-worktree-roots-cache', () =>
   moduleMocks.registeredWorktreeRootsCacheModuleMock(reposMocks)
 )
-vi.mock('../../worktree-root-preparation', () =>
+vi.mock('../../workspaces/creation/worktree-root-preparation', () =>
   moduleMocks.worktreeRootPreparationModuleMock(reposMocks)
 )
 
@@ -32,7 +35,7 @@ const { setupProjectAtMappedPath, emitRepoAdded } = vi.hoisted(() => ({
 vi.mock('./project-host-mapped-setup', () => ({ setupProjectAtMappedPath }))
 vi.mock('./repo-added-telemetry', () => ({ emitRepoAdded }))
 vi.mock('../folder-repo-git-upgrade-wake', () => ({ wakeFolderRepoGitUpgradeWatch: vi.fn() }))
-vi.mock('../worktree-base-directory-watcher', () => ({
+vi.mock('../worktrees/creation/worktree-base-directory-watcher', () => ({
   scheduleCurrentWorktreeBaseDirectoryWatcherSync: vi.fn()
 }))
 

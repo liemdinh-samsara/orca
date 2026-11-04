@@ -18,23 +18,45 @@ vi.mock('@/hooks/useShortcutLabel', () => ({
   useOptionalShortcutLabel: vi.fn<() => string | null>()
 }))
 
+const menuMocks = vi.hoisted(() => ({
+  item:
+    (kind: string) =>
+    ({
+      children,
+      disabled,
+      onSelect
+    }: {
+      children?: ReactNode
+      disabled?: boolean
+      onSelect?: () => void
+    }) => (
+      <button
+        type="button"
+        role="menuitem"
+        data-menu-kind={kind}
+        disabled={disabled}
+        onClick={() => onSelect?.()}
+      >
+        {children}
+      </button>
+    ),
+  shortcut:
+    (kind: string) =>
+    ({ children }: { children?: ReactNode }) => (
+      <span data-testid="shortcut" data-menu-kind={kind}>
+        {children}
+      </span>
+    )
+}))
+
 vi.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenuItem: ({
-    children,
-    disabled,
-    onSelect
-  }: {
-    children?: ReactNode
-    disabled?: boolean
-    onSelect?: () => void
-  }) => (
-    <button type="button" role="menuitem" disabled={disabled} onClick={() => onSelect?.()}>
-      {children}
-    </button>
-  ),
-  DropdownMenuShortcut: ({ children }: { children?: ReactNode }) => (
-    <span data-testid="shortcut">{children}</span>
-  )
+  DropdownMenuItem: menuMocks.item('dropdown'),
+  DropdownMenuShortcut: menuMocks.shortcut('dropdown')
+}))
+
+vi.mock('@/components/ui/context-menu', () => ({
+  ContextMenuItem: menuMocks.item('context'),
+  ContextMenuShortcut: menuMocks.shortcut('context')
 }))
 
 vi.mock('lucide-react', () => ({ RotateCcw: () => null }))
@@ -57,8 +79,8 @@ vi.mock('@/store', () => ({
 let container: HTMLDivElement
 let root: Root
 
-function renderItem(): HTMLButtonElement {
-  act(() => root.render(<ReopenClosedTabMenuItem worktreeId="wt-1" />))
+function renderItem(menuKind?: 'dropdown' | 'context'): HTMLButtonElement {
+  act(() => root.render(<ReopenClosedTabMenuItem worktreeId="wt-1" menuKind={menuKind} />))
   const item = container.querySelector<HTMLButtonElement>('[role="menuitem"]')
   if (!item) {
     throw new Error('Missing reopen menu item')
@@ -134,6 +156,18 @@ describe('ReopenClosedTabMenuItem', () => {
 
     expect(renderItem().textContent).toBe('Reopen Closed Tab')
     expect(container.querySelector('[data-testid="shortcut"]')).toBeNull()
+  })
+
+  it('renders a dropdown item by default and a context item inside context menus', () => {
+    expect(renderItem().dataset.menuKind).toBe('dropdown')
+
+    const item = renderItem('context')
+    expect(item.dataset.menuKind).toBe('context')
+    expect(
+      container.querySelector('[data-testid="shortcut"]')?.getAttribute('data-menu-kind')
+    ).toBe('context')
+    act(() => item.click())
+    expect(storeMock.reopenClosedTab).toHaveBeenCalledExactlyOnceWith('wt-1')
   })
 
   it('has the Reopen Closed Tab label in the English locale', () => {

@@ -48,6 +48,8 @@ export function buildSshTargetSavePayload(form: EditingTarget): SshTargetSavePay
   const proxyCommand = form.proxyCommand.trim() || undefined
   const jumpHost = form.jumpHost.trim() || undefined
   const systemSshConnectionReuse = form.systemSshConnectionReuse ? undefined : false
+  const systemSshProxyConnectionReuse = form.systemSshProxyConnectionReuse ? true : undefined
+  const reconnectOnLaunch = form.reconnectOnLaunch ? undefined : false
 
   const target: SshTargetCreateInput = {
     label: form.label.trim() || (username ? `${username}@${host}` : configHost),
@@ -60,8 +62,11 @@ export function buildSshTargetSavePayload(form: EditingTarget): SshTargetSavePay
     ...(proxyCommand ? { proxyCommand } : {}),
     ...(jumpHost ? { jumpHost } : {}),
     ...(systemSshConnectionReuse === false ? { systemSshConnectionReuse } : {}),
-    ...(form.allowRemoteCliControl ? { allowRemoteCliControl: true } : {}),
-    ...(projectPathPrefix ? { projectPathPrefix } : {})
+    ...(systemSshProxyConnectionReuse ? { systemSshProxyConnectionReuse } : {}),
+    ...(reconnectOnLaunch === false ? { reconnectOnLaunch } : {}),
+    ...(projectPathPrefix ? { projectPathPrefix } : {}),
+    // Send explicit true/false because older servers interpret absence as disabled.
+    allowRemoteCliControl: form.allowRemoteCliControl
   }
 
   return {
@@ -70,14 +75,14 @@ export function buildSshTargetSavePayload(form: EditingTarget): SshTargetSavePay
       target,
       updates: {
         ...target,
-        // Why: updateTarget merges partially, so explicit undefined values are
-        // required to clear optional fields inherited from ~/.ssh/config.
+        // Partial updates need explicit undefined to clear fields inherited from SSH config.
         identityFile,
         gssapiAuthentication: form.gssapiAuthentication || undefined,
         proxyCommand,
         jumpHost,
         systemSshConnectionReuse,
-        allowRemoteCliControl: form.allowRemoteCliControl || undefined,
+        systemSshProxyConnectionReuse,
+        reconnectOnLaunch,
         projectPathPrefix,
         source: 'manual'
       }

@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') }
 }))
 
-vi.mock('./structured-agent-session-runtime', () => ({
+vi.mock('./agent-session/structured-agent-session-runtime', () => ({
   ensureStructuredAgentSessionHost: vi.fn(
     async (deps: Record<string, unknown> & { logger: StructuredAgentSessionLogger }) => {
       installed.deps = deps
@@ -109,7 +109,8 @@ describe('mail dispatch through the current runtime', () => {
     })
 
     target.onStructuredSessionStatusForMail({ sessionId: 'session-mailbox', status: 'working' })
-    expect(events).toEqual([])
+    expect(events).toEqual(['journal:session-mailbox'])
+    events.length = 0
     target.onStructuredSessionStatusForMail({ sessionId: 'session-mailbox', status: 'idle' })
     expect(events).toEqual(['journal:session-mailbox', 'delivery:term_mailbox'])
   })

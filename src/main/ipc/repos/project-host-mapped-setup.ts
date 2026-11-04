@@ -1,6 +1,6 @@
 import { realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import type { Store } from '../../persistence'
+import type { Store } from '../../persistence/loading-store/store'
 import type { Repo } from '../../../shared/repo-types'
 import type {
   ProjectHostMappedSetupOutcome,
@@ -13,8 +13,8 @@ import {
   normalizeWorkspaceStartPath,
   resolveWorkspaceStartCwd
 } from '../../../shared/workspace-start-path'
-import { getSshConnectionManager } from '../../ssh/ssh-target-registry'
-import { resolveRemoteDirectory } from '../ssh-browse'
+import { getSshConnectionManager } from '../../ssh/targets/ssh-target-registry'
+import { resolveRemoteDirectory } from '../ssh/ssh-browse'
 import {
   buildProjectHostSetupResult,
   setupExistingFolderOnHost
@@ -146,7 +146,7 @@ function mirrorWorkspaceSettings(
   const startPath = startFolder.startsWith(`${root}/`)
     ? normalizeWorkspaceStartPath(startFolder.slice(root.length + 1))
     : null
-  const updated = store.updateRepo(repo.id, {
+  const updated = store.updateRepo(repo, {
     ...(startPath ? { workspaceStartPath: startPath } : {}),
     ...(sourceRepo.inPlaceWorkspaces === undefined
       ? {}

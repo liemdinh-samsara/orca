@@ -17,6 +17,8 @@ import { getChatBehaviorTitle } from './chat-behavior-search'
 export function ChatSettingsSection({
   settings,
   updateSettings,
+  fontSuggestions,
+  onRequestFontSuggestions,
   writeSourceControlAiSettings,
   onChatPromptDirtyChange,
   chatPromptDiscardSignal,
@@ -26,7 +28,9 @@ export function ChatSettingsSection({
   isMounted
 }: {
   settings: GlobalSettings
-  updateSettings: (updates: Partial<GlobalSettings>) => void
+  updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
+  fontSuggestions?: string[]
+  onRequestFontSuggestions?: () => void
   writeSourceControlAiSettings: (patch: SourceControlAiSettingsPatch) => Promise<void>
   onChatPromptDirtyChange?: (dirty: boolean) => void
   chatPromptDiscardSignal?: number
@@ -34,11 +38,8 @@ export function ChatSettingsSection({
   searchEntries: SettingsSearchEntry[]
   showDesktopOnlySettings: boolean
   isMounted: boolean
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   const query = useAppStore((state) => state.settingsSearchQuery)
-  if (settings.experimentalNativeChat !== true) {
-    return null
-  }
   const title = translate('settings.appearance.chat.title', 'Chat')
   const appearanceTitle = translate('auto.components.settings.Settings.2b4474780a', 'Appearance')
   const showAllBehavior = matchesSettingsSearch(query, [
@@ -64,6 +65,8 @@ export function ChatSettingsSection({
                   <AppearanceChatSection
                     settings={settings}
                     updateSettings={updateSettings}
+                    fontSuggestions={fontSuggestions}
+                    onRequestFontSuggestions={onRequestFontSuggestions}
                     forceVisiblePrimary={matchesSettingsSearch(query, [
                       { title },
                       { title: appearanceTitle }

@@ -5,8 +5,12 @@ import { createRepoUpdateSchema } from '../../shared/rpc-contract/repo-update-pa
 import { RuntimeRepositorySettingsController } from './runtime-repository-settings-controller'
 import type { RuntimeStore } from './runtime-store-contract'
 
-vi.mock('../ipc/filesystem-auth', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))
-vi.mock('../worktree-root-preparation', () => ({ prepareLocalWorktreeRootForRepo: vi.fn() }))
+vi.mock('../ipc/worktrees/removal/registered-worktree-roots-cache', () => ({
+  invalidateAuthorizedRootsCache: vi.fn()
+}))
+vi.mock('../workspaces/creation/worktree-root-preparation', () => ({
+  prepareLocalWorktreeRootForRepo: vi.fn()
+}))
 
 const schema = createRepoUpdateSchema({ repoSelector: z.string() })
 function setup() {
@@ -20,7 +24,7 @@ function setup() {
     connectionId: 'ssh-1',
     workspaceStartPath: 'old/start'
   }
-  const updateRepo = vi.fn((_id: string, updates: Partial<Repo>) => {
+  const updateRepo = vi.fn((_target: Pick<Repo, 'id'>, updates: Partial<Repo>) => {
     repo = { ...repo, ...updates }
     return repo
   })
@@ -32,7 +36,8 @@ function setup() {
     forgetTerminalTopology: vi.fn(),
     invalidateResolvedWorktrees: vi.fn(),
     invalidateWorktreeScan: vi.fn(),
-    notifyReposChanged: vi.fn()
+    notifyReposChanged: vi.fn(),
+    notifyWorktreesChanged: vi.fn()
   })
   return { controller, updateRepo }
 }
@@ -54,7 +59,7 @@ describe('runtime repository workspace settings through RPC', () => {
         'id:repo-1',
         rpcUpdates({ inPlaceWorkspaces, workspaceStartPath: 'packages/web' })
       )
-      expect(updateRepo).toHaveBeenCalledWith('repo-1', {
+      expect(updateRepo).toHaveBeenCalledWith(expect.objectContaining({ id: 'repo-1' }), {
         inPlaceWorkspaces,
         workspaceStartPath: 'packages/web'
       })

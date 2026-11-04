@@ -9,8 +9,8 @@ import {
   readDataFile,
   testState,
   writeDataFile
-} from '../persistence-test-harness'
-import { SshConnectionStore } from '../ssh/ssh-connection-store'
+} from '../persistence/persistence-test-harness'
+import { SshConnectionStore } from '../ssh/connection/ssh-connection-store'
 
 vi.mock('electron', () => ({
   app: { getPath: () => testState.dir },

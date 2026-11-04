@@ -1,5 +1,5 @@
-import { getSshConnectionManager } from '../../ssh/ssh-target-registry'
-import { resolveRemoteDirectory } from '../ssh-browse'
+import { getSshConnectionManager } from '../../ssh/targets/ssh-target-registry'
+import { resolveRemoteDirectory } from '../ssh/ssh-browse'
 
 /** Expands a leading `~` against the SSH host's home; returns `path` unchanged when it can't. */
 export async function resolveRemoteHomePath(connectionId: string, path: string): Promise<string> {

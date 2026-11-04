@@ -122,18 +122,16 @@ describe('getDevicePushToken', () => {
 describe('addPushTokenListener', () => {
   it('forwards a rolled native token and removes the subscription on teardown', () => {
     const remove = vi.fn()
-    let emit: Notifications.PushTokenListener = () => {
-      throw new Error('token listener was not registered')
-    }
+    const native: { emit?: Parameters<typeof Notifications.addPushTokenListener>[0] } = {}
     vi.mocked(Notifications.addPushTokenListener).mockImplementation((listener) => {
-      emit = listener
+      native.emit = listener
       return { remove }
     })
     const seen: unknown[] = []
 
     const stop = addPushTokenListener((token) => seen.push(token))
-    emit({ type: 'android', data: 'rolled' })
-    emit({ type: 'web', data: {} })
+    native.emit?.({ type: 'android', data: 'rolled' })
+    native.emit?.({ type: 'web', data: {} })
     stop()
 
     expect(seen).toEqual([{ platform: 'android', token: 'rolled' }])

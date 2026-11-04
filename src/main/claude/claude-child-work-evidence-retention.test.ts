@@ -1,15 +1,16 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type {
-  AgentJournalItemBody,
-  AgentJournalItemIdentity
-} from '../../shared/agent-session-journal-types'
+import type { AgentJournalItemBody } from '../../shared/agent-session/journal/agent-session-journal-types'
+import type { AgentJournalItemIdentity } from '../../shared/agent-session-journal-identity'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import { ClaudeChildWorkDecoder } from './claude-child-work-decoder'
 import { claudeChildOperation, drainClaudeChildWork } from './claude-child-work-evidence'
 import { ClaudePromptRegistry } from './claude-prompt-registry'
-import { createClaudeJournalTranslator } from './claude-structured-journal-translation'
-import { claudeToolResults, readClaudeMessageEnvelope } from './claude-structured-item-translation'
+import { createClaudeJournalTranslator } from './structured/journal/claude-structured-journal-translation'
+import {
+  claudeToolResults,
+  readClaudeMessageEnvelope
+} from './structured/journal/claude-structured-item-translation'
 
 function frame(content: unknown, parentToolUseId: string | null): Record<string, unknown> {
   return {
@@ -78,12 +79,15 @@ describe('Claude child operation output retention', () => {
       if (result?.kind !== 'tool-call') {
         throw new Error('Result did not produce a journal tool-call body')
       }
-      expect(result.output).toEqual({
-        head: 'a'.repeat(16 * 1024),
-        byteLength: first.length + second.length + 1,
-        digest: createHash('sha256').update(first).update('\n').update(second).digest('hex'),
-        truncated: true
-      })
+      expect(result.output?.truncated).toBe(false)
+      expect(result.output?.byteLength).toBe(first.length + second.length + 1)
+      expect(result.output?.digest).toBe(
+        createHash('sha256').update(first).update('\n').update(second).digest('hex')
+      )
+      expect(result.output?.head.length).toBe(first.length + second.length + 1)
+      expect(result.output?.head.startsWith(first)).toBe(true)
+      expect(result.output?.head.charAt(first.length)).toBe('\n')
+      expect(result.output?.head.endsWith(second)).toBe(true)
       expect(joinedOutputUnits).toBe(0)
     } finally {
       vi.restoreAllMocks()

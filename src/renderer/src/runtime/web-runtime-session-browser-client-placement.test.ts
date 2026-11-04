@@ -36,7 +36,6 @@ const mocks = vi.hoisted(() => ({
   trackTerminalPaneSplit: vi.fn(),
   deliverLaunchPromptToAgentTab: vi.fn(),
   seedNativeChatLaunchDraftForAgentTab: vi.fn(),
-  getRuntimeEnvironmentIdForWorktree: vi.fn(),
   hasMaterializedWebRuntimeBrowserPage: vi.fn()
 }))
 
@@ -60,7 +59,6 @@ vi.mock('./web-session-tabs-sync/tracking-decisions', () => ({
 vi.mock('./web-session-tabs-sync/store-patch', () => ({
   applyWebSessionTabsStorePatch: (buildPatch: (state: unknown) => unknown) => {
     mocks.setState(buildPatch)
-    // The production caller invokes the returned settle receipt.
     return () => {}
   }
 }))
@@ -69,9 +67,6 @@ vi.mock('./web-session-tabs-sync/tracking-mappings', () => ({
 }))
 vi.mock('@/lib/feature-education-telemetry', () => ({
   trackTerminalPaneSplit: mocks.trackTerminalPaneSplit
-}))
-vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getRuntimeEnvironmentIdForWorktree: mocks.getRuntimeEnvironmentIdForWorktree
 }))
 vi.mock('@/lib/agent-launch-prompt-delivery', () => ({
   deliverLaunchPromptToAgentTab: mocks.deliverLaunchPromptToAgentTab,
@@ -129,16 +124,6 @@ describe('web runtime browser client placement', () => {
     expect(preparePlacement.mock.invocationCallOrder[0]).toBeLessThan(
       runtimeCall.mock.invocationCallOrder[0]!
     )
-  })
-
-  it('omits placement when fresh preparation selects the legacy server path', async () => {
-    const preparePlacement = vi.fn().mockResolvedValue({ kind: 'server' })
-    const runtimeCall = successfulCreateCalls()
-    stubRuntimeApi(preparePlacement, runtimeCall)
-
-    await expect(createWebRuntimeSessionBrowserTab({ worktreeId: WORKTREE_ID })).resolves.toBe(true)
-
-    expect(runtimeCall.mock.calls[0]?.[0].params).not.toHaveProperty('placement')
   })
 
   it('does not prepare or publish placement for an explicit server request', async () => {

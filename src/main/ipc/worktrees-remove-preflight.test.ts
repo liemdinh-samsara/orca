@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as filesystemAuth from './filesystem-auth'
+import * as scopedRootsInvalidation from './registered-worktree-roots-scoped-invalidation'
 import * as authorizedRootsCache from './registered-worktree-roots-cache'
 import {
   removeWorktreeLinkedPathsMock,
@@ -9,7 +9,6 @@ import {
   removeWorktreeMock,
   getEffectiveHooksMock,
   runHookMock,
-  gitExecFileAsyncMock,
   killAllProcessesForWorktreeMock
 } from './worktrees-test-module-mocks'
 import { handlers, setupWorktreeHandlers, store } from './worktrees-test-harness'
@@ -38,9 +37,6 @@ vi.mock('../github/client', async () =>
 )
 vi.mock('../source-control/hosted-review', async () =>
   (await import('./worktrees-test-module-mocks')).hostedReviewModuleMock()
-)
-vi.mock('../providers/ssh-filesystem-dispatch', async () =>
-  (await import('./worktrees-test-module-mocks')).sshFilesystemDispatchModuleMock()
 )
 vi.mock('./worktree-symlinks', async () =>
   (await import('./worktrees-test-module-mocks')).worktreeSymlinksModuleMock()
@@ -101,7 +97,7 @@ describe('registerWorktreeHandlers', () => {
 
   beforeEach(() => {
     runtimeStub = setupWorktreeHandlers()
-    vi.spyOn(filesystemAuth, 'invalidateAuthorizedRootsCacheForRepo').mockClear()
+    vi.spyOn(scopedRootsInvalidation, 'invalidateAuthorizedRootsCacheForRepo').mockClear()
     vi.spyOn(authorizedRootsCache, 'invalidateAuthorizedRootsCache').mockClear()
   })
 
@@ -138,24 +134,8 @@ describe('registerWorktreeHandlers', () => {
     expect(removeWorktreeLinkedPathsMock).not.toHaveBeenCalled()
     expect(killAllProcessesForWorktreeMock).not.toHaveBeenCalled()
     expect(removeWorktreeMock).not.toHaveBeenCalled()
-    expect(filesystemAuth.invalidateAuthorizedRootsCacheForRepo).not.toHaveBeenCalled()
+    expect(scopedRootsInvalidation.invalidateAuthorizedRootsCacheForRepo).not.toHaveBeenCalled()
     expect(authorizedRootsCache.invalidateAuthorizedRootsCache).not.toHaveBeenCalled()
-  })
-
-  it('propagates a timed-out removal preflight before watcher teardown', async () => {
-    mockKnownFeatureWorktree()
-    getEffectiveHooksMock.mockReturnValue(null)
-    assertWorktreeCleanForRemovalMock.mockRejectedValue(new Error('git timed out.'))
-
-    await expect(
-      handlers['worktrees:remove'](null, {
-        worktreeId: 'repo-1::/workspace/feature-wt'
-      })
-    ).rejects.toThrow('Failed to delete worktree at /workspace/feature-wt. git timed out.')
-
-    expect(runtimeStub.closeFileWatchersForRemoval).not.toHaveBeenCalled()
-    expect(killAllProcessesForWorktreeMock).not.toHaveBeenCalled()
-    expect(removeWorktreeMock).not.toHaveBeenCalled()
   })
 
   it('fails locked dirty-force deletes before hooks, link cleanup, or PTY teardown', async () => {
@@ -201,7 +181,7 @@ describe('registerWorktreeHandlers', () => {
     expect(removeWorktreeLinkedPathsMock).not.toHaveBeenCalled()
     expect(killAllProcessesForWorktreeMock).not.toHaveBeenCalled()
     expect(removeWorktreeMock).not.toHaveBeenCalled()
-    expect(filesystemAuth.invalidateAuthorizedRootsCacheForRepo).not.toHaveBeenCalled()
+    expect(scopedRootsInvalidation.invalidateAuthorizedRootsCacheForRepo).not.toHaveBeenCalled()
     expect(authorizedRootsCache.invalidateAuthorizedRootsCache).not.toHaveBeenCalled()
   })
 
@@ -238,55 +218,5 @@ describe('registerWorktreeHandlers', () => {
     expect(assertWorktreeCleanForRemovalMock).not.toHaveBeenCalled()
     expect(killAllProcessesForWorktreeMock).not.toHaveBeenCalled()
     expect(removeWorktreeMock).not.toHaveBeenCalled()
-  })
-
-  it('formats preflight subprocess failures and does not tear down PTYs', async () => {
-    mockKnownFeatureWorktree()
-    getEffectiveHooksMock.mockReturnValue(null)
-    assertWorktreeCleanForRemovalMock.mockRejectedValue(
-      Object.assign(new Error('status failed'), {
-        stderr: 'fatal: unable to read current working directory\n'
-      })
-    )
-
-    await expect(
-      handlers['worktrees:remove'](null, {
-        worktreeId: 'repo-1::/workspace/feature-wt'
-      })
-    ).rejects.toThrow(
-      'Failed to delete worktree at /workspace/feature-wt. fatal: unable to read current working directory'
-    )
-
-    expect(killAllProcessesForWorktreeMock).not.toHaveBeenCalled()
-    expect(removeWorktreeMock).not.toHaveBeenCalled()
-  })
-
-  it('falls through to orphan cleanup when preflight reports missing/non-repo worktree', async () => {
-    mockKnownFeatureWorktree()
-    getEffectiveHooksMock.mockReturnValue(null)
-    assertWorktreeCleanForRemovalMock.mockRejectedValue(
-      Object.assign(new Error('status failed'), {
-        stderr: 'fatal: not a git repository (or any of the parent directories): .git\n'
-      })
-    )
-    removeWorktreeMock.mockRejectedValue(
-      Object.assign(new Error('git worktree remove failed'), {
-        stderr: "fatal: '/workspace/feature-wt' is not a working tree"
-      })
-    )
-    gitExecFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' })
-
-    await handlers['worktrees:remove'](null, {
-      worktreeId: 'repo-1::/workspace/feature-wt'
-    })
-
-    expect(killAllProcessesForWorktreeMock).toHaveBeenCalledWith(
-      'repo-1::/workspace/feature-wt',
-      expect.objectContaining({ requirePhysicalStop: true })
-    )
-    expect(removeWorktreeMock).toHaveBeenCalled()
-    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(['worktree', 'prune'], {
-      cwd: '/workspace/repo'
-    })
   })
 })

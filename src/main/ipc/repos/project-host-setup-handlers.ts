@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
-import type { Store } from '../../persistence'
+import type { Store } from '../../persistence/loading-store/store'
 import type {
   ProjectHostSetupCreateArgs,
   ProjectHostSetupCreateResult,
@@ -14,6 +14,7 @@ import type {
   ProjectHostSetupUpdateResult
 } from '../../../shared/project-types'
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
+import { updateProjectHostSetupWithProvenKind } from '../../folder-repo-git-conversion'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { emitRepoAdded } from './repo-added-telemetry'
 import { notifyReposChanged } from './repos-changed-notification'
@@ -67,14 +68,21 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
 
   ipcMain.handle(
     'projectHostSetups:update',
-    (_event, rawArgs: ProjectHostSetupUpdateArgs): ProjectHostSetupUpdateResult => {
+    async (_event, rawArgs: ProjectHostSetupUpdateArgs): Promise<ProjectHostSetupUpdateResult> => {
       const args = parseProjectGroupIpcArgs(
         ProjectHostSetupUpdateIpcArgs,
         rawArgs,
         'project_host_setup_update_invalid_args'
       )
-      assertWslMoveHostSetupIdWritable(store, args.setupId)
-      const result = store.updateProjectHostSetup(args)
+      assertWslMoveHostSetupIdWritable(store, args)
+      const result = await updateProjectHostSetupWithProvenKind(
+        store,
+        (setupArgs) => {
+          assertWslMoveHostSetupIdWritable(store, setupArgs)
+          return store.updateProjectHostSetup(setupArgs)
+        },
+        args
+      )
       if (!result) {
         throw new Error(`Project host setup not found: ${args.setupId}`)
       }
@@ -95,7 +103,7 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
         rawArgs,
         'project_host_setup_delete_invalid_args'
       )
-      assertWslMoveHostSetupIdWritable(store, args.setupId)
+      assertWslMoveHostSetupIdWritable(store, args)
       const result = store.deleteProjectHostSetup(args)
       if (!result) {
         throw new Error(`Project host setup not found: ${args.setupId}`)

@@ -1,3 +1,4 @@
+import { EVERY_AGENT_CHAT } from '../../shared/native-chat/every-agent-chat.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { getDefaultWorkspaceSession } from '../../shared/constants'
 import type { RuntimePtyController } from './runtime-pty-controller-contract'
@@ -26,6 +27,7 @@ const {
 await import('./orca-runtime-test-lifecycle.spec')
 const { makeRuntimeStoreWithWorkspaceSession, store } =
   await import('./orca-runtime-test-fixtures.spec')
+const { committingSpawn } = await import('./bind-first-pane.test-fixture')
 
 const DEFAULTS = {
   runCommands: true,
@@ -65,7 +67,7 @@ function chatCreateRuntime(args: {
     getSettings: () => ({
       ...runtimeStore.getSettings(),
       setupScriptLaunchMode: args.setupScriptLaunchMode,
-      ...(args.nativeChat ? { experimentalNativeChat: true } : {})
+      ...(args.nativeChat ? { nativeChatProviders: EVERY_AGENT_CHAT } : {})
     })
   })
   const spawn = vi.fn<NonNullable<RuntimePtyController['spawn']>>(async () => {
@@ -73,7 +75,7 @@ function chatCreateRuntime(args: {
     return { id: ptyId }
   })
   runtime.setPtyController({
-    spawn,
+    spawn: committingSpawn(runtime, spawn),
     write: () => true,
     kill: () => true,
     getForegroundProcess: async () => null
@@ -82,7 +84,7 @@ function chatCreateRuntime(args: {
   ensurePathWithinWorkspaceMock.mockReturnValue(path)
   vi.mocked(getEffectiveHooks).mockReturnValue({ scripts: { setup: 'pnpm install' } })
   vi.mocked(getDefaultTabsLaunch).mockReturnValue(args.withDefaults ? DEFAULTS : undefined)
-  vi.mocked(createSetupRunnerScript).mockReturnValue({
+  vi.mocked(createSetupRunnerScript).mockResolvedValue({
     runnerScriptPath: '/repo/setup.sh',
     envVars: {},
     ...(args.wait ? { waitForAgentStartup: true } : {})
@@ -114,7 +116,7 @@ describe('host-created workspaces awaiting their agent chat', () => {
         observeSetupCompletion: true,
         activate
       })
-      const commandCount = withDefaults ? 3 : setupScriptLaunchMode === 'new-tab' ? 1 : 2
+      const commandCount = withDefaults ? 3 : 1
       expect(spawn).toHaveBeenCalledTimes(commandCount)
       expect(spawn.mock.calls.filter(([args]) => args.command === 'pnpm dev')).toHaveLength(
         withDefaults ? 1 : 0
@@ -146,13 +148,12 @@ describe('host-created workspaces awaiting their agent chat', () => {
         ).initialSurfaceLaunch
       ).toBeUndefined()
       expect(snapshot.tabs).toHaveLength(commandCount)
-      if (setupScriptLaunchMode === 'new-tab' && !withDefaults) {
+      if (!withDefaults) {
         expect(snapshot.tabs[0]?.title).toBe('Setup')
       }
     }
   )
 
-  // The phone creates through agent.launch; a reported bug left a plain "Terminal 1" beside Setup.
   it('gives a paired-device chat launch Setup and the chat with no plain shell', async () => {
     const { runtime, spawn } = chatCreateRuntime({
       setupScriptLaunchMode: 'new-tab',

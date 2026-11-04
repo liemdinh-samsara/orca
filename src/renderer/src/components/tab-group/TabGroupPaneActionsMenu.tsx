@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Ellipsis, X } from 'lucide-react'
 import {
   DropdownMenu,
@@ -8,16 +9,24 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 
+type TabGroupPaneActionsMenuProps = {
+  isFocused: boolean
+  onCloseGroup: () => void
+}
+
 export function TabGroupPaneActionsMenu({
-  className,
-  onClosePane
-}: {
-  className: string
-  onClosePane: () => void
-}): React.JSX.Element {
+  isFocused,
+  onCloseGroup
+}: TabGroupPaneActionsMenuProps): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  // Why: the strip stays mounted when focus or the workspace moves away; close so it can't act on a stale group.
+  if (!isFocused && open) {
+    setOpen(false)
+  }
+
   return (
     <Tooltip>
-      <DropdownMenu modal={false}>
+      <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
             <button
@@ -29,14 +38,23 @@ export function TabGroupPaneActionsMenu({
               onClick={(event) => {
                 event.stopPropagation()
               }}
-              className={className}
+              className="my-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <Ellipsis className="size-4" />
             </button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
-          <DropdownMenuItem variant="destructive" onSelect={() => onClosePane()}>
+        <DropdownMenuContent
+          align="end"
+          side="bottom"
+          sideOffset={4}
+          onCloseAutoFocus={(event) => {
+            if (!isFocused) {
+              event.preventDefault()
+            }
+          }}
+        >
+          <DropdownMenuItem variant="destructive" onSelect={() => onCloseGroup()}>
             <X className="size-4" />
             {translate(
               'auto.components.tab.group.TabGroupPanel.closePaneColumn',

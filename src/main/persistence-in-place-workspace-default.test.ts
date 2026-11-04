@@ -8,7 +8,7 @@ import {
   makeRepo,
   testState,
   writeDataFile
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
 
 vi.mock('electron', () => ({ app: { getPath: () => testState.dir } }))
 vi.mock('./telemetry/client', () => ({ track: vi.fn() }))

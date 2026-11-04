@@ -8,6 +8,8 @@ import {
   seedStore
 } from './store-test-helpers'
 import { createStoreCascadesMockApi } from './store-cascades-test-harness'
+import { provideLayoutFrameTerminalPanes } from '@/runtime/layout-frame-terminal-panes'
+import type { PublishedTab } from '../../../../shared/workspace-layout/workspace-layout-published'
 
 const mocks = vi.hoisted(() => ({
   layoutOwnerIsMain: true,
@@ -54,51 +56,53 @@ function storeWithWorktree() {
 beforeEach(() => {
   mocks.layoutOwnerIsMain = true
   mocks.callRuntimeRpc.mockClear()
+  provideLayoutFrameTerminalPanes({ holdsTerminalPane: () => false, terminalTab: () => undefined })
 })
 
 describe('createTab in a layout-owner build', () => {
-  it('sends main the tab it drew, under its ids and in its group', () => {
+  it('draws a tab main made itself with main’s creation facts and sends no create', () => {
+    const mainTab: PublishedTab = {
+      id: TAB,
+      kind: 'terminal',
+      entityId: TAB,
+      executionHostId: 'local',
+      createdAt: 42,
+      customTitle: null,
+      color: null,
+      terminal: {
+        root: { type: 'leaf', leafId: LEAF },
+        panes: [{ leafId: LEAF, ptyId: 'pty-1' }],
+        defaultTitle: 'Terminal 3',
+        startupCwd: '/path/wt'
+      }
+    }
+    provideLayoutFrameTerminalPanes({
+      holdsTerminalPane: () => false,
+      terminalTab: (worktreeId, tabId) =>
+        worktreeId === WORKTREE && tabId === TAB ? mainTab : undefined
+    })
     const store = storeWithWorktree()
 
-    store.getState().createTab(WORKTREE, undefined, 'zsh', {
+    const tab = store.getState().createTab(WORKTREE, undefined, 'zsh', {
       id: TAB,
       initialLeafId: LEAF,
-      startupCwd: '/path/wt/src',
-      launchAgent: 'claude',
-      viewMode: 'chat'
+      initialPtyId: 'pty-1'
     })
 
-    expect(mocks.callRuntimeRpc).toHaveBeenCalledTimes(1)
-    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith({ kind: 'local' }, 'layout.apply', {
-      command: {
-        type: 'createTerminalTab',
-        workspace: WORKTREE,
-        tabId: TAB,
-        leafId: LEAF,
-        groupId: 'group-1',
-        viewMode: 'chat',
-        creation: {
-          defaultTitle: 'Terminal 1',
-          shellOverride: 'zsh',
-          startupCwd: '/path/wt/src',
-          launchAgent: 'claude'
-        }
-      }
+    expect(tab).toMatchObject({
+      createdAt: 42,
+      title: 'Terminal 3',
+      defaultTitle: 'Terminal 3',
+      startupCwd: '/path/wt',
+      ptyId: 'pty-1'
     })
-    // The window drew it first: its callers act on the tab at once.
-    expect(store.getState().tabsByWorktree[WORKTREE]?.map((tab) => tab.id)).toEqual([TAB])
-  })
-
-  it('sends the leaf id the window named the first pane with when the caller gave none', () => {
-    const store = storeWithWorktree()
-
-    const tab = store.getState().createTab(WORKTREE)
-
-    const leafId = store.getState().terminalLayoutsByTabId[tab.id]?.activeLeafId
-    expect(leafId).toBeTruthy()
-    expect(mocks.callRuntimeRpc.mock.calls[0]?.[2]).toMatchObject({
-      command: { tabId: tab.id, leafId }
+    // Main's copy names no shell: the one the window resolved stays.
+    expect(tab.shellOverride).toBe('zsh')
+    expect(store.getState().unifiedTabsByWorktree[WORKTREE]?.[0]).toMatchObject({
+      createdAt: 42,
+      label: 'Terminal 3'
     })
+    expect(mocks.callRuntimeRpc).not.toHaveBeenCalled()
   })
 
   it('leaves a paired server’s workspace to its mirror', () => {
@@ -110,15 +114,6 @@ describe('createTab in a layout-owner build', () => {
         worktreesByRepo: { repo1: [worktree] }
       })
     )
-
-    store.getState().createTab(WORKTREE)
-
-    expect(mocks.callRuntimeRpc).not.toHaveBeenCalled()
-  })
-
-  it('sends nothing in a window-owned build', () => {
-    mocks.layoutOwnerIsMain = false
-    const store = storeWithWorktree()
 
     store.getState().createTab(WORKTREE)
 

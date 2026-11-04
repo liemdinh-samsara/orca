@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { buildRows } from './worktree-list/grouping/build-rows'
-import { getLineageGroupKey, getWorktreeLineageGroupKey } from './worktree-list/grouping/group-keys'
-import { getLineageRenderInfo, getWorktreeLineageAncestors } from './worktree-lineage-projection'
+import { buildRows } from './worktree-list/grouping/build-rows.test-fixture'
+import {
+  getLineageGroupKey,
+  getWorktreeLineageGroupKey
+} from '../../../../shared/sidebar-list/group-keys'
+import {
+  getLineageRenderInfo,
+  getWorktreeLineageAncestors
+} from '../../../../shared/sidebar-list/worktree-lineage-projection'
 import { worktree, repoMap } from './worktree-list-groups-test-fixtures'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
@@ -268,7 +274,11 @@ describe('buildRows workspace lineage nesting', () => {
       [secondChildId, 1],
       [childId, 1]
     ])
-    expect(items[0]).toMatchObject({ lineageChildCount: 2, lineageCollapsed: false })
+    expect(items[0]).toMatchObject({
+      lineageChildCount: 2,
+      lineageChildWorktreeIds: [secondChildId, childId],
+      lineageCollapsed: false
+    })
   })
 
   it('rejects stale resolved lineage after a parent instance is replaced', () => {
@@ -528,6 +538,7 @@ describe('buildRows workspace lineage nesting', () => {
       type: 'item',
       worktree: { id: parent.id },
       lineageChildCount: 1,
+      lineageChildWorktreeIds: [child.id],
       lineageCollapsed: true
     })
   })

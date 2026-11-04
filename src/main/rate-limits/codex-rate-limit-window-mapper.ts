@@ -46,7 +46,7 @@ export function mapCodexRateLimitWindow(
   }
   return {
     usedPercent: clampPercent(raw.usedPercent),
-    // Why: older app-server builds can report canonical bucket lengths off by one minute.
+    // Normalize the one-minute duration drift in older app-server builds.
     windowMinutes: expectedWindowMinutes,
     ...mapCodexReset(raw.resetsAt)
   }

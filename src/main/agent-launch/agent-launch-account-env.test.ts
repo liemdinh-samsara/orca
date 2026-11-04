@@ -1,7 +1,4 @@
-/**
- * `agent.launch`'s `accountEnv` reaches only terminal agents; a structured launch keeps its
- * host-derived home and says so.
- */
+import { EVERY_AGENT_CHAT } from '../../shared/native-chat/every-agent-chat.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { executeAgentLaunch, type AgentLaunchExecution } from './agent-launch-executor'
 import type { AgentLaunchIntent } from '../../shared/agent-launch-intent'
@@ -22,7 +19,9 @@ function harness(structured: boolean) {
   }))
   const createTerminalAgent = vi.fn(async () => ({ handle: 'term_1' }))
   const runtime = {
-    getClientSettings: () => (structured ? { experimentalNativeChat: true } : null),
+    requireStore: () => ({
+      getSettings: () => (structured ? { nativeChatProviders: EVERY_AGENT_CHAT } : null)
+    }),
     getStructuredAgentSessionCreateSupport: async () => ({ supported: true })
   }
   return {

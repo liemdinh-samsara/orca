@@ -16,33 +16,27 @@ function fakeHost() {
   let created = 0
   return {
     canSpawn: () => true,
-    createTerminal: vi.fn(async () => {
+    createTerminal: vi.fn(async (_selector: string, _options: Record<string, unknown>) => {
       created += 1
       return { handle: `term_${created}` }
     }),
-    splitTerminal: vi.fn(async () => ({ handle: 'term_split' })),
     setTabTitle: vi.fn(async (_handle: string, _title: string) => {}),
     setTabColor: vi.fn(async (_handle: string, _color: string) => {}),
-    getSettings: () => ({}),
     getPtyId: () => undefined,
     recordSetupCompletionToken: vi.fn()
   } satisfies Partial<Record<keyof WorktreeTerminalProvisioningHost, unknown>>
 }
 
 function provision(host: ReturnType<typeof fakeHost>, startup: boolean) {
-  return provisionWorktreeTerminals(
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake implements every host member provisioning reaches for default tabs with no setup.
-    host as unknown as WorktreeTerminalProvisioningHost,
-    {
-      worktreeSelector: 'id:wt-1',
-      worktreeId: 'wt-1',
-      worktreePath: '/worktrees/wt-1',
-      defaultTabs: DEFAULT_TABS,
-      primaryTerminalHandle: startup ? 'term_agent' : null,
-      hasStartupTerminal: startup,
-      setupCommandPlatform: 'posix'
-    }
-  )
+  return provisionWorktreeTerminals(host, {
+    worktreeSelector: 'id:wt-1',
+    worktreeId: 'wt-1',
+    worktreePath: '/worktrees/wt-1',
+    defaultTabs: DEFAULT_TABS,
+    primaryTerminalHandle: startup ? 'term_agent' : null,
+    hasStartupTerminal: startup,
+    setupCommandPlatform: 'posix'
+  })
 }
 
 describe('default tabs beside the agent a create started', () => {
@@ -96,21 +90,21 @@ describe('default tabs beside the agent a create started', () => {
 })
 
 describe('setup terminal cwd', () => {
+  function provisionSetup(host: WorktreeTerminalProvisioningHost) {
+    return provisionWorktreeTerminals(host, {
+      worktreeSelector: 'id:wt-1',
+      worktreeId: 'wt-1',
+      worktreePath: '/worktrees/wt-1',
+      setup: { runnerScriptPath: '/tmp/setup.sh', envVars: {} },
+      hasStartupTerminal: true,
+      primaryTerminalHandle: 'term_agent',
+      setupCommandPlatform: 'posix'
+    })
+  }
+
   it('creates a Setup tab at the workspace root', async () => {
     const host = fakeHost()
-    const result = await provisionWorktreeTerminals(
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeHost implements all host methods reached by setup provisioning.
-      host as unknown as WorktreeTerminalProvisioningHost,
-      {
-        worktreeSelector: 'id:wt-1',
-        worktreeId: 'wt-1',
-        worktreePath: '/worktrees/wt-1',
-        setup: { runnerScriptPath: '/tmp/setup.sh', envVars: {} },
-        hasStartupTerminal: true,
-        primaryTerminalHandle: 'term_agent',
-        setupCommandPlatform: 'posix'
-      }
-    )
+    const result = await provisionSetup(host)
     expect(result).toEqual({ setupSpawned: true, setupTerminalHandle: 'term_1' })
     expect(host.createTerminal).toHaveBeenCalledWith(
       'id:wt-1',
@@ -119,44 +113,30 @@ describe('setup terminal cwd', () => {
         cwd: '/worktrees/wt-1'
       })
     )
-    expect(host.splitTerminal).not.toHaveBeenCalled()
   })
 
+  // Split setup placement was retired upstream (#29819); a stale preference still lands at the root.
   it.each(['split-vertical', 'split-horizontal'] as const)(
-    'currently passes no cwd to a %s setup split',
+    'keeps the workspace root for a retired %s setup preference',
     async (setupLaunchMode) => {
       const host = {
         ...fakeHost(),
         getSettings: () => ({ setupScriptLaunchMode: setupLaunchMode })
       }
-      const result = await provisionWorktreeTerminals(
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakeHost implements all host methods reached by setup provisioning.
-        host as unknown as WorktreeTerminalProvisioningHost,
-        {
-          worktreeSelector: 'id:wt-1',
-          worktreeId: 'wt-1',
-          worktreePath: '/worktrees/wt-1',
-          setup: { runnerScriptPath: '/tmp/setup.sh', envVars: {} },
-          hasStartupTerminal: true,
-          primaryTerminalHandle: 'term_agent',
-          setupCommandPlatform: 'posix'
-        }
+      const result = await provisionSetup(host)
+      expect(result).toEqual({ setupSpawned: true, setupTerminalHandle: 'term_1' })
+      expect(host.createTerminal).toHaveBeenCalledOnce()
+      expect(host.createTerminal).toHaveBeenCalledWith(
+        'id:wt-1',
+        expect.objectContaining({ title: 'Setup', cwd: '/worktrees/wt-1' })
       )
-      expect(result).toEqual({ setupSpawned: true, setupTerminalHandle: 'term_split' })
-      expect(host.createTerminal).not.toHaveBeenCalled()
-      expect(host.splitTerminal).toHaveBeenCalledWith('term_agent', {
-        direction: setupLaunchMode === 'split-horizontal' ? 'horizontal' : 'vertical',
-        command: expect.any(String),
-        env: {},
-        activate: false
-      })
     }
   )
 })
 
 const setup = { runnerScriptPath: '/repo/.orca/setup.sh', envVars: {} }
 
-function createHost(settings: Record<string, unknown>): {
+function createHost(): {
   host: WorktreeTerminalProvisioningHost
   titles: () => (string | undefined)[]
 } {
@@ -167,11 +147,8 @@ function createHost(settings: Record<string, unknown>): {
     host: {
       canSpawn: () => true,
       createTerminal,
-      splitTerminal: vi.fn(async () => ({ handle: 'split' })),
       setTabTitle: vi.fn(async () => {}),
       setTabColor: vi.fn(async () => {}),
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: provisioning reads only the optional keys each test supplies.
-      getSettings: () => settings as ReturnType<WorktreeTerminalProvisioningHost['getSettings']>,
       getPtyId: () => undefined,
       recordSetupCompletionToken: vi.fn()
     },
@@ -200,16 +177,21 @@ function provisionWithSetup(
 }
 
 describe('provisionWorktreeTerminals with a cleared creation choice', () => {
-  const none = { defaultTuiAgent: 'blank', newWorkspaceSetupOnly: true }
+  it('uses the injected setup title', async () => {
+    const { host, titles } = createHost()
+    host.getSetupTerminalTitle = () => '초기 설정'
+    await provisionWithSetup(host, true, true)
+    expect(titles()).toEqual(['초기 설정'])
+  })
 
-  it('honours a one-off None choice over the host blank default', async () => {
-    const { host, titles } = createHost({ defaultTuiAgent: 'blank' })
+  it('creates only Setup for an explicit setup-only choice', async () => {
+    const { host, titles } = createHost()
     await provisionWithSetup(host, true, true)
     expect(titles()).toEqual(['Setup'])
   })
 
   it('skips configured template commands when Setup is the only tab', async () => {
-    const { host, titles } = createHost({ defaultTuiAgent: 'blank' })
+    const { host, titles } = createHost()
     await provisionWithSetup(host, true, true, DEFAULT_TABS)
     expect(titles()).toEqual(['Setup'])
     expect(host.setTabTitle).not.toHaveBeenCalled()
@@ -217,42 +199,38 @@ describe('provisionWorktreeTerminals with a cleared creation choice', () => {
   })
 
   it.each([
-    { withSetup: true, setupOnly: false, mode: 'new-tab', titles: ['Dev', 'Tests', 'Setup'] },
-    { withSetup: false, setupOnly: true, mode: 'new-tab', titles: ['Dev', 'Tests'] },
-    { withSetup: true, setupOnly: true, mode: 'split-vertical', titles: ['Dev', 'Tests'] }
-  ])(
-    'keeps templates for blank, skipped, and split setup: $mode/$withSetup/$setupOnly',
-    async (test) => {
-      const { host, titles } = createHost({ setupScriptLaunchMode: test.mode })
-      await provisionWithSetup(host, test.withSetup, test.setupOnly, DEFAULT_TABS)
-      expect(titles()).toEqual(test.titles)
-      expect(host.createTerminal).toHaveBeenCalledWith('id:wt-1', {
-        title: 'Dev',
-        command: 'pnpm dev'
-      })
-    }
-  )
+    { withSetup: true, setupOnly: false, titles: ['Dev', 'Tests', 'Setup'] },
+    { withSetup: false, setupOnly: true, titles: ['Dev', 'Tests'] }
+  ])('keeps templates for blank or skipped setup: $withSetup/$setupOnly', async (test) => {
+    const { host, titles } = createHost()
+    await provisionWithSetup(host, test.withSetup, test.setupOnly, DEFAULT_TABS)
+    expect(titles()).toEqual(test.titles)
+    expect(host.createTerminal).toHaveBeenCalledWith('id:wt-1', {
+      title: 'Dev',
+      command: 'pnpm dev'
+    })
+  })
 
-  it('honours a one-off blank choice over the host None default', async () => {
-    const { host, titles } = createHost(none)
+  it('keeps the primary terminal for an explicit plain-terminal choice', async () => {
+    const { host, titles } = createHost()
     await provisionWithSetup(host, true, false)
     expect(titles()).toEqual([undefined, 'Setup'])
   })
 
-  it('ignores the retired saved None flag without an explicit cleared choice', async () => {
-    const { host, titles } = createHost(none)
+  it('keeps the primary terminal without a cleared creation choice', async () => {
+    const { host, titles } = createHost()
     await expect(provisionWithSetup(host)).resolves.toMatchObject({ setupSpawned: true })
     expect(titles()).toEqual([undefined, 'Setup'])
   })
 
-  it('keeps the blank terminal for a plain blank default', async () => {
-    const { host, titles } = createHost({ defaultTuiAgent: 'blank' })
-    await provisionWithSetup(host)
-    expect(titles()).toEqual([undefined, 'Setup'])
+  it('creates Setup without a shell when the caller supplies the primary surface', async () => {
+    const { host, titles } = createHost()
+    await provisionWithSetup(host, true, false, undefined, true)
+    expect(titles()).toEqual(['Setup'])
   })
 
   it('falls back to a blank terminal when no setup runs', async () => {
-    const { host, titles } = createHost(none)
+    const { host, titles } = createHost()
     await provisionWithSetup(host, false, true)
     expect(titles()).toEqual([undefined])
   })
@@ -260,7 +238,7 @@ describe('provisionWorktreeTerminals with a cleared creation choice', () => {
   it.each([false, true])(
     'opens a failed-Setup recovery shell only when the caller owes the surface (%s)',
     async (callerProvidesSurface) => {
-      const { host, titles } = createHost(none)
+      const { host, titles } = createHost()
       const createTerminal = vi.mocked(host.createTerminal)
       createTerminal.mockRejectedValueOnce(new Error('spawn failed'))
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -274,11 +252,28 @@ describe('provisionWorktreeTerminals with a cleared creation choice', () => {
       warn.mockRestore()
     }
   )
+})
 
-  it('keeps the shell a split setup needs', async () => {
-    const { host, titles } = createHost({ ...none, setupScriptLaunchMode: 'split-vertical' })
-    await provisionWithSetup(host, true, true)
-    expect(titles()).toEqual([undefined])
-    expect(host.splitTerminal).toHaveBeenCalledTimes(1)
+describe("a create's E9 origin", () => {
+  it("starts every terminal of a person's create as their act, and an automation's as background", async () => {
+    const person = fakeHost()
+    await provisionWorktreeTerminals(person, {
+      worktreeSelector: 'id:wt-1',
+      worktreeId: 'wt-1',
+      worktreePath: '/worktrees/wt-1',
+      defaultTabs: DEFAULT_TABS,
+      hasStartupTerminal: false,
+      setupCommandPlatform: 'posix',
+      wslUserAct: true
+    })
+    expect(person.createTerminal.mock.calls.map((call) => call[1])).toEqual(
+      DEFAULT_TABS.tabs.map(() => expect.objectContaining({ wslUserAct: true }))
+    )
+
+    const automation = fakeHost()
+    await provision(automation, false)
+    for (const call of automation.createTerminal.mock.calls) {
+      expect(call[1]).not.toHaveProperty('wslUserAct')
+    }
   })
 })

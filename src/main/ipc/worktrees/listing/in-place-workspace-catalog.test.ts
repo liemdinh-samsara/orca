@@ -3,7 +3,7 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { toDetectedWorktree } from '../../../../shared/worktree/ownership'
-import type { Store } from '../../../persistence'
+import type { Store } from '../../../persistence/loading-store/store'
 import {
   appendInPlaceGitWorkspaces,
   appendInPlaceDetectedGitWorkspaces

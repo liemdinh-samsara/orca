@@ -2,7 +2,7 @@ export const CODEX_SESSION_WINDOW_MINUTES = 300
 export const CODEX_WEEKLY_WINDOW_MINUTES = 10080
 export const CODEX_MONTHLY_WINDOW_MINUTES = 43_200
 
-// Why: tolerate the one-minute drift seen in older Codex bucket lengths without absorbing other durations.
+// Older Codex bucket lengths drift by one minute; tolerate that without absorbing other durations.
 const CODEX_WINDOW_DURATION_TOLERANCE_MINUTES = 1
 
 export type CodexRateWindowSnapshot = {
@@ -79,7 +79,7 @@ export function classifyCodexRateLimitWindows(
     }
   }
 
-  // Why: unknown app-server durations retain Orca's legacy primary/session and secondary/weekly mapping.
+  // Unknown durations preserve legacy primary/session and secondary/weekly mapping.
   if (!session && primary && classifyWindowDuration(primary) === null) {
     session = primary
   }

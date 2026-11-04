@@ -1,4 +1,3 @@
-import type { SecretAtRestProtection } from '../../../../shared/secret-at-rest-protection'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type {
@@ -17,8 +16,10 @@ import type { SettingsHostScope } from './settings-host-scope'
 
 export type AccountsPaneProps = {
   settings: GlobalSettings
-  updateSettings: (updates: Partial<GlobalSettings>) => void
+  updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
   hostScope: SettingsHostScope
+  nativeAccounts?: boolean
+  onAccountLocationChange?: () => void
   wslSupportedPlatform?: boolean
   wslAvailable?: boolean
   wslDistros?: string[]
@@ -69,7 +70,8 @@ export type AccountsPaneSectionModel = {
   settings: GlobalSettings
   /** Host whose accounts the pane lists and mutates. */
   accountOwner: RuntimeClientTarget
-  updateSettings: (updates: Partial<GlobalSettings>) => void
+  updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
+  onAccountLocationChange?: () => void
   searchQuery: string
   recordFeatureInteraction: (featureId: FeatureInteractionId) => void
   wslSupportedPlatform: boolean
@@ -112,18 +114,4 @@ export type AccountsPaneSectionModel = {
   setRemoveCodexTarget: Dispatch<SetStateAction<RemoveAccountTarget | null>>
   runCodexAccountAction: CodexAccountActionRunner
   recordOpenCodeSettingEdit: (field: 'cookie' | 'workspaceId' | 'apiKey') => void
-  miniMaxRateLimits: ProviderRateLimits | null
-  miniMaxApiKeyDraft: string
-  setMiniMaxApiKeyDraft: Dispatch<SetStateAction<string>>
-  miniMaxApiKeyConfigured: boolean
-  miniMaxApiKeyProtection: SecretAtRestProtection | null
-  saveMiniMaxApiKey: () => Promise<void>
-  clearMiniMaxApiKey: () => Promise<void>
-  miniMaxCookieDraft: string
-  setMiniMaxCookieDraft: Dispatch<SetStateAction<string>>
-  miniMaxConfigured: boolean
-  miniMaxCookieProtection: SecretAtRestProtection | null
-  miniMaxCredentialBusy: boolean
-  saveMiniMaxCookie: () => Promise<void>
-  clearMiniMaxCookie: () => Promise<void>
 }

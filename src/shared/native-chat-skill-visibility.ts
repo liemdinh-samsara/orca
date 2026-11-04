@@ -1,6 +1,17 @@
 import type { AgentType } from './agent-status-types'
-import { getNativeChatAgentProfile } from './native-chat-agent-profiles'
+import type { AgentSessionSlashCommand } from './agent-session/agent-session-wire'
 import type { DiscoveredSkill, SkillDiscoveryResult } from './skills'
+import {
+  getNativeChatAgentProfile,
+  readsSkillSource
+} from './native-chat/native-chat-agent-profiles'
+import { classifyPickerCommands } from './native-chat/input/native-chat-picker-items'
+import {
+  sessionReportedSkills,
+  type NativeChatSessionSkill,
+  type SlashCommandSuggestion
+} from './native-chat/input/native-chat-slash-commands'
+import { isStructuredAgentSessionComposerCommand } from './agent-session/view/structured-agent-session-composer'
 
 export function isNativeChatSkillForAgent(
   agent: AgentType,
@@ -17,12 +28,33 @@ export function isNativeChatSkillForAgent(
       (skill.providers.includes('codex') || skill.providers.includes('agent-skills'))
     )
   }
-  // Why: canonical-path dedup keeps one row per file, but a symlinked skill can
-  // be reachable through several roots; any shared or agent-owned root grants
-  // visibility regardless of which root the scanner happened to list first.
+  // Canonical dedup may hide alternate symlink roots; any shared/agent root grants visibility regardless of scan order.
   const rootPaths = skill.rootPaths?.length ? skill.rootPaths : [skill.rootPath]
   return rootPaths.some((rootPath) => {
     const source = result.sources.find((entry) => entry.path === rootPath)
-    return source?.owner === null || source?.owner === profile.skillSourceOwner
+    return source !== undefined && readsSkillSource(profile, source)
+  })
+}
+
+/** Skills the session reported; undefined keeps the host disk scan (also for chats that keep scanned skills). */
+export function nativeChatSessionSkills(
+  agent: AgentType,
+  reported: readonly AgentSessionSlashCommand[] | undefined
+): readonly NativeChatSessionSkill[] | undefined {
+  const keepsScannedSkills = getNativeChatAgentProfile(agent)?.keepsScannedSkills === true
+  return reported !== undefined && !keepsScannedSkills
+    ? sessionReportedSkills(reported, agent)
+    : undefined
+}
+
+export function nativeChatPickerCommands(
+  agent: AgentType,
+  commands: readonly SlashCommandSuggestion[],
+  scannedSkills: readonly DiscoveredSkill[]
+): readonly SlashCommandSuggestion[] {
+  return classifyPickerCommands(commands, scannedSkills, {
+    // A chat that keeps scanned skills (OpenCode) may report each as a command too.
+    reportMayListSkills: getNativeChatAgentProfile(agent)?.keepsScannedSkills === true,
+    isSendCommand: (name) => isStructuredAgentSessionComposerCommand(`/${name}`, agent)
   })
 }

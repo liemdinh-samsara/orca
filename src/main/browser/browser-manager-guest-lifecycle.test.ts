@@ -16,6 +16,19 @@ const browserMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
+  WebContentsView: class {
+    onDestroyed: (() => void) | null = null
+    webContents = {
+      id: 9001,
+      isDestroyed: () => false,
+      close: () => this.onDestroyed?.(),
+      once: (_event: string, listener: () => void) => {
+        this.onDestroyed = listener
+      },
+      focus: vi.fn()
+    }
+    setVisible(): void {}
+  },
   app: {
     getPath: browserMocks.appGetPathMock
   },
@@ -40,7 +53,6 @@ vi.mock('./popup-origin-bar-window', () => ({
 }))
 
 import { browserManager } from './browser-manager'
-import { DestroyedGuestTestContents } from './browser-manager-destroyed-guest-test-fixture'
 import {
   rendererWebContentsId,
   resetBrowserManagerMocks,
@@ -50,10 +62,7 @@ import { installDocPreviewGuestPolicy } from './doc-preview-guest-policy'
 import { mintDocPreviewGrant, revokeAllDocPreviewGrants } from './doc-preview-grant-registry'
 import { buildDocPreviewUrl } from '../../shared/doc-preview-scheme'
 
-/**
- * A page the document half of the registry really holds. Built rather than named: membership is
- * what both doors refuse on now, so an id that merely looks like a preview's would be admitted.
- */
+/** Register a real document page; membership checks do not rely on ID shape. */
 function registerWorkspaceDocPage(browserPageId: string): void {
   const grant = mintDocPreviewGrant({
     owner: { kind: 'ssh', connectionId: 'ssh-1' },
@@ -79,6 +88,7 @@ const {
   guestSetBackgroundThrottlingMock,
   guestSetWindowOpenHandlerMock,
   guestOpenDevToolsMock,
+  browserWindowFromWebContentsMock,
   webContentsFromIdMock,
   menuBuildFromTemplateMock
 } = browserMocks
@@ -99,6 +109,8 @@ describe('browserManager', () => {
       id: 104,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -120,8 +132,6 @@ describe('browserManager', () => {
     expect(browserManager.getSessionProfileIdForTab('browser-1')).toBe('work')
   })
 
-  // Why both doors: one id in both halves of the registry would make the tool door answer with a
-  // document guest for a page the reader is browsing in.
   it.each(['registerGuest', 'registerOffscreenGuest'] as const)(
     'refuses %s for a page the document registry already holds',
     (entryPoint) => {
@@ -129,6 +139,8 @@ describe('browserManager', () => {
         id: 129,
         isDestroyed: vi.fn(() => false),
         getType: vi.fn(() => 'webview'),
+        isCurrentlyAudible: vi.fn(() => false),
+        send: vi.fn(),
         setBackgroundThrottling: guestSetBackgroundThrottlingMock,
         setWindowOpenHandler: guestSetWindowOpenHandlerMock,
         on: guestOnMock,
@@ -158,8 +170,7 @@ describe('browserManager', () => {
     }
   )
 
-  // Why this answer is load-bearing: the headless backend destroys its window on false, so a true
-  // for a guest that is already gone would leave a page id registered onto nothing.
+  // The headless backend destroys its window when registration returns false.
   it.each(['missing', 'destroyed'] as const)(
     'refuses registerOffscreenGuest when the named guest is %s',
     (guestState) => {
@@ -198,18 +209,32 @@ describe('browserManager', () => {
     expect(guestOpenDevToolsMock).not.toHaveBeenCalled()
   })
 
-  it('keeps devtools available for a desktop webview guest', async () => {
+  it('docks devtools into the page pane, or pops them out to a window when asked', async () => {
+    const setDevToolsWebContents = vi.fn()
     const guest = {
       id: 139,
+      hostWebContents: {},
       isDestroyed: vi.fn(() => false),
+      isDevToolsOpened: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
+      setDevToolsWebContents,
       on: guestOnMock,
+      once: vi.fn(),
       off: guestOffMock,
       openDevTools: guestOpenDevToolsMock
     }
-    webContentsFromIdMock.mockReturnValue(guest)
+    const renderer = { id: rendererWebContentsId, isDestroyed: () => false, send: vi.fn() }
+    webContentsFromIdMock.mockImplementation((id: number) =>
+      id === rendererWebContentsId ? renderer : guest
+    )
+    browserWindowFromWebContentsMock.mockReturnValue({
+      isDestroyed: () => false,
+      contentView: { addChildView: vi.fn(), removeChildView: vi.fn() }
+    })
     browserManager.attachGuestPolicies(guest as never)
     browserManager.registerGuest({
       browserPageId: 'desktop-devtools',
@@ -218,11 +243,21 @@ describe('browserManager', () => {
     })
 
     await expect(browserManager.openDevTools('desktop-devtools')).resolves.toBe(true)
-    expect(guestOpenDevToolsMock).toHaveBeenCalledWith({ mode: 'detach' })
+    expect(setDevToolsWebContents).toHaveBeenCalledWith(expect.objectContaining({ id: 9001 }))
+    expect(guestOpenDevToolsMock).not.toHaveBeenCalledWith({ mode: 'detach' })
+    expect(renderer.send).toHaveBeenLastCalledWith('browser:devToolsDockChanged', {
+      browserPageId: 'desktop-devtools',
+      docked: true
+    })
+
+    await browserManager.openDevTools('desktop-devtools', undefined, { detach: true })
+    expect(guestOpenDevToolsMock).toHaveBeenLastCalledWith({ mode: 'detach' })
+    expect(renderer.send).toHaveBeenLastCalledWith('browser:devToolsDockChanged', {
+      browserPageId: 'desktop-devtools',
+      docked: false
+    })
   })
 
-  // Why the exit door needs the same check: a document page withdraws by revoking its grant, so its
-  // id here is misaddressed — and unregistering opens by evicting whatever grab that id names.
   it('refuses unregisterGuest for a page the document registry holds', () => {
     registerWorkspaceDocPage('doc-page-2')
     const cancelGrabOp = vi.spyOn(browserManager, 'cancelGrabOp')
@@ -231,7 +266,6 @@ describe('browserManager', () => {
 
     expect(cancelGrabOp).not.toHaveBeenCalled()
 
-    // The presence half: the same door does evict a browsing page's grab.
     browserManager.unregisterGuest('browser-page-1')
     expect(cancelGrabOp).toHaveBeenCalledWith('browser-page-1', 'evicted')
     cancelGrabOp.mockRestore()
@@ -241,6 +275,9 @@ describe('browserManager', () => {
     const guest = {
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
+      getURL: vi.fn(() => 'https://example.com/'),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -261,11 +298,41 @@ describe('browserManager', () => {
     expect(preventDefault).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    ['https://example.com/', true],
+    ['file:///docs/plan.html', false]
+  ])('from %s, a file: link navigation is blocked=%s', (currentUrl, blocked) => {
+    const guest = {
+      isDestroyed: vi.fn(() => false),
+      getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
+      getURL: vi.fn(() => currentUrl),
+      setBackgroundThrottling: guestSetBackgroundThrottlingMock,
+      setWindowOpenHandler: guestSetWindowOpenHandlerMock,
+      on: guestOnMock,
+      off: guestOffMock,
+      openDevTools: guestOpenDevToolsMock
+    }
+    webContentsFromIdMock.mockReturnValue(guest)
+
+    browserManager.attachGuestPolicies(guest as never)
+
+    const willNavigateHandler = guestOnMock.mock.calls.find(
+      ([event]) => event === 'will-navigate'
+    )?.[1] as ((event: { preventDefault: () => void }, url: string) => void) | undefined
+    const preventDefault = vi.fn()
+    willNavigateHandler?.({ preventDefault }, 'file:///docs/index.html')
+    expect(preventDefault).toHaveBeenCalledTimes(blocked ? 1 : 0)
+  })
+
   it('unregisterAll clears tracked guests and context-menu listeners', () => {
     const guest = {
       id: 101,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -278,9 +345,6 @@ describe('browserManager', () => {
     browserManager.registerGuest({
       browserPageId: 'browser-1',
       webContentsId: 101,
-      // Why: registrations now record which renderer owns each guest so main
-      // can route load failures back to the correct window instead of dropping
-      // them once multiple renderers exist.
       rendererWebContentsId
     })
     browserManager.attachGuestPolicies({ ...guest, id: 102 } as never)
@@ -289,7 +353,7 @@ describe('browserManager', () => {
       webContentsId: 102,
       rendererWebContentsId
     })
-    // Guests attached before registration still need their policy listeners released.
+    // Policies attached before registration also need cleanup.
     const unregisteredGuestOff = vi.fn()
     browserManager.attachGuestPolicies({ ...guest, id: 103, off: unregisteredGuestOff } as never)
 
@@ -303,9 +367,7 @@ describe('browserManager', () => {
   })
 
   it('rejects non-webview guest types to prevent privilege escalation', () => {
-    // A compromised renderer could send the main window's own webContentsId.
-    // registerGuest must reject it because getType() would return 'window',
-    // not 'webview'.
+    // An untrusted renderer could submit the main window WebContents ID.
     const mainWindowContents = {
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'window'),
@@ -323,9 +385,7 @@ describe('browserManager', () => {
       rendererWebContentsId
     })
 
-    // The guest should NOT be registered
     expect(browserManager.getGuestWebContentsId('browser-evil')).toBeNull()
-    // setWindowOpenHandler must NOT have been called on the main window's webContents
     expect(guestSetWindowOpenHandlerMock).not.toHaveBeenCalled()
   })
 
@@ -334,6 +394,8 @@ describe('browserManager', () => {
       id: 777,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -357,6 +419,8 @@ describe('browserManager', () => {
       id: 303,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -367,7 +431,7 @@ describe('browserManager', () => {
     browserManager.attachGuestPolicies(guest as never)
     browserManager.attachGuestPolicies(guest as never)
 
-    expect(guestSetBackgroundThrottlingMock).toHaveBeenCalledTimes(1)
+    expect(guestSetBackgroundThrottlingMock).not.toHaveBeenCalled()
     expect(guestSetWindowOpenHandlerMock).toHaveBeenCalledTimes(1)
     expect(guestOnMock.mock.calls.filter(([event]) => event === 'will-navigate')).toHaveLength(1)
     expect(guestOnMock.mock.calls.filter(([event]) => event === 'will-redirect')).toHaveLength(1)
@@ -381,6 +445,8 @@ describe('browserManager', () => {
       id: 304,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -411,6 +477,8 @@ describe('browserManager', () => {
       id: 306,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -443,6 +511,8 @@ describe('browserManager', () => {
       id: 305,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -503,6 +573,8 @@ describe('browserManager', () => {
       id: 501,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: oldGuestOnMock,
@@ -514,6 +586,8 @@ describe('browserManager', () => {
       id: 502,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: newGuestOnMock,
@@ -548,6 +622,8 @@ describe('browserManager', () => {
       webContentsId: newGuest.id,
       rendererWebContentsId
     })
+    // Registration also reports audio state; this test is about load-failure routing.
+    rendererSendMock.mockClear()
 
     const oldDidFailLoadHandler = oldGuestOnMock.mock.calls.find(
       ([event]) => event === 'did-fail-load'
@@ -598,6 +674,8 @@ describe('browserManager', () => {
       id: 808,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -636,100 +714,7 @@ describe('browserManager', () => {
     ).toHaveLength(2)
   })
 
-  function registerSideButtonGuest(
-    guest: DestroyedGuestTestContents,
-    rendererSendMock: ReturnType<typeof vi.fn>
-  ) {
-    webContentsFromIdMock.mockImplementation((id: number) => {
-      if (id === guest.id) {
-        return guest.asWebContents()
-      }
-      if (id === rendererWebContentsId) {
-        return { isDestroyed: () => false, send: rendererSendMock }
-      }
-      return null
-    })
-    browserManager.attachGuestPolicies(guest.asWebContents())
-    expect(
-      browserManager.registerGuest({
-        browserPageId: 'side-button-page',
-        webContentsId: guest.id,
-        rendererWebContentsId
-      })
-    ).toBe(true)
-  }
-
-  it('registers side-button navigation for a guest and removes it on unregister', () => {
-    const guest = new DestroyedGuestTestContents(810)
-    const onMock = vi.spyOn(guest, 'on')
-    const offMock = vi.spyOn(guest, 'off')
-    const rendererSendMock = vi.fn()
-    registerSideButtonGuest(guest, rendererSendMock)
-    const preventDefault = vi.fn()
-    const navigators = onMock.mock.calls.filter(([event, listener]) => {
-      if (event !== 'before-mouse-event') {
-        return false
-      }
-      const callsBefore = rendererSendMock.mock.calls.length
-      listener({ preventDefault }, { type: 'mouseUp', button: 'back' })
-      return rendererSendMock.mock.calls.length > callsBefore
-    })
-
-    expect(navigators).toHaveLength(1)
-    expect(preventDefault).toHaveBeenCalledTimes(1)
-    expect(rendererSendMock).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
-      browserPageId: 'side-button-page',
-      direction: 'back'
-    })
-
-    browserManager.unregisterGuest('side-button-page')
-
-    expect(offMock).toHaveBeenCalledWith('before-mouse-event', navigators[0]?.[1])
-    expect(offMock).toHaveBeenCalledWith('before-input-event', expect.any(Function))
-    rendererSendMock.mockClear()
-    guest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
-    expect(rendererSendMock).not.toHaveBeenCalled()
-  })
-
-  it('removes the old guest side-button listener when a page registers a replacement guest', () => {
-    const oldGuest = new DestroyedGuestTestContents(811)
-    const oldOffMock = vi.spyOn(oldGuest, 'off')
-    const rendererSendMock = vi.fn()
-    registerSideButtonGuest(oldGuest, rendererSendMock)
-    const preventDefault = vi.fn()
-    const navigators = oldGuest.listeners('before-mouse-event').filter((listener) => {
-      const callsBefore = rendererSendMock.mock.calls.length
-      listener({ preventDefault }, { type: 'mouseUp', button: 'back' })
-      return rendererSendMock.mock.calls.length > callsBefore
-    })
-    expect(navigators).toHaveLength(1)
-    expect(rendererSendMock).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
-      browserPageId: 'side-button-page',
-      direction: 'back'
-    })
-    const newGuest = new DestroyedGuestTestContents(812)
-    const newOffMock = vi.spyOn(newGuest, 'off')
-    registerSideButtonGuest(newGuest, rendererSendMock)
-
-    expect(oldOffMock).toHaveBeenCalledWith('before-mouse-event', navigators[0])
-    rendererSendMock.mockClear()
-    oldGuest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
-    expect(rendererSendMock).not.toHaveBeenCalled()
-    newGuest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
-    expect(rendererSendMock).toHaveBeenCalledExactlyOnceWith('ui:browserHistoryNavigate', {
-      browserPageId: 'side-button-page',
-      direction: 'back'
-    })
-
-    browserManager.unregisterGuest('side-button-page')
-    expect(newOffMock).toHaveBeenCalledWith('before-mouse-event', expect.any(Function))
-    rendererSendMock.mockClear()
-    newGuest.emit('before-mouse-event', { preventDefault }, { type: 'mouseUp', button: 'back' })
-    expect(rendererSendMock).not.toHaveBeenCalled()
-  })
-
-  // Why: a plain browsing tab must never attach a debugger (Cloudflare treats CDP as a bot signal);
-  // the only debugger wiring it keeps is the detach listener that invalidates the auth-host UA override.
+  // Browsing guests track override invalidation without attaching a debugger.
   it('never attaches a debugger to a browsing guest and drops its detach listener on unregister', () => {
     const debuggerHandlers = new Map<string, () => void>()
     const debuggerAttachMock = vi.fn()
@@ -737,6 +722,8 @@ describe('browserManager', () => {
       id: 809,
       isDestroyed: vi.fn(() => false),
       getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => false),
+      send: vi.fn(),
       setBackgroundThrottling: guestSetBackgroundThrottlingMock,
       setWindowOpenHandler: guestSetWindowOpenHandlerMock,
       on: guestOnMock,
@@ -773,5 +760,50 @@ describe('browserManager', () => {
     browserManager.unregisterGuest('browser-no-debugger')
     expect(debuggerHandlers.has('detach')).toBe(false)
     expect(debuggerAttachMock).not.toHaveBeenCalled()
+  })
+
+  // The renderer re-applies a tab's mute on each registration report and clears the
+  // speaker on the unregister report, so neither may be skipped.
+  it('reports page audio on registration and on change, and silence on unregister', () => {
+    const rendererSend = vi.fn()
+    const guest = {
+      id: 301,
+      isDestroyed: vi.fn(() => false),
+      getType: vi.fn(() => 'webview'),
+      isCurrentlyAudible: vi.fn(() => true),
+      setBackgroundThrottling: guestSetBackgroundThrottlingMock,
+      setWindowOpenHandler: guestSetWindowOpenHandlerMock,
+      on: guestOnMock,
+      off: guestOffMock,
+      openDevTools: guestOpenDevToolsMock
+    }
+    webContentsFromIdMock.mockImplementation((id: number) =>
+      id === guest.id
+        ? guest
+        : id === rendererWebContentsId
+          ? { isDestroyed: () => false, send: rendererSend }
+          : null
+    )
+    browserManager.attachGuestPolicies(guest as never)
+    const onAudioStateChanged: (event: { audible: boolean }) => void = guestOnMock.mock.calls.find(
+      ([event]) => event === 'audio-state-changed'
+    )?.[1]
+
+    browserManager.registerGuest({
+      browserPageId: 'page-1',
+      webContentsId: guest.id,
+      rendererWebContentsId
+    })
+    onAudioStateChanged({ audible: false })
+    browserManager.unregisterGuest('page-1')
+    onAudioStateChanged({ audible: true })
+
+    expect(
+      rendererSend.mock.calls.filter(([channel]) => channel === 'browser:audio-state-changed')
+    ).toEqual([
+      ['browser:audio-state-changed', { browserPageId: 'page-1', audible: true }],
+      ['browser:audio-state-changed', { browserPageId: 'page-1', audible: false }],
+      ['browser:audio-state-changed', { browserPageId: 'page-1', audible: false }]
+    ])
   })
 })

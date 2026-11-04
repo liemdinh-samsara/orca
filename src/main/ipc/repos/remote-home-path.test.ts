@@ -5,10 +5,10 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteDirectory: vi.fn()
 }))
 
-vi.mock('../../ssh/ssh-target-registry', () => ({
+vi.mock('../../ssh/targets/ssh-target-registry', () => ({
   getSshConnectionManager: () => ({ getConnection: () => mocks.connection.current })
 }))
-vi.mock('../ssh-browse', () => ({ resolveRemoteDirectory: mocks.resolveRemoteDirectory }))
+vi.mock('../ssh/ssh-browse', () => ({ resolveRemoteDirectory: mocks.resolveRemoteDirectory }))
 
 import { resolveRemoteHomePath } from './remote-home-path'
 

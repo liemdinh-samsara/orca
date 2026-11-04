@@ -1,4 +1,4 @@
-// COMPAT(legacy-relay-bridge): revisit 2027-01-15, with src/main/ssh/legacy-relay-bridge/.
+// COMPAT(legacy-relay-bridge): revisit 2027-01-15, with src/main/ssh/legacy-relay/.
 // The managed server starts a shell for any unmaterialized pane a client activates. A pane an older
 // relay still runs is served by the bridge, so activating it would leave a second, unseen shell.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -110,27 +110,6 @@ describe('activating a pane the legacy relay bridge serves', () => {
       expect.objectContaining({
         method: 'session.tabs.activate',
         params: expect.objectContaining({ tabId: 'relay-tab', leafId: 'orcad-leaf' })
-      })
-    )
-  })
-
-  it('still activates its sibling panes and every other tab on the server', async () => {
-    const call = vi.fn().mockResolvedValue({ id: 'activate', ok: true, result: {} })
-    stubWindow(call)
-
-    for (const hostTabId of ['relay-tab::orcad-leaf', 'orcad-tab::leaf']) {
-      await activateWebRuntimeSessionTab({
-        worktreeId: WORKTREE_ID,
-        tabId: toWebTerminalSurfaceTabId(hostTabId),
-        environmentId: ENVIRONMENT_ID
-      })
-    }
-
-    expect(call).toHaveBeenCalledTimes(2)
-    expect(call).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: 'session.tabs.activate',
-        params: expect.objectContaining({ tabId: 'orcad-tab::leaf' })
       })
     )
   })

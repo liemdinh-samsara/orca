@@ -4,20 +4,20 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { canAssignWorktreeParent } from './worktree-parent-eligibility'
-import { getCyclicProjectedWorktreeLineageIds } from './worktree-lineage-projection'
+import { getCyclicProjectedWorktreeLineageIds } from '../../../../shared/sidebar-list/worktree-lineage-projection'
 
 type ParentCandidateArgs = {
   child: Worktree
   worktrees: readonly Worktree[]
   lineageById: Record<string, WorktreeLineage>
-  worktreeMap: Map<string, Worktree>
-  repoMap: Map<string, Pick<Repo, 'connectionId' | 'executionHostId'>>
+  worktreeMap: ReadonlyMap<string, Worktree>
+  repoMap: ReadonlyMap<string, Pick<Repo, 'connectionId' | 'executionHostId'>>
   cyclicLineageIds?: ReadonlySet<string>
 }
 
 function getWorktreeOwnerHostId(
   worktree: Worktree,
-  repoMap: Map<string, Pick<Repo, 'connectionId' | 'executionHostId'>>
+  repoMap: ReadonlyMap<string, Pick<Repo, 'connectionId' | 'executionHostId'>>
 ): ExecutionHostId | null {
   const repo = repoMap.get(worktree.repoId)
   return repo ? getWorktreeExecutionHostId(worktree, repo) : (worktree.hostId ?? null)

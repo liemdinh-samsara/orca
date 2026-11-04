@@ -23,6 +23,7 @@ import {
 } from './tab-bar-windows-shell-launch-test-harness'
 
 vi.mock('react', async () => await stubHeadlessReact())
+vi.mock('@/store/plugin-new-files', () => ({ usePluginNewFiles: () => [] }))
 vi.mock('zustand/react/shallow', () => stubShallowSelector())
 vi.mock('lucide-react', async () => (await import('./lucide-icon-stub-fixture')).stubEveryIcon())
 vi.mock('@dnd-kit/sortable', () => stubSortableContext())
@@ -50,7 +51,8 @@ vi.mock('react-i18next', async () => ({
   useTranslation: () => ({})
 }))
 vi.mock('@/runtime/structured-conversation-name', () => ({
-  useStructuredChatTabConversationName: () => null
+  useStructuredChatTabConversationName: () => null,
+  useStructuredChatTabNamingFailure: () => null
 }))
 vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
 vi.mock('./ClientHostedBrowserTabRows', () => ({
@@ -154,7 +156,7 @@ describe('TabBar strip orientation', () => {
     vi.resetModules()
     resetAppStoreSnapshot()
     vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
-    vi.stubGlobal('window', { api: {} })
+    vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), api: {} })
     appStoreSnapshot.repos = [{ id: 'repo-local', connectionId: null }]
     appStoreSnapshot.worktreesByRepo = { 'repo-local': [{ id: 'wt-local', repoId: 'repo-local' }] }
   })

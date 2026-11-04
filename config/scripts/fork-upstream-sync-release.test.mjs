@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { describe, expect, it } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
-import { compareReleaseNames, pickRelease } from './fork-upstream-sync.mjs'
+import { compareReleaseNames, pickRelease } from './fork-upstream-sync-releases.mjs'
 import {
   cli,
   git,

@@ -10,6 +10,11 @@ import {
   ownersForFiles
 } from './fork-contract-registry.mjs'
 import { buildRunPlan, executeRunPlan, writeRunReport } from './fork-contract-run.mjs'
+import {
+  newestRelease,
+  parseReleaseTags,
+  releaseTagListingArgs
+} from './fork-upstream-sync-releases.mjs'
 
 export {
   loadRegistry,
@@ -33,18 +38,36 @@ function git(root, args) {
   return result.stdout
 }
 
+// Why the release: a release tag sits on a side commit off upstream main, so its own fixes
+// would otherwise count as fork changes.
+function newestMergedReleaseSha(root, upstream) {
+  if (upstream.track !== 'release') {
+    return null
+  }
+  const release = newestRelease(
+    parseReleaseTags(git(root, releaseTagListingArgs('HEAD')), upstream.releaseTagPattern)
+  )
+  return release
+    ? git(root, ['rev-parse', '--verify', `refs/tags/${release.name}^{commit}`]).trim()
+    : null
+}
+
+function upstreamMergeBase(root, upstream) {
+  const ref = `${upstream.remote}/${upstream.branch}`
+  try {
+    git(root, ['rev-parse', '--verify', `${ref}^{commit}`])
+  } catch {
+    throw new Error(
+      `Missing upstream ref ${ref}. Run: git remote add ${upstream.remote} ${upstream.url} && git fetch ${upstream.remote} ${upstream.branch} --no-tags`
+    )
+  }
+  return git(root, ['merge-base', 'HEAD', ref]).trim()
+}
+
 export function forkChangedFiles(root, base) {
   if (!base) {
     const { upstream } = loadRegistry(root)
-    const ref = `${upstream.remote}/${upstream.branch}`
-    try {
-      git(root, ['rev-parse', '--verify', `${ref}^{commit}`])
-    } catch {
-      throw new Error(
-        `Missing upstream ref ${ref}. Run: git remote add ${upstream.remote} ${upstream.url} && git fetch ${upstream.remote} ${upstream.branch} --no-tags`
-      )
-    }
-    base = git(root, ['merge-base', 'HEAD', ref]).trim()
+    base = newestMergedReleaseSha(root, upstream) ?? upstreamMergeBase(root, upstream)
   }
   return [
     ...new Set(

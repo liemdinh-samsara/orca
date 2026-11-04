@@ -411,6 +411,23 @@ describe('CLI and git integration', () => {
     git('checkout', '--quiet', '-')
     expect(forkChangedFiles(scratch)).not.toContain('upstream-only.txt')
   })
+  it('measures fork changes from the newest merged release when tracking releases', () => {
+    initialize()
+    const value = loadRegistry(scratch)
+    value.upstream = { ...value.upstream, track: 'release' }
+    write(registryPath, JSON.stringify(value))
+    git('checkout', '--quiet', 'upstream/main')
+    write('release-fix.txt')
+    git('add', 'release-fix.txt')
+    git('-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'release: v1.0.0')
+    git('-c', 'tag.gpgsign=false', 'tag', '-a', 'v1.0.0', '-m', 'v1.0.0')
+    git('tag', 'v1.0.1-rc.0')
+    git('checkout', '--quiet', '-')
+    expect(forkChangedFiles(scratch)).toEqual([registryPath])
+    git('-c', 'commit.gpgsign=false', 'merge', '--quiet', '--no-edit', 'v1.0.0')
+    expect(forkChangedFiles(scratch)).toEqual([registryPath])
+    expect(forkChangedFiles(scratch)).not.toContain('release-fix.txt')
+  })
   it('gives a fetch hint when upstream is missing and permits explicit base', () => {
     initialize()
     git('branch', '-D', 'upstream/main')

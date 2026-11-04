@@ -3,17 +3,24 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import {
+  DEFAULT_RELEASE_TAG_PATTERN,
+  newestRelease,
+  compareReleaseNames,
+  parseReleaseTags,
+  pickRelease,
+  releaseAgeDays,
+  releaseTagListingArgs
+} from './fork-upstream-sync-releases.mjs'
 
 const DEFAULT_UPSTREAM = {
   remote: 'upstream',
   url: 'https://github.com/stablyai/orca.git',
   branch: 'main',
   track: 'branch',
-  releaseTagPattern: '^v\\d+\\.\\d+\\.\\d+$',
+  releaseTagPattern: DEFAULT_RELEASE_TAG_PATTERN,
   minReleaseAgeDays: 7
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000
 
 class SyncError extends Error {
   constructor(message, exitCode = 1) {
@@ -103,54 +110,10 @@ function upstreamConfig(root) {
   return config
 }
 
-function versionParts(name) {
-  return (name.match(/\d+/g) ?? []).map(Number)
-}
-
-export function compareReleaseNames(a, b) {
-  const left = versionParts(a)
-  const right = versionParts(b)
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const diff = (left[index] ?? 0) - (right[index] ?? 0)
-    if (diff) {
-      return diff
-    }
-  }
-  return 0
-}
-
-/** Newest release tag that has been out for at least `minAgeDays`, or null. */
-export function pickRelease(tags, { pattern, minAgeDays, now = Date.now() }) {
-  const matcher = new RegExp(pattern)
-  return (
-    tags
-      .filter((tag) => matcher.test(tag.name) && now - tag.date >= minAgeDays * DAY_MS)
-      .sort((a, b) => compareReleaseNames(b.name, a.name))[0] ?? null
-  )
-}
-
-function releaseTags(root, pattern, merged) {
-  const matcher = new RegExp(pattern)
-  const listing = git(root, [
-    'for-each-ref',
-    '--format=%(refname:strip=2)%09%(creatordate:unix)',
-    ...(merged ? [`--merged=${merged}`] : []),
-    'refs/tags/'
-  ])
-  return listing
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [name, seconds] = line.split('\t')
-      return { name, date: Number(seconds) * 1000 }
-    })
-    .filter((tag) => matcher.test(tag.name))
-}
-
 // Why releases: upstream main lands ~120 commits a day; its nightly releases are what it ships.
 function resolveRelease(root, upstream, options, baseSha) {
   const now = options.now ?? Date.now()
-  const tags = releaseTags(root, upstream.releaseTagPattern)
+  const tags = parseReleaseTags(git(root, releaseTagListingArgs()), upstream.releaseTagPattern)
   let release
   if (options.release) {
     release = tags.find((tag) => tag.name === options.release)
@@ -169,13 +132,13 @@ function resolveRelease(root, upstream, options, baseSha) {
       )
     }
   }
-  const newestMerged = releaseTags(root, upstream.releaseTagPattern, baseSha).sort((a, b) =>
-    compareReleaseNames(b.name, a.name)
-  )[0]
+  const newestMerged = newestRelease(
+    parseReleaseTags(git(root, releaseTagListingArgs(baseSha)), upstream.releaseTagPattern)
+  )
   return {
     tag: release.name,
     publishedAt: new Date(release.date).toISOString(),
-    ageDays: Math.floor((now - release.date) / DAY_MS),
+    ageDays: releaseAgeDays(release, now),
     pinned: Boolean(options.release),
     // A release the fork already has, or one older than it, must never be merged again.
     alreadyMerged: Boolean(

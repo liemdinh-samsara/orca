@@ -21,7 +21,7 @@ import type { HostWorktreeTarget } from '../../shared/worktree/host-qualified-id
 function repo(
   id: string,
   path: string,
-  options: Pick<Repo, 'connectionId' | 'executionHostId' | 'kind'> = {}
+  options: Pick<Repo, 'connectionId' | 'executionHostId' | 'kind' | 'inPlaceWorkspaces'> = {}
 ): Repo {
   return {
     id,
@@ -445,7 +445,7 @@ describe('folder-to-Git checkout identity', () => {
 
 describe('in-place git workspace rows', () => {
   it('appends instance metadata after scanned rows with root git state and no lineage', async () => {
-    const gitRepo = repo('repo', '/path', { kind: 'git' })
+    const gitRepo = repo('repo', '/path', { kind: 'git', inPlaceWorkspaces: true })
     const deps = createDeps([gitRepo])
     const instanceId = 'repo::/path::workspace:11111111-2222-3333-4444-555555555555'
     deps.metaById[instanceId] = mergeWorktreeMetaForWrite(undefined, {

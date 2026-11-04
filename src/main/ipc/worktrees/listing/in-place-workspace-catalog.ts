@@ -18,7 +18,9 @@ export function appendInPlaceGitWorkspaces<T extends Worktree>(
   worktrees: T[],
   metadata: Readonly<Record<string, WorktreeMeta>>
 ): (T | Worktree)[] {
-  if (isFolderRepo(repo)) {
+  // Why the undefined check: the toggle saves false, so only a repo that never used in-place
+  // workspaces skips this scan, which keeps large listings to one metadata pass.
+  if (isFolderRepo(repo) || repo.inPlaceWorkspaces === undefined) {
     return worktrees
   }
   const prefix = `${getFolderWorkspaceRootId(repo)}${FOLDER_WORKSPACE_INSTANCE_SEPARATOR}`

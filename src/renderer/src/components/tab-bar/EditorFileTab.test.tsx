@@ -25,6 +25,9 @@ const appStoreMocks = vi.hoisted(() => ({
 
 const renameFileOnDiskMock = vi.hoisted(() => vi.fn())
 
+// Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
+vi.mock('./ReopenClosedTabMenuItem', () => ({ ReopenClosedTabMenuItem: () => null }))
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof ReactModule>('react')
   return {

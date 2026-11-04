@@ -23,6 +23,13 @@ vi.mock('@/store', async () => {
   }
 })
 
+// Why: the reopen item reads the real store; these harnesses stub only what the menu itself uses.
+vi.mock('./ReopenClosedTabMenuItem', () => ({
+  ReopenClosedTabMenuItem: ({ worktreeId }: { worktreeId: string }) => (
+    <span data-testid="reopen" data-worktree={worktreeId} />
+  )
+}))
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof ReactModule>('react')
   return {

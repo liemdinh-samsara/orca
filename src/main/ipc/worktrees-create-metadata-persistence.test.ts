@@ -45,6 +45,7 @@ const WORKTREE_HANDLER_CHANNELS = [
   'worktrees:updateMeta',
   'worktrees:listLineage',
   'worktrees:updateLineage',
+  'worktrees:setCrossHostLineage',
   'worktrees:persistSortOrder',
   'worktrees:getBranchRenameFailureOutput',
   'hooks:check',

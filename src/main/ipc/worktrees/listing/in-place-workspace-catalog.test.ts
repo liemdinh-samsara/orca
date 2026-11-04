@@ -89,6 +89,20 @@ describe('appendInPlaceGitWorkspaces', () => {
     expect(result.map((item) => item.id)).toEqual([root.id, instanceId])
   })
 
+  it('skips the metadata scan for a repo that never used in-place workspaces', () => {
+    const root = worktree({})
+    const { inPlaceWorkspaces: _unset, ...neverInPlace } = repo
+    const metadata = new Proxy(
+      { [instanceId]: meta({ displayName: 'x' }) },
+      {
+        ownKeys: () => {
+          throw new Error('scanned metadata')
+        }
+      }
+    )
+    expect(appendInPlaceGitWorkspaces(neverInPlace, [root], metadata)).toEqual([root])
+  })
+
   it('ignores other repos and folder projects', () => {
     const root = worktree({})
     const otherRepoInstance = `other::${repo.path}::workspace:11111111-2222-3333-4444-555555555555`

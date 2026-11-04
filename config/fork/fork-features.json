@@ -253,6 +253,7 @@
         "src/renderer/src/store/slices/worktrees-slice-test-harness.ts"
       ],
       "unit": [
+        "src/main/ipc/worktrees-create-metadata-persistence.test.ts",
         "src/main/ipc/worktree-create-lineage.test.ts",
         "src/main/ipc/worktrees-lineage-hydration.test.ts",
         "src/main/runtime/orca-runtime.test.ts",
@@ -486,6 +487,9 @@
         "src/renderer/src/store/slices/recently-closed-tabs.ts"
       ],
       "unit": [
+        "src/renderer/src/components/tab-bar/BrowserTab.test.tsx",
+        "src/renderer/src/components/tab-bar/EditorFileTab.test.tsx",
+        "src/renderer/src/components/tab-bar/SortableTab.rename-shortcut.test.tsx",
         "src/renderer/src/components/tab-bar/BrowserTab.reopen-closed-tab.test.tsx",
         "src/renderer/src/components/tab-bar/EditorFileTabContextMenu.test.tsx",
         "src/renderer/src/components/tab-bar/ReopenClosedTabMenuItem.test.tsx",

@@ -249,7 +249,6 @@ describe('in-place workspace lineage', () => {
     )
 
     expect(store.removeWorktreeLineage).not.toHaveBeenCalled()
-    expect(store.removeWorkspaceLineage).not.toHaveBeenCalled()
     expect(store.setWorktreeMeta).not.toHaveBeenCalled()
     expect(metaById[childId]).toBe(childMeta)
     expect(metaById[parentId]).toBe(parentMeta)

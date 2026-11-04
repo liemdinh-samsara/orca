@@ -1,4 +1,4 @@
-import type * as WorktreeScanCacheModule from '../git/worktrees/catalog/worktree-scan-cache'
+import type * as WorktreeScanCacheModule from '../git/worktree-scan-cache'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'
 import type * as WorktreeLogic from './worktree-logic'
@@ -12,7 +12,7 @@ import {
 import * as nestedRemoval from './worktrees/removal/nested-worktree-removal'
 import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 
-vi.mock('../git/worktrees/catalog/worktree-scan-cache', async (importOriginal) => {
+vi.mock('../git/worktree-scan-cache', async (importOriginal) => {
   return {
     ...(await importOriginal<typeof WorktreeScanCacheModule>()),
     listWorktrees: (await import('./worktrees-test-module-mocks')).listWorktreesMock,

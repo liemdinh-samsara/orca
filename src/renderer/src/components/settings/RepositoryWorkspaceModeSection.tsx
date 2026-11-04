@@ -2,8 +2,8 @@ import type { Repo } from '../../../../shared/repo-types'
 import { normalizeWorkspaceStartPath } from '../../../../shared/workspace-start-path'
 import { Label } from '../ui/label'
 import { RepoSettingsDraftInput } from './repository/RepositorySettingsDraftInput'
-import { SearchableSetting } from './section-layout/SearchableSetting'
-import { SettingsRow, SettingsSwitch } from './form-controls/SettingsFormControls'
+import { SearchableSetting } from './SearchableSetting'
+import { SettingsRow, SettingsSwitch } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
 type RepositoryWorkspaceModeSectionProps = {

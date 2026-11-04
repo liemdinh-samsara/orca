@@ -24,7 +24,9 @@ function runPnpm(args) {
     program: pnpm.command,
     args: [...pnpm.prefixArgs, ...args],
     env,
-    stdio: 'inherit'
+    stdio: 'inherit',
+    // Why: the Docker host specs run for minutes; the 30s default would orphan Playwright.
+    timeoutMs: null
   }).code
 }
 

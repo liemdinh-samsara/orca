@@ -73,11 +73,13 @@ function git(...args) {
   return result.stdout.trim()
 }
 function cli(...args) {
+  // Why drop SKIP_BUILD: the gate exports it, and it removes the e2e build step from run plans.
+  const { SKIP_BUILD: _skipBuild, ...env } = process.env
   return runProcessSync({
     program: process.execPath,
     args: [script, ...args],
     cwd: scratch,
-    env: { ...process.env, ORCA_BACKGROUND_LAUNCH: '1' }
+    env: { ...env, ORCA_BACKGROUND_LAUNCH: '1' }
   })
 }
 

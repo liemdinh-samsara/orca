@@ -33,6 +33,8 @@ async function readNotificationPermission(
   const allowButton = page.getByRole('button', { name: 'Allow', exact: true })
   const requested = run('Notification.requestPermission()').then(String)
   await (answer ? allowButton.click() : expect(allowButton).toHaveCount(0))
+  // Why: the next site's prompt must not open under this one's closing overlay.
+  await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(0)
   return { requested: await requested, after: String(await run('Notification.permission')) }
 }
 

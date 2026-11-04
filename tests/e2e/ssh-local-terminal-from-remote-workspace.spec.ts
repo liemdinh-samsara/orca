@@ -54,15 +54,20 @@ function readTabText(page: Page, tabId: string): Promise<string> {
   )
 }
 
-function projectIdOf(page: Page, worktreeId: string): Promise<string | null> {
+// Why both: the menu item opens in this computer's checkout only once its project setup is ready.
+function localCheckoutJoined(page: Page, worktreeId: string): Promise<boolean> {
   return page.evaluate((worktreeId) => {
-    for (const rows of Object.values(window.__store!.getState().worktreesByRepo)) {
-      const row = rows.find((worktree) => worktree.id === worktreeId)
-      if (row) {
-        return row.projectId ?? null
-      }
-    }
-    return null
+    const state = window.__store!.getState()
+    const projectId = Object.values(state.worktreesByRepo)
+      .flat()
+      .find((worktree) => worktree.id === worktreeId)?.projectId
+    return Boolean(
+      projectId &&
+      state.projectHostSetups.some(
+        (setup) =>
+          setup.projectId === projectId && setup.hostId === 'local' && setup.setupState === 'ready'
+      )
+    )
   }, worktreeId)
 }
 
@@ -94,11 +99,11 @@ test('opens a shell on this computer from a devbox workspace on its managed serv
       const remoteId = workspace.seeded.worktreeId
       expect(localRepoId).not.toBe('')
       await expect
-        .poll(() => projectIdOf(page, remoteId), {
+        .poll(() => localCheckoutJoined(page, remoteId), {
           timeout: 90_000,
-          message: 'the devbox checkout never joined a project'
+          message: 'the devbox and local checkouts never joined one project'
         })
-        .not.toBeNull()
+        .toBe(true)
       const remoteTabCount = await page.evaluate(
         (worktreeId) => window.__store!.getState().tabsByWorktree[worktreeId]?.length ?? 0,
         remoteId

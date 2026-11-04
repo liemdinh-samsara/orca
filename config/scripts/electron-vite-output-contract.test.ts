@@ -12,6 +12,7 @@ import {
   createBootstrapFatalExitBanner
 } from '../build-plugins/bootstrap-fatal-exit-banner'
 import { BOOTSTRAP_FATAL_EXIT_GUARD_KEY } from '../../src/main/startup/bootstrap-fatal-exit-guard'
+import { electronViteConfig } from '../../electron.vite.config'
 
 type BootstrapProcessMock = EventEmitter & {
   env: Record<string, string>

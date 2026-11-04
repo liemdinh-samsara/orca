@@ -1,3 +1,4 @@
+import { resolveProjectStartFolderCwd } from '../../project-start-folder-cwd'
 import { resolveTuiAgentLaunchEnv } from '../../../shared/tui-agent-launch-defaults'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { StructuredAgentId } from '../../../shared/agent-session/lifecycle/agent-session-provider-handle'
@@ -76,6 +77,15 @@ export abstract class OrcaRuntimeWithWorktreePsDependencies extends OrcaRuntimeW
 
   listRepos(): Repo[] {
     return this.store?.getRepos() ?? []
+  }
+
+  /** Where a structured chat starts: the project's start folder when set, else the workspace. */
+  protected async resolveStructuredWorkspacePath(workspaceId: string): Promise<string> {
+    const { worktree } = await this.resolveRuntimeFileTarget(`id:${workspaceId}`)
+    return (
+      resolveProjectStartFolderCwd(worktree.path, this.store?.getRepo(worktree.repoId)) ??
+      worktree.path
+    )
   }
 
   /** A chat worker whose request settled failed tells the Run that dispatched it. */

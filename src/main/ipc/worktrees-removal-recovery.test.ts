@@ -623,7 +623,9 @@ describe('registerWorktreeHandlers', () => {
 
     expect(listWorktreesMock).not.toHaveBeenCalled()
     expect(removeWorktreeMock).not.toHaveBeenCalled()
-    expect(store.removeWorktreeMeta).toHaveBeenCalledWith(worktreeId, 'local')
+    expect(store.removeWorktreeMeta).toHaveBeenCalledWith(
+      hostWorktreeTarget({ id: worktreeId, hostId: 'local' })
+    )
     expect(mainWindow.webContents.send).toHaveBeenCalledWith('worktrees:changed', {
       repoId: 'repo-git'
     })

@@ -248,8 +248,7 @@ export abstract class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithWorktr
       claimKeyId: this.agentSessionClaimSigner.keyId,
       logger,
       // Resolve plain folder workspaces as well as git worktrees.
-      resolveWorkspacePath: async (workspaceId) =>
-        (await this.resolveRuntimeFileTarget(`id:${workspaceId}`)).worktree.path,
+      resolveWorkspacePath: (workspaceId) => this.resolveStructuredWorkspacePath(workspaceId),
       resolveClaudeCommand: (options) =>
         resolveStructuredAgentCommand('claude', this.requireStore().getSettings(), options),
       resolveCodexCommand: (options) =>

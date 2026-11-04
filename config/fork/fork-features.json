@@ -34,6 +34,7 @@
         "src/main/runtime/terminal/launch/terminal-workspace-scope.ts",
         "src/main/runtime/workspaces/workspace-creation.ts",
         "src/main/runtime/workspaces/workspace-process-listing.ts",
+        "src/main/runtime/workspaces/workspace-process-listing-dependencies.ts",
         "src/main/runtime/workspaces/workspace-registration-removal.ts",
         "src/main/worktree-lineage-pruning.ts",
         "src/renderer/src/components/TerminalLegacyTerminalPanes.tsx",

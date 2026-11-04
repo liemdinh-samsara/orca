@@ -3,7 +3,10 @@
   "upstream": {
     "remote": "upstream",
     "url": "https://github.com/stablyai/orca.git",
-    "branch": "main"
+    "branch": "main",
+    "track": "release",
+    "releaseTagPattern": "^v\\d+\\.\\d+\\.\\d+$",
+    "minReleaseAgeDays": 7
   },
   "exempt": ["**/*.md", "docs/**"],
   "features": [
@@ -663,6 +666,7 @@
         "config/scripts/fork-contract.test.mjs",
         "config/scripts/fork-contract-run.test.mjs",
         "config/scripts/fork-upstream-sync.test.mjs",
+        "config/scripts/fork-upstream-sync-release.test.mjs",
         "tests/tools/fork-upstream-sync-skill.test.mjs"
       ],
       "unitSupport": [],

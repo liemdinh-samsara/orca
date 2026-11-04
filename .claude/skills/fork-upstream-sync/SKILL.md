@@ -1,13 +1,16 @@
 ---
 name: fork-upstream-sync
-description: Weekly sync of this Orca fork (liemdinh-samsara/orca) with upstream stablyai/orca main - merge upstream into a sync/upstream-<date> branch, resolve conflicts so every fork feature survives, run the fork contract gate (registry check, typecheck, fork unit/mobile/e2e tests), prove the desktop app and the iOS app in the Simulator, publish a validation report and open a PR for the owner to merge. Use when the weekly "Upstream sync" Orca automation runs, or when someone asks to sync, merge or catch up the fork with upstream, even if they don't name the skill.
+description: Weekly sync of this Orca fork (liemdinh-samsara/orca) with the newest upstream stablyai/orca release that has been out at least 7 days - merge that release tag into a sync/upstream-<date> branch, resolve conflicts so every fork feature survives, run the fork contract gate (registry check, typecheck, fork unit/mobile/e2e tests), prove the desktop app and the iOS app in the Simulator, publish a validation report and open a PR for the owner to merge. Use when the weekly "Upstream sync" Orca automation runs, or when someone asks to sync, merge or catch up the fork with upstream, even if they don't name the skill.
 ---
 
 # Fork upstream sync
 
-This repo is a personal fork that its owner builds and runs daily. Upstream lands ~120 commits a day. Once a
-week this skill merges upstream `main` into a branch, keeps every fork feature working, proves it in the
-running apps, and opens a PR. The owner merges the PR; this skill never moves `main`.
+This repo is a personal fork that its owner builds and runs daily. Upstream lands ~120 commits a day on `main`
+and cuts a release (`vX.Y.Z`, on a side commit off `main` with its own last-minute fixes) almost every night.
+Once a week this skill merges the newest release that has been out for `upstream.minReleaseAgeDays` (7) days,
+never upstream `main`, so the fork only takes code upstream has shipped and had time to follow up on. It keeps
+every fork feature working, proves it in the running apps, and opens a PR. The owner merges the PR; this skill
+never moves `main`.
 
 The fork's features, the files they own and their tests are listed in `config/fork/fork-features.json`.
 `config/scripts/fork-contract.mjs` checks that list against the real diff and runs the tests.
@@ -48,6 +51,10 @@ proof spec `assets/fork-proof.spec.ts`, so BEFORE and AFTER show the same screen
 ```bash
 node config/scripts/fork-upstream-sync.mjs start --base origin/main --json > "$RUN_DIR/start.json"; echo "exit=$?"; cat "$RUN_DIR/start.json"
 ```
+
+`start` fetches upstream's tags and picks the release; `start.json` names it (`upstreamRef`, `release.tag`,
+`release.ageDays`). Pass `--release vX.Y.Z` only when the owner asks for a specific release; it skips the age rule.
+It never merges a release older than or equal to one the fork already has.
 
 - Exit 0 + `up-to-date`: write one line to the final message and stop. No PR.
 - Exit 0 + `merged`: go to step 4.
@@ -107,7 +114,7 @@ If something can't be exercised (no Simulator runtime, Xcode broke), say so plai
 4. ```bash
    node config/scripts/fork-upstream-sync.mjs pr-body --gate "$RUN_DIR/gate.json" \
      --resolutions "$RUN_DIR/resolutions.md" --report-url "<url>" --out "$RUN_DIR/pr.md"
-   node config/scripts/fork-upstream-sync.mjs publish --title "chore: sync upstream stablyai/orca main ($(date +%Y-%m-%d))" \
+   node config/scripts/fork-upstream-sync.mjs publish --title "chore: sync upstream stablyai/orca $(node -p "require('$RUN_DIR/start.json').upstreamRef") ($(date +%Y-%m-%d))" \
      --body-file "$RUN_DIR/pr.md" [--draft]       # --draft when any gate result failed or proof is missing
    ```
 

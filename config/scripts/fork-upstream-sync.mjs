@@ -7,8 +7,13 @@ import { pathToFileURL } from 'node:url'
 const DEFAULT_UPSTREAM = {
   remote: 'upstream',
   url: 'https://github.com/stablyai/orca.git',
-  branch: 'main'
+  branch: 'main',
+  track: 'branch',
+  releaseTagPattern: '^v\\d+\\.\\d+\\.\\d+$',
+  minReleaseAgeDays: 7
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 class SyncError extends Error {
   constructor(message, exitCode = 1) {
@@ -80,7 +85,7 @@ function upstreamConfig(root) {
     return DEFAULT_UPSTREAM
   }
   const config = { ...DEFAULT_UPSTREAM, ...JSON.parse(fs.readFileSync(file, 'utf8')).upstream }
-  for (const key of ['remote', 'url', 'branch']) {
+  for (const key of ['remote', 'url', 'branch', 'releaseTagPattern']) {
     if (typeof config[key] !== 'string' || !config[key] || config[key].startsWith('-')) {
       throw new SyncError(`Invalid upstream ${key}`)
     }
@@ -88,8 +93,95 @@ function upstreamConfig(root) {
   if (config.remote === 'origin') {
     throw new SyncError('Upstream remote must differ from origin')
   }
+  if (!['branch', 'release'].includes(config.track)) {
+    throw new SyncError('Upstream track must be "branch" or "release"')
+  }
+  if (!Number.isFinite(config.minReleaseAgeDays) || config.minReleaseAgeDays < 0) {
+    throw new SyncError('Invalid upstream minReleaseAgeDays')
+  }
   git(root, ['check-ref-format', `refs/remotes/${config.remote}/${config.branch}`])
   return config
+}
+
+function versionParts(name) {
+  return (name.match(/\d+/g) ?? []).map(Number)
+}
+
+export function compareReleaseNames(a, b) {
+  const left = versionParts(a)
+  const right = versionParts(b)
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0)
+    if (diff) {
+      return diff
+    }
+  }
+  return 0
+}
+
+/** Newest release tag that has been out for at least `minAgeDays`, or null. */
+export function pickRelease(tags, { pattern, minAgeDays, now = Date.now() }) {
+  const matcher = new RegExp(pattern)
+  return (
+    tags
+      .filter((tag) => matcher.test(tag.name) && now - tag.date >= minAgeDays * DAY_MS)
+      .sort((a, b) => compareReleaseNames(b.name, a.name))[0] ?? null
+  )
+}
+
+function releaseTags(root, pattern, merged) {
+  const matcher = new RegExp(pattern)
+  const listing = git(root, [
+    'for-each-ref',
+    '--format=%(refname:strip=2)%09%(creatordate:unix)',
+    ...(merged ? [`--merged=${merged}`] : []),
+    'refs/tags/'
+  ])
+  return listing
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [name, seconds] = line.split('\t')
+      return { name, date: Number(seconds) * 1000 }
+    })
+    .filter((tag) => matcher.test(tag.name))
+}
+
+// Why releases: upstream main lands ~120 commits a day; its nightly releases are what it ships.
+function resolveRelease(root, upstream, options, baseSha) {
+  const now = options.now ?? Date.now()
+  const tags = releaseTags(root, upstream.releaseTagPattern)
+  let release
+  if (options.release) {
+    release = tags.find((tag) => tag.name === options.release)
+    if (!release) {
+      throw new SyncError(`No upstream release tag ${options.release}`)
+    }
+  } else {
+    release = pickRelease(tags, {
+      pattern: upstream.releaseTagPattern,
+      minAgeDays: upstream.minReleaseAgeDays,
+      now
+    })
+    if (!release) {
+      throw new SyncError(
+        `No upstream release is at least ${upstream.minReleaseAgeDays} day(s) old`
+      )
+    }
+  }
+  const newestMerged = releaseTags(root, upstream.releaseTagPattern, baseSha).sort((a, b) =>
+    compareReleaseNames(b.name, a.name)
+  )[0]
+  return {
+    tag: release.name,
+    publishedAt: new Date(release.date).toISOString(),
+    ageDays: Math.floor((now - release.date) / DAY_MS),
+    pinned: Boolean(options.release),
+    // A release the fork already has, or one older than it, must never be merged again.
+    alreadyMerged: Boolean(
+      newestMerged && compareReleaseNames(release.name, newestMerged.name) <= 0
+    )
+  }
 }
 
 async function resolveFileOwners(root, files, resolveOwners) {
@@ -138,6 +230,7 @@ export async function startSync(root, options = {}) {
     baseSha: null,
     upstreamRef: null,
     upstreamSha: null,
+    release: null,
     behind: 0,
     forkAhead: 0,
     conflicts: [],
@@ -156,20 +249,43 @@ export async function startSync(root, options = {}) {
       throw new SyncError('Invalid base ref')
     }
     const upstream = upstreamConfig(root)
-    state.upstreamRef = `${upstream.remote}/${upstream.branch}`
+    if (options.release && upstream.track !== 'release') {
+      throw new SyncError(
+        '--release needs upstream.track "release" in config/fork/fork-features.json'
+      )
+    }
+    if (options.release) {
+      git(root, ['check-ref-format', `refs/tags/${options.release}`])
+    }
     const remotes = git(root, ['remote']).split('\n')
     if (!remotes.includes(upstream.remote)) {
       git(root, ['remote', 'add', upstream.remote, upstream.url])
     }
     if (!options.noFetch) {
       git(root, ['fetch', 'origin', '--prune'])
-      git(root, ['fetch', upstream.remote, upstream.branch, '--no-tags'])
+      git(root, [
+        'fetch',
+        upstream.remote,
+        upstream.branch,
+        ...(upstream.track === 'release' ? ['--tags'] : ['--no-tags'])
+      ])
     }
     state.baseSha = git(root, ['rev-parse', '--verify', `${state.base}^{commit}`])
-    state.upstreamSha = git(root, ['rev-parse', '--verify', `${state.upstreamRef}^{commit}`])
-    state.behind = Number(
-      git(root, ['rev-list', '--count', `${state.baseSha}..${state.upstreamSha}`])
-    )
+    if (upstream.track === 'release') {
+      state.release = resolveRelease(root, upstream, options, state.baseSha)
+      state.upstreamRef = state.release.tag
+      state.upstreamSha = git(root, [
+        'rev-parse',
+        '--verify',
+        `refs/tags/${state.release.tag}^{commit}`
+      ])
+    } else {
+      state.upstreamRef = `${upstream.remote}/${upstream.branch}`
+      state.upstreamSha = git(root, ['rev-parse', '--verify', `${state.upstreamRef}^{commit}`])
+    }
+    state.behind = state.release?.alreadyMerged
+      ? 0
+      : Number(git(root, ['rev-list', '--count', `${state.baseSha}..${state.upstreamSha}`]))
     state.forkAhead = Number(
       git(root, ['rev-list', '--count', '--no-merges', `${state.upstreamSha}..${state.baseSha}`])
     )
@@ -180,14 +296,16 @@ export async function startSync(root, options = {}) {
       git(root, ['switch', '-c', branch, state.base])
       state.branch = branch
       const shortSha = git(root, ['rev-parse', '--short', state.upstreamSha])
-      const subject = `chore: sync upstream stablyai/orca ${upstream.branch} (${state.behind} commits, up to ${shortSha})`
+      const label = state.release?.tag ?? upstream.branch
+      const subject = `chore: sync upstream stablyai/orca ${label} (${state.behind} commits, up to ${shortSha})`
+      // Why the sha: merging an annotated tag by name would pull its tag message into the merge.
       const merge = command(root, 'git', [
         'merge',
         '--no-ff',
         '--no-edit',
         '-m',
         subject,
-        state.upstreamRef
+        state.release ? state.upstreamSha : state.upstreamRef
       ])
       if (merge.status === 0) {
         state.status = 'merged'
@@ -396,7 +514,13 @@ export function publishSync(root, options, run = (program, args) => command(root
 }
 
 const OPTIONS = {
-  start: { '--base': 'base', '--branch': 'branch', '--no-fetch': 'noFetch', '--json': 'json' },
+  start: {
+    '--base': 'base',
+    '--branch': 'branch',
+    '--release': 'release',
+    '--no-fetch': 'noFetch',
+    '--json': 'json'
+  },
   status: { '--json': 'json' },
   summary: { '--json': 'json' },
   'pr-body': {

@@ -3,16 +3,15 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
-import { waitForSessionReady } from './helpers/store'
+import { quotePosixShell } from '../../src/shared/shell-argument-quoting'
 import {
-  cleanupDockerSshRelayTarget,
-  execDockerSshRelayTargetCommand,
-  shellQuote,
-  startDockerSshRelayTarget
-} from './helpers/docker-ssh-relay-target'
-import { connectDockerSshRelayTarget } from './helpers/docker-ssh-relay-connection'
+  launchManagedWorkspace,
+  skipUnlessManagedDockerHost,
+  withManagedHost
+} from './helpers/orcad-managed-workspace'
 
-const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'
+skipUnlessManagedDockerHost()
+
 // Why one origin: both checkouts must land in one project for the devbox to count as its host.
 const ORIGIN = 'https://github.com/orca-e2e/path-prefix-setup.git'
 const SUFFIX = 'co/mono_projects'
@@ -30,8 +29,12 @@ function seedCheckout(root: string): void {
   git('remote', 'add', 'origin', ORIGIN)
 }
 
-async function openSetLocation(page: Page, hostLabel: string): Promise<void> {
-  await page.evaluate(() => window.__store!.getState().openModal('new-workspace-composer', {}))
+async function openSetLocation(page: Page, repoId: string, hostLabel: string): Promise<void> {
+  await page.evaluate(
+    (initialRepoId) =>
+      window.__store!.getState().openModal('new-workspace-composer', { initialRepoId }),
+    repoId
+  )
   await page.getByRole('button', { name: 'Browse run targets' }).first().click()
   await page.getByRole('button', { name: `Set project location on ${hostLabel}` }).click()
 }
@@ -52,51 +55,41 @@ async function readDevboxSetup(
   }, hostId)
 }
 
-test.use({ seedTestRepo: false })
-
-test.describe('SSH project path prefix setup', () => {
-  test.skip(!RUN_DOCKER_SSH, 'Set ORCA_E2E_SSH_DOCKER=1 to run Docker-backed SSH tests.')
-  test.skip(process.platform === 'win32', 'Docker SSH tests use POSIX ssh tooling.')
-
-  test('sets a devbox up at the Mac path under its home and creates a sub workspace there', async ({
-    orcaPage,
-    electronApp
-  }, testInfo) => {
-    test.setTimeout(300_000)
-    const target = startDockerSshRelayTarget(testInfo)
-    const home = await electronApp.evaluate(({ app }) => app.getPath('home'))
-    const localRoot = path.join(home, SUFFIX)
-    try {
+test('sets a devbox up at the Mac path under its home and creates a sub workspace there', async (// oxlint-disable-next-line no-empty-pattern -- Owns app launch.
+{}, testInfo) => {
+  test.setTimeout(6 * 60_000)
+  let localRoot: string | null = null
+  try {
+    await withManagedHost(testInfo, async (fixture) => {
+      const exec = fixture.host.exec!
+      const workspace = await launchManagedWorkspace(fixture)
+      const page = workspace.page
+      const hostId = `runtime:${workspace.environmentId}`
+      const remoteHome = exec('printf %s "$HOME"').trim()
+      const home = await workspace.app.evaluate(({ app }) => app.getPath('home'))
+      localRoot = path.join(home, SUFFIX)
       seedCheckout(localRoot)
-      execDockerSshRelayTargetCommand(
-        target,
-        'mkdir -p /tmp/unrelated && git -C /tmp/unrelated init -q -b main'
-      )
-      await waitForSessionReady(orcaPage)
-      const localRepoId = await orcaPage.evaluate(
+      const localRepoId = await page.evaluate(
         async (repoPath) => {
           const result = await window.api.repos.add({ path: repoPath })
           if ('error' in result) {
             throw new Error(result.error)
           }
-          await window.__store?.getState().fetchRepos()
+          await window
+            .__store!.getState()
+            .fetchRepos({ runtimeEnvironmentId: null, throwOnError: true })
           return result.repo.id
         },
         path.join(localRoot, START)
       )
-      const remote = await connectDockerSshRelayTarget(orcaPage, target, {
-        remotePath: '/tmp/unrelated',
-        seedInitialTab: false
-      })
-      const hostId = `ssh:${remote.targetId}`
-      const hostLabel = await orcaPage.evaluate(
+      const hostLabel = await page.evaluate(
         (targetId) => window.__store!.getState().sshTargetLabels.get(targetId) ?? targetId,
-        remote.targetId
+        workspace.seeded.targetId
       )
       await expect
         .poll(
           () =>
-            orcaPage.evaluate(async (repoId) => {
+            page.evaluate(async (repoId) => {
               const store = window.__store!
               await store.getState().fetchWorktrees(repoId)
               const main = (store.getState().worktreesByRepo[repoId] ?? []).find(
@@ -112,39 +105,39 @@ test.describe('SSH project path prefix setup', () => {
         .toBe(true)
 
       // Nothing at the mapped path yet: the dialog opens with that path filled in.
-      await openSetLocation(orcaPage, hostLabel)
-      const dialog = orcaPage.getByTestId('set-project-location-dialog')
-      await expect(dialog.getByRole('textbox')).toHaveValue(`/root/${SUFFIX}/${START}`, {
+      await openSetLocation(page, localRepoId, hostLabel)
+      const dialog = page.getByTestId('set-project-location-dialog')
+      await expect(dialog.getByRole('textbox')).toHaveValue(`${remoteHome}/${SUFFIX}/${START}`, {
         timeout: 30_000
       })
-      await orcaPage.keyboard.press('Escape')
-      await orcaPage.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
       await expect(dialog).toBeHidden()
 
       // With the checkout in place, one click sets the devbox up like the Mac.
-      execDockerSshRelayTargetCommand(
-        target,
+      exec(
         [
           `mkdir -p ~/${SUFFIX}/${START}`,
           `cd ~/${SUFFIX}`,
           'git init -q -b main',
           `printf 'devbox\\n' > ${START}/README.md`,
           'git add -A && git -c user.email=e2e@test.local -c user.name=e2e commit -qm init',
-          `git remote add origin ${shellQuote(ORIGIN)}`
+          `git remote add origin ${quotePosixShell(ORIGIN)}`
         ].join(' && ')
       )
-      await openSetLocation(orcaPage, hostLabel)
+      await openSetLocation(page, localRepoId, hostLabel)
       await expect
-        .poll(() => readDevboxSetup(orcaPage, hostId), { timeout: 30_000 })
-        .toEqual(expect.objectContaining({ path: `/root/${SUFFIX}`, startPath: START }))
+        .poll(() => readDevboxSetup(page, hostId), { timeout: 30_000 })
+        .toEqual(expect.objectContaining({ path: `${remoteHome}/${SUFFIX}`, startPath: START }))
       await expect(dialog).toBeHidden()
+      await page.screenshot({ path: testInfo.outputPath('devbox-mapped-setup.png') })
 
-      const devbox = (await readDevboxSetup(orcaPage, hostId))!
-      await orcaPage.getByRole('button', { name: /^Create workspace/ }).click()
+      const devbox = (await readDevboxSetup(page, hostId))!
+      await page.getByRole('button', { name: /^Create workspace/ }).click()
       await expect
         .poll(
           () =>
-            orcaPage.evaluate(
+            page.evaluate(
               (repoId) =>
                 (window.__store!.getState().worktreesByRepo[repoId] ?? [])
                   .filter((worktree) => !worktree.isMainWorktree)
@@ -153,10 +146,11 @@ test.describe('SSH project path prefix setup', () => {
             ),
           { timeout: 60_000, message: 'no sub workspace was created on the devbox' }
         )
-        .toEqual([`/root/${SUFFIX}`])
-    } finally {
-      cleanupDockerSshRelayTarget(target)
+        .toEqual([`${remoteHome}/${SUFFIX}`])
+    })
+  } finally {
+    if (localRoot) {
       rmSync(localRoot, { recursive: true, force: true })
     }
-  })
+  }
 })

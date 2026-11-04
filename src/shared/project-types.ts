@@ -80,6 +80,17 @@ export type ProjectHostSetupExistingFolderArgs = {
 export type ProjectHostMappedSetupArgs = {
   projectId: string
   hostId: ExecutionHostId
+  /** For a devbox's managed server: the SSH target it runs on, which resolves the mapped path. */
+  sshTargetId?: string
+}
+
+/** The folder a managed server should register; the renderer sets it up through that server. */
+export type ProjectHostMappedFolder = {
+  path: string
+  kind: 'git' | 'folder'
+  displayName: string
+  workspaceStartPath?: string
+  inPlaceWorkspaces?: boolean
 }
 
 /** `suggestedPath` is the mapped location, offered for manual setup when it could not be used. */
@@ -90,6 +101,11 @@ export type ProjectHostMappedSetupOutcome =
       reason: 'unsupported-host' | 'not-connected' | 'no-mappable-setup' | 'not-found'
       suggestedPath?: string
     }
+
+/** Main's answer: a managed server's folder comes back `mapped` for the renderer to register. */
+export type ProjectHostMappedSetupIpcOutcome =
+  | ProjectHostMappedSetupOutcome
+  | { status: 'mapped'; folder: ProjectHostMappedFolder }
 
 export type ProjectHostSetupCreateArgs = {
   projectId: string

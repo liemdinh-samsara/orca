@@ -48,7 +48,8 @@ export const ProjectHostSetupExistingFolderIpcArgs = z.object({
 
 export const ProjectHostMappedSetupIpcArgs = z.object({
   projectId: z.string().min(1),
-  hostId: z.string().min(1)
+  hostId: z.string().min(1),
+  sshTargetId: z.string().min(1).optional()
 })
 
 const LocalWindowsRuntimePreferenceIpcArgs = z.discriminatedUnion('kind', [

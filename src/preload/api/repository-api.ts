@@ -15,7 +15,7 @@ import type {
   ProjectHostSetupDeleteArgs,
   ProjectHostSetupDeleteResult,
   ProjectHostMappedSetupArgs,
-  ProjectHostMappedSetupOutcome,
+  ProjectHostMappedSetupIpcOutcome,
   ProjectHostSetupExistingFolderArgs,
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
@@ -111,7 +111,7 @@ export type ProjectsApi = {
   listHostSetups: () => Promise<ProjectHostSetup[]>
   createHostSetup: (args: ProjectHostSetupCreateArgs) => Promise<ProjectHostSetupCreateResult>
   setupExistingFolder: (args: ProjectHostSetupExistingFolderArgs) => Promise<ProjectHostSetupResult>
-  setupMappedFolder: (args: ProjectHostMappedSetupArgs) => Promise<ProjectHostMappedSetupOutcome>
+  setupMappedFolder: (args: ProjectHostMappedSetupArgs) => Promise<ProjectHostMappedSetupIpcOutcome>
   updateHostSetup: (args: ProjectHostSetupUpdateArgs) => Promise<ProjectHostSetupUpdateResult>
   deleteHostSetup: (args: ProjectHostSetupDeleteArgs) => Promise<ProjectHostSetupDeleteResult>
 }

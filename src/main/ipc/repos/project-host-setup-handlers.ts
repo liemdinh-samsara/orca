@@ -7,7 +7,7 @@ import type {
   ProjectHostSetupDeleteArgs,
   ProjectHostSetupDeleteResult,
   ProjectHostMappedSetupArgs,
-  ProjectHostMappedSetupOutcome,
+  ProjectHostMappedSetupIpcOutcome,
   ProjectHostSetupExistingFolderArgs,
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
@@ -132,7 +132,10 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
 
   ipcMain.handle(
     'projectHostSetups:setupMappedFolder',
-    async (_event, rawArgs: ProjectHostMappedSetupArgs): Promise<ProjectHostMappedSetupOutcome> => {
+    async (
+      _event,
+      rawArgs: ProjectHostMappedSetupArgs
+    ): Promise<ProjectHostMappedSetupIpcOutcome> => {
       const args = parseProjectGroupIpcArgs(
         ProjectHostMappedSetupIpcArgs,
         rawArgs,

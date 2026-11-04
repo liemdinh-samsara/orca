@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import type { Store } from '../../persistence/loading-store/store'
 import type { Repo } from '../../../shared/repo-types'
 import type {
+  ProjectHostMappedFolder,
   ProjectHostMappedSetupOutcome,
   ProjectHostSetupResult
 } from '../../../shared/project-types'
@@ -21,10 +22,11 @@ import {
 } from './project-host-existing-folder-setup'
 import { resolveRemoteHomePath } from './remote-home-path'
 
-type MappedSetupArgs = { projectId: string; hostId: string }
+type MappedSetupArgs = { projectId: string; hostId: string; sshTargetId?: string }
 
 type MappedSetupResult =
   | { status: 'ready'; result: ProjectHostSetupResult; alreadyExisted: boolean }
+  | { status: 'mapped'; folder: ProjectHostMappedFolder }
   | Extract<ProjectHostMappedSetupOutcome, { status: 'unavailable' }>
 
 function localProjectPrefixes(): string[] {
@@ -89,11 +91,14 @@ export async function setupProjectAtMappedPath(
   args: MappedSetupArgs
 ): Promise<MappedSetupResult> {
   const host = parseExecutionHostId(args.hostId)
-  if (host?.kind !== 'ssh') {
+  // Why a managed server too: upstream serves SSH devboxes through one, reached over that target.
+  const targetId =
+    host?.kind === 'ssh' ? host.targetId : host?.kind === 'runtime' ? args.sshTargetId : undefined
+  if (!targetId) {
     return { status: 'unavailable', reason: 'unsupported-host' }
   }
-  const conn = getSshConnectionManager()?.getConnection(host.targetId)
-  const targetPrefix = conn ? await resolveSshProjectPrefix(store, host.targetId) : null
+  const conn = getSshConnectionManager()?.getConnection(targetId)
+  const targetPrefix = conn ? await resolveSshProjectPrefix(store, targetId) : null
   if (!conn || !targetPrefix) {
     return { status: 'unavailable', reason: 'not-connected' }
   }
@@ -104,6 +109,9 @@ export async function setupProjectAtMappedPath(
   const startFolder = resolveWorkspaceStartCwd(source.root, source.repo)
   if (!(await resolveRemoteDirectory(conn, startFolder))) {
     return { status: 'unavailable', reason: 'not-found', suggestedPath: startFolder }
+  }
+  if (host?.kind === 'runtime') {
+    return { status: 'mapped', folder: await managedServerFolder(conn, source, startFolder) }
   }
 
   const base = {
@@ -131,6 +139,38 @@ export async function setupProjectAtMappedPath(
   return { status: 'ready', ...mirrorWorkspaceSettings(store, setup, source.repo, startFolder) }
 }
 
+/** What a managed server should register: the checkout root with its start folder, or the folder. */
+async function managedServerFolder(
+  conn: Parameters<typeof resolveRemoteDirectory>[0],
+  source: { repo: Repo; root: string },
+  startFolder: string
+): Promise<ProjectHostMappedFolder> {
+  const displayName = source.repo.displayName
+  const isGitCheckout =
+    !isFolderRepo(source.repo) &&
+    Boolean(await resolveRemoteDirectory(conn, `${source.root.replace(/\/+$/, '')}/.git`))
+  if (!isGitCheckout) {
+    return { path: startFolder, kind: 'folder', displayName }
+  }
+  const startPath = workspaceStartPathWithin(source.root, startFolder)
+  return {
+    path: source.root,
+    kind: 'git',
+    displayName,
+    ...(startPath ? { workspaceStartPath: startPath } : {}),
+    ...(source.repo.inPlaceWorkspaces === undefined
+      ? {}
+      : { inPlaceWorkspaces: source.repo.inPlaceWorkspaces })
+  }
+}
+
+function workspaceStartPathWithin(root: string, startFolder: string): string | null {
+  const trimmed = root.replace(/\/+$/, '')
+  return startFolder.startsWith(`${trimmed}/`)
+    ? normalizeWorkspaceStartPath(startFolder.slice(trimmed.length + 1))
+    : null
+}
+
 /** A new git checkout starts in the same subfolder and creates workspaces the same way. */
 function mirrorWorkspaceSettings(
   store: Store,
@@ -142,10 +182,7 @@ function mirrorWorkspaceSettings(
   if (setup.alreadyExisted) {
     return setup
   }
-  const root = repo.path.replace(/\/+$/, '')
-  const startPath = startFolder.startsWith(`${root}/`)
-    ? normalizeWorkspaceStartPath(startFolder.slice(root.length + 1))
-    : null
+  const startPath = workspaceStartPathWithin(repo.path, startFolder)
   const updated = store.updateRepo(repo, {
     ...(startPath ? { workspaceStartPath: startPath } : {}),
     ...(sourceRepo.inPlaceWorkspaces === undefined

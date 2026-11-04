@@ -362,4 +362,50 @@ describe('setupProjectAtMappedPath', () => {
       expect(mocks.buildProjectHostSetupResult).not.toHaveBeenCalled()
     }
   )
+
+  it("hands a devbox's managed server the mapped checkout and its settings to register", async () => {
+    const { store, updateRepo } = makeStore({
+      workspaceStartPath: 'projects/ray',
+      inPlaceWorkspaces: true
+    })
+    mocks.remoteDirs.add('/home/ubuntu/co/mono/projects/ray')
+    mocks.remoteDirs.add('/home/ubuntu/co/mono/.git')
+
+    const outcome = await setupProjectAtMappedPath(store, {
+      projectId: PROJECT,
+      hostId: 'runtime:env-1',
+      sshTargetId: 'devbox4'
+    })
+
+    expect(outcome).toEqual({
+      status: 'mapped',
+      folder: {
+        path: '/home/ubuntu/co/mono',
+        kind: 'git',
+        displayName: 'mono',
+        workspaceStartPath: 'projects/ray',
+        inPlaceWorkspaces: true
+      }
+    })
+    expect(mocks.setupExistingFolderOnHost).not.toHaveBeenCalled()
+    expect(updateRepo).not.toHaveBeenCalled()
+  })
+
+  it("hands a managed server the start folder when the devbox copy isn't a git checkout", async () => {
+    mocks.remoteDirs.add('/home/ubuntu/co/mono/projects/ray')
+    const outcome = await setupProjectAtMappedPath(
+      makeStore({ workspaceStartPath: 'projects/ray' }).store,
+      { projectId: PROJECT, hostId: 'runtime:env-1', sshTargetId: 'devbox4' }
+    )
+    expect(outcome).toEqual({
+      status: 'mapped',
+      folder: { path: '/home/ubuntu/co/mono/projects/ray', kind: 'folder', displayName: 'mono' }
+    })
+  })
+
+  it('needs the SSH target behind a managed server to map its path', async () => {
+    await expect(
+      setupProjectAtMappedPath(makeStore({}).store, { projectId: PROJECT, hostId: 'runtime:env-1' })
+    ).resolves.toEqual({ status: 'unavailable', reason: 'unsupported-host' })
+  })
 })

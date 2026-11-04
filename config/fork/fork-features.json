@@ -389,6 +389,7 @@
         "src/renderer/src/i18n/locales/en.json",
         "src/renderer/src/lib/floating-workspace-tab-creation.ts",
         "src/renderer/src/lib/local-terminal-for-remote-workspace.ts",
+        "src/renderer/src/lib/remote-workspace-host.ts",
         "src/renderer/src/components/tab-bar/use-tab-bar-create-menu-controller.ts"
       ],
       "unit": [
@@ -396,7 +397,8 @@
         "src/renderer/src/components/tab-bar/tab-create-menu-options.test.ts",
         "src/renderer/src/components/tab-bar/use-tab-bar-local-terminal-menu.test.ts",
         "src/renderer/src/lib/floating-workspace-tab-creation.test.ts",
-        "src/renderer/src/lib/local-terminal-for-remote-workspace.test.ts"
+        "src/renderer/src/lib/local-terminal-for-remote-workspace.test.ts",
+        "src/renderer/src/lib/remote-workspace-host.test.ts"
       ],
       "unitSupport": [],
       "mobile": [],
@@ -404,7 +406,7 @@
       "checks": [],
       "appProof": {
         "surface": "desktop",
-        "steps": "Needs a workspace running on an SSH host (Docker sshd relay target from tests/e2e/helpers/docker-ssh-relay-target.ts, or a real devbox) and a local checkout of the same project (same git origin) so both belong to one project. Launch hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode and attach over CDP. Activate the SSH workspace, click the \"New tab\" button, and in the menu click \"New Local Terminal\" (BEFORE screenshot: same menu on a local workspace has no such item). AFTER screenshot: the floating terminal panel ([data-floating-terminal-panel][aria-hidden=\"false\"]) is visible with a new tab; window.__store.getState().tabsByWorktree[\"global-floating-terminal\"].at(-1).startupCwd equals the local checkout start folder; write \"echo cwd=$(pwd -P)\" through window.api.pty.write on that tab pty and read the serialized pane text for the local path; the SSH workspace tab count is unchanged and it is still active. Kill the extra floating tab afterwards."
+        "steps": "Needs a workspace on a devbox served by its managed server (the Docker host from tests/e2e/helpers/orcad-managed-workspace.ts with ORCA_E2E_SSH_DOCKER=1 and ORCA_E2E_ORCAD_CONVERT_TEMPLATE, or a real devbox) and a local checkout of the same project (same git origin) so both belong to one project. Launch hidden with ORCA_BACKGROUND_LAUNCH=1 in e2e mode and attach over CDP. Activate the SSH workspace, click the \"New tab\" button, and in the menu click \"New Local Terminal\" (BEFORE screenshot: same menu on a local workspace has no such item). AFTER screenshot: the floating terminal panel ([data-floating-terminal-panel][aria-hidden=\"false\"]) is visible with a new tab; window.__store.getState().tabsByWorktree[\"global-floating-terminal\"].at(-1).startupCwd equals the local checkout start folder; write \"echo cwd=$(pwd -P)\" through window.api.pty.write on that tab pty and read the serialized pane text for the local path; the devbox workspace tab count is unchanged and it is still active. Kill the extra floating tab afterwards."
       }
     },
     {

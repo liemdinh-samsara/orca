@@ -1,16 +1,16 @@
 import { useMemo } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { openLocalTerminalForRemoteWorkspace } from '@/lib/local-terminal-for-remote-workspace'
+import { workspaceRunsOnAnotherMachine } from '@/lib/remote-workspace-host'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { useAppStore } from '../../store'
 import { buildLocalTerminalMenuOption, type TabCreateMenuOption } from './tab-create-menu-options'
 import type { TabBarCreateMenuController } from './use-tab-bar-create-menu-controller'
 
 export type TabBarCreateMenu = TabBarCreateMenuController & {
-  /** Set only in workspaces whose terminals run on an SSH host. */
+  /** Set only in workspaces whose terminals run on another machine (SSH or a devbox server). */
   openLocalTerminal?: () => void
 }
 
@@ -24,16 +24,14 @@ function insertAfterTerminalOptions(
   return options.toSpliced(lastTerminalIndex + 1, 0, option)
 }
 
-/** Adds "New Local Terminal" to the "+" menu of an SSH workspace. */
+/** Adds "New Local Terminal" to the "+" menu of a workspace on another machine. */
 export function useTabBarLocalTerminalMenu(
   createMenu: TabBarCreateMenuController,
   { worktreeId, terminalOnly }: { worktreeId: string; terminalOnly: boolean }
 ): TabBarCreateMenu {
-  const isSshWorkspace = useAppStore((s) =>
-    Boolean(getConnectionIdFromState(s, worktreeId)?.trim())
-  )
+  const isRemoteWorkspace = useAppStore((s) => workspaceRunsOnAnotherMachine(s, worktreeId))
   // Why desktop only: a web client's floating terminal runs on the host it is paired with.
-  const available = isSshWorkspace && !isWebClientLocation()
+  const available = isRemoteWorkspace && !isWebClientLocation()
   const openLocalTerminal = useMemo(
     () =>
       available

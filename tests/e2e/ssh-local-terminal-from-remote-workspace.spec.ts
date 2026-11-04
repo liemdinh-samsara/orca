@@ -1,26 +1,26 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
-import { waitForSessionReady } from './helpers/store'
+import { quotePosixShell } from '../../src/shared/shell-argument-quoting'
 import {
-  cleanupDockerSshRelayTarget,
-  execDockerSshRelayTargetCommand,
-  shellQuote,
-  startDockerSshRelayTarget
-} from './helpers/docker-ssh-relay-target'
-import { connectDockerSshRelayTarget } from './helpers/docker-ssh-relay-connection'
+  launchManagedWorkspace,
+  skipUnlessManagedDockerHost,
+  withManagedHost
+} from './helpers/orcad-managed-workspace'
 
-const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'
+skipUnlessManagedDockerHost()
+
 // Why: mirrors FLOATING_TERMINAL_WORKTREE_ID; specs avoid importing renderer/shared modules.
 const FLOATING_WORKTREE_ID = 'global-floating-terminal'
 // Why one origin: both checkouts must land in one project for the local one to be found.
 const ORIGIN = 'https://github.com/orca-e2e/local-terminal-from-ssh.git'
-const SUFFIX = 'co/mono_projects'
 const START = 'projects/ray'
 
-function seedCheckout(root: string): void {
+function seedLocalCheckout(): string {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'orca-local-terminal-'))
   mkdirSync(path.join(root, START), { recursive: true })
   const git = (...args: string[]): void => {
     execFileSync('git', args, { cwd: root, stdio: 'ignore' })
@@ -30,9 +30,10 @@ function seedCheckout(root: string): void {
   git('add', '-A')
   git('-c', 'user.email=e2e@test.local', '-c', 'user.name=e2e', 'commit', '-qm', 'init')
   git('remote', 'add', 'origin', ORIGIN)
+  return root
 }
 
-async function readTabPtyId(page: Page, worktreeId: string, tabId: string): Promise<string | null> {
+function readTabPtyId(page: Page, worktreeId: string, tabId: string): Promise<string | null> {
   return page.evaluate(
     ({ worktreeId, tabId }) =>
       window.__store!.getState().tabsByWorktree[worktreeId]?.find((tab) => tab.id === tabId)
@@ -41,7 +42,7 @@ async function readTabPtyId(page: Page, worktreeId: string, tabId: string): Prom
   )
 }
 
-async function readTabText(page: Page, tabId: string): Promise<string> {
+function readTabText(page: Page, tabId: string): Promise<string> {
   return page.evaluate(
     (tabId) =>
       window.__paneManagers
@@ -53,72 +54,74 @@ async function readTabText(page: Page, tabId: string): Promise<string> {
   )
 }
 
-test.use({ seedTestRepo: false })
+function projectIdOf(page: Page, worktreeId: string): Promise<string | null> {
+  return page.evaluate((worktreeId) => {
+    for (const rows of Object.values(window.__store!.getState().worktreesByRepo)) {
+      const row = rows.find((worktree) => worktree.id === worktreeId)
+      if (row) {
+        return row.projectId ?? null
+      }
+    }
+    return null
+  }, worktreeId)
+}
 
-test.describe('Local terminal from an SSH workspace', () => {
-  test.skip(!RUN_DOCKER_SSH, 'Set ORCA_E2E_SSH_DOCKER=1 to run Docker-backed SSH tests.')
-  test.skip(process.platform === 'win32', 'Docker SSH tests use POSIX ssh tooling.')
-
-  test('opens a shell on this computer in the local checkout of the project', async ({
-    orcaPage,
-    electronApp
-  }, testInfo) => {
-    test.setTimeout(300_000)
-    const target = startDockerSshRelayTarget(testInfo)
-    const home = await electronApp.evaluate(({ app }) => app.getPath('home'))
-    const localRoot = path.join(home, SUFFIX)
-    try {
-      seedCheckout(localRoot)
-      execDockerSshRelayTargetCommand(
-        target,
-        [
-          `mkdir -p ~/${SUFFIX}/${START}`,
-          `cd ~/${SUFFIX}`,
-          'git init -q -b main',
-          `printf 'devbox\\n' > ${START}/README.md`,
-          'git add -A && git -c user.email=e2e@test.local -c user.name=e2e commit -qm init',
-          `git remote add origin ${shellQuote(ORIGIN)}`
-        ].join(' && ')
+test('opens a shell on this computer from a devbox workspace on its managed server', async (// oxlint-disable-next-line no-empty-pattern -- Owns app launch.
+{}, testInfo) => {
+  test.setTimeout(6 * 60_000)
+  const localRoot = seedLocalCheckout()
+  try {
+    await withManagedHost(testInfo, async (fixture) => {
+      fixture.host.exec!(
+        `cd ${quotePosixShell(fixture.host.remoteRepoPath)} && git remote add origin ${quotePosixShell(ORIGIN)}`
       )
-      await waitForSessionReady(orcaPage)
-      await orcaPage.evaluate(
-        async (repoPath) => {
-          const result = await window.api.repos.add({ path: repoPath })
-          if ('error' in result) {
-            throw new Error(result.error)
-          }
-          await window.__store?.getState().fetchRepos()
-        },
-        path.join(localRoot, START)
-      )
-      const remote = await connectDockerSshRelayTarget(orcaPage, target, {
-        remotePath: `/root/${SUFFIX}`
+      let localRepoId = ''
+      const workspace = await launchManagedWorkspace(fixture, {
+        beforeSeed: async (page) => {
+          localRepoId = await page.evaluate(
+            async (repoPath) => {
+              const result = await window.api.repos.add({ path: repoPath })
+              if ('error' in result) {
+                throw new Error(result.error)
+              }
+              return result.repo.id
+            },
+            path.join(localRoot, START)
+          )
+        }
       })
-      const sshTabCount = await orcaPage.evaluate(
+      const page = workspace.page
+      const remoteId = workspace.seeded.worktreeId
+      expect(localRepoId).not.toBe('')
+      await expect
+        .poll(() => projectIdOf(page, remoteId), {
+          timeout: 90_000,
+          message: 'the devbox checkout never joined a project'
+        })
+        .not.toBeNull()
+      const remoteTabCount = await page.evaluate(
         (worktreeId) => window.__store!.getState().tabsByWorktree[worktreeId]?.length ?? 0,
-        remote.worktreeId
+        remoteId
       )
 
-      await orcaPage.getByRole('button', { name: 'New tab' }).first().click()
-      await orcaPage.getByRole('menuitem', { name: 'New Local Terminal' }).click()
+      await page.getByRole('button', { name: 'New tab' }).first().click()
+      await page.getByRole('menuitem', { name: 'New Local Terminal' }).click()
 
       let floatingTabId: string | null = null
       await expect
         .poll(
           async () => {
-            floatingTabId = await orcaPage.evaluate(
+            floatingTabId = await page.evaluate(
               (id) => window.__store!.getState().tabsByWorktree[id]?.at(-1)?.id ?? null,
               FLOATING_WORKTREE_ID
             )
-            return floatingTabId
-              ? readTabPtyId(orcaPage, FLOATING_WORKTREE_ID, floatingTabId)
-              : null
+            return floatingTabId ? readTabPtyId(page, FLOATING_WORKTREE_ID, floatingTabId) : null
           },
           { timeout: 30_000, message: 'the local terminal never started' }
         )
         .not.toBeNull()
       const localStart = realpathSync(path.join(localRoot, START))
-      const tab = await orcaPage.evaluate(
+      const tab = await page.evaluate(
         ({ worktreeId, tabId }) =>
           window
             .__store!.getState()
@@ -126,32 +129,32 @@ test.describe('Local terminal from an SSH workspace', () => {
         { worktreeId: FLOATING_WORKTREE_ID, tabId: floatingTabId! }
       )
       expect(tab?.startupCwd).toBe(localStart)
-      await expect(
-        orcaPage.locator('[data-floating-terminal-panel][aria-hidden="false"]')
-      ).toHaveCount(1)
+      await expect(page.locator('[data-floating-terminal-panel][aria-hidden="false"]')).toHaveCount(
+        1
+      )
+      await page.screenshot({ path: testInfo.outputPath('local-terminal-from-devbox.png') })
 
-      const ptyId = (await readTabPtyId(orcaPage, FLOATING_WORKTREE_ID, floatingTabId!))!
-      await orcaPage.evaluate(
+      const ptyId = (await readTabPtyId(page, FLOATING_WORKTREE_ID, floatingTabId!))!
+      await page.evaluate(
         (ptyId) => window.api.pty.write(ptyId, 'echo "cwd=$(pwd -P)"\r', 'driving'),
         ptyId
       )
       await expect
-        .poll(() => readTabText(orcaPage, floatingTabId!), { timeout: 30_000 })
+        .poll(() => readTabText(page, floatingTabId!), { timeout: 30_000 })
         .toContain(`cwd=${localStart}`)
 
-      // The SSH workspace stays where it was: still active, no tab added to it.
+      // The devbox workspace stays where it was: still active, no tab added to it.
       expect(
-        await orcaPage.evaluate((worktreeId) => {
+        await page.evaluate((worktreeId) => {
           const state = window.__store!.getState()
           return {
             active: state.activeWorktreeId === worktreeId,
             tabs: state.tabsByWorktree[worktreeId]?.length ?? 0
           }
-        }, remote.worktreeId)
-      ).toEqual({ active: true, tabs: sshTabCount })
-    } finally {
-      cleanupDockerSshRelayTarget(target)
-      rmSync(localRoot, { recursive: true, force: true })
-    }
-  })
+        }, remoteId)
+      ).toEqual({ active: true, tabs: remoteTabCount })
+    })
+  } finally {
+    rmSync(localRoot, { recursive: true, force: true })
+  }
 })

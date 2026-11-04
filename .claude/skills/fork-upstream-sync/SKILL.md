@@ -86,7 +86,9 @@ pnpm exec vitest run --config config/vitest.config.ts --reporter=json --outputFi
   `config/fork/fork-features.json` and commit (`chore: track <feature> files after upstream move`).
 - The full upstream suite catches upstream tests the fork breaks (an upstream test still asserting behavior a fork
   feature changed). Re-run every failing file on the upstream tip in a scratch worktree
-  (`git worktree add --detach "$RUN_DIR/upstream" "$UPSTREAM_SHA"`, symlink `node_modules`). Failing there too
+  (`git worktree add --detach "$RUN_DIR/upstream" "$UPSTREAM_SHA"`, symlink `node_modules`, and run
+  `node <fork>/node_modules/vitest/vitest.mjs run --config config/vitest.config.ts <files>` there: `pnpm exec`
+  in that worktree reinstalls through the symlink and breaks the fork's `node_modules` links). Failing there too
   means pre-existing or this machine's environment (global gitignore, missing Playwright browsers, release tags):
   list them in the PR and move on. Passing there means the fork broke it: update the test to the fork's intended
   behavior (never weaken it) and register the file under the owning feature.
@@ -95,6 +97,7 @@ pnpm exec vitest run --config config/vitest.config.ts --reporter=json --outputFi
 ## 5. Prove the apps
 
 Follow `references/app-proof.md`:
+
 - Desktop AFTER with the same proof spec (`PROOF_LABEL=after`), then read every after/before pair yourself.
 - `node config/scripts/fork-upstream-sync.mjs summary --json > "$RUN_DIR/summary.json"` lists the fork features
   the merge touched. Exercise each `desktop`/`both` one with its registry `appProof.steps`.
